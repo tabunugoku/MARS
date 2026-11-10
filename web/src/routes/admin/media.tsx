@@ -1,0 +1,10 @@
+import { Page, PageHeader } from "@/components/media/layout";
+
+// TODO(haiku): implement per docs/screens/09-admin.md
+export default function Screen() {
+  return (
+    <Page>
+      <PageHeader title="media" meta="未実装" />
+    </Page>
+  );
+}

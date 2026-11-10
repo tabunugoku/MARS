@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "iconmcp": {
+      "type": "http",
+      "url": "https://iconmcp.com/mcp"
+    }
+  }
+}
