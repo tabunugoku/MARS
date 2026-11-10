@@ -31,6 +31,7 @@ import {
   Moon,
   LogOut,
   BookOpen,
+  CircleUser,
 } from "@keyline-icons/react";
 import { useTheme } from "./theme";
 import { LibraryGlyph } from "./library-glyph";
@@ -108,6 +109,16 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
+        {/* Settings split by who they belong to: 設定 is the signed-in
+            user's own (everyone), 管理 is the server's (admins only). */}
+        <SidebarGroup collapsible className="pl-4">
+          <SidebarGroupLabel>設定</SidebarGroupLabel>
+          <SidebarMenu>
+            <NavRow to="/settings/reader" icon={I(BookOpen)} label="リーダー" />
+            <NavRow to="/settings/account" icon={I(CircleUser)} label="アカウント" />
+          </SidebarMenu>
+        </SidebarGroup>
+
         {me?.role === "admin" && (
           <SidebarGroup collapsible className="pl-4">
             <SidebarGroupLabel>管理</SidebarGroupLabel>
@@ -138,9 +149,7 @@ export function AppSidebar() {
                 label={theme === "dark" ? "ライトテーマ" : "ダークテーマ"}
                 onSelect={() => toggle()}
               />
-              <MenuItem index={1} icon={I(BookOpen)} label="リーダー設定" onSelect={() => navigate("/settings/reader")} />
-              <MenuItem index={2} icon={I(Settings)} label="アカウント設定" onSelect={() => navigate("/account")} />
-              <MenuItem index={3} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
+              <MenuItem index={1} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
             </>
           }
         />

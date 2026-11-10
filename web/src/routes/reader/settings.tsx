@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Link } from "react-router";
-import { BG_LABEL, DIRECTION_LABEL, FIT_LABEL, SPREAD_LABEL, type ReaderPrefs, type SeriesReaderPrefs } from "@/api";
+import { BG_LABEL, DIRECTION_LABEL, FIT_LABEL, SPREAD_LABEL, type ReaderPrefs, type ReaderScope } from "@/api";
 import { spring } from "@/lib/springs";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
@@ -39,26 +39,36 @@ function Segmented<T extends string>({ label, value, options, onChange, disabled
   );
 }
 
-/** The reader's 表示設定 panel. A series either follows the global reader
- *  settings (the master, edited at /settings/reader) or keeps its own. While
- *  it follows, the controls show the values in effect but can't be changed;
- *  choosing この作品だけ starts from those same values. */
+const SCOPE_NOTE: Record<ReaderScope, string> = {
+  global: "全体設定の値を使っています。",
+  series: "このシリーズの全巻が下の設定で開きます。",
+  book: "この巻だけ下の設定で開きます。",
+};
+
+/** The reader's 表示設定 panel. Settings come from one of three scopes: the
+ *  global set (the master, edited at /settings/reader), one shared by every
+ *  volume of the series, or one for this volume only. Under 全体設定 the
+ *  controls show the values in effect but are locked; switching scope starts
+ *  the new scope from the values in effect. */
 export function ReaderSettings({
   open,
-  series,
+  scope,
   prefs,
+  onScope,
   onChange,
   onClose,
 }: {
   open: boolean;
-  series: SeriesReaderPrefs;
-  /** The values in effect (global resolved for this series, or its own). */
+  scope: ReaderScope;
+  /** The values in effect for this volume. */
   prefs: ReaderPrefs;
-  onChange: (p: SeriesReaderPrefs) => void;
+  onScope: (s: ReaderScope) => void;
+  /** Edit the values of the current (non-global) scope. */
+  onChange: (p: ReaderPrefs) => void;
   onClose: () => void;
 }) {
-  const custom = series.mode === "custom";
-  const set = <K extends keyof ReaderPrefs>(k: K) => (v: ReaderPrefs[K]) => onChange({ mode: "custom", prefs: { ...prefs, [k]: v } });
+  const custom = scope !== "global";
+  const set = <K extends keyof ReaderPrefs>(k: K) => (v: ReaderPrefs[K]) => onChange({ ...prefs, [k]: v });
   const paged = prefs.direction !== "webtoon";
   return (
     <AnimatePresence>
@@ -85,16 +95,17 @@ export function ReaderSettings({
 
           <div className="space-y-2">
             <Segmented
-              label="この作品の設定"
-              value={series.mode}
-              onChange={(m) => onChange(m === "custom" ? { mode: "custom", prefs } : { mode: "global" })}
+              label="使う設定"
+              value={scope}
+              onChange={onScope}
               options={[
-                ["global", "全体設定に従う"],
-                ["custom", "この作品だけ"],
+                ["global", "全体設定"],
+                ["series", "シリーズ共通"],
+                ["book", "この巻だけ"],
               ]}
             />
             <p className={cn(typeClass("caption"), "text-white/60")}>
-              {custom ? "この作品は下の設定で開きます。" : "全体設定の値を使っています。"}
+              {SCOPE_NOTE[scope]}
               <Link to="/settings/reader" className="ml-1 text-white/80 underline underline-offset-2 hover:text-white">
                 全体設定を開く
               </Link>

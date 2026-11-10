@@ -7,8 +7,10 @@ import {
   DIRECTION_LABEL,
   FIT_LABEL,
   SPREAD_LABEL,
+  customBookIds,
   customSeriesIds,
   getGlobalPrefs,
+  setBookPrefs,
   setGlobalPrefs,
   setSeriesPrefs,
   type GlobalReaderPrefs,
@@ -21,8 +23,8 @@ import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 
-// The master reader settings. Every series follows these unless it was given
-// its own in the reader's 表示設定 panel. Changes apply at once.
+// The master reader settings. Every volume follows these unless it or its
+// series was given its own in the reader's 表示設定 panel. Changes apply at once.
 
 const DIRECTION_OPTIONS: [GlobalReaderPrefs["direction"], string][] = [
   ["series", "作品の指定に従う"],
@@ -45,24 +47,34 @@ function Choice<T extends string>({ id, label, hint, value, options, onChange }:
 
 export default function Screen() {
   const [prefs, setPrefs] = useState<GlobalReaderPrefs>(getGlobalPrefs);
-  const [custom, setCustom] = useState<string[]>(customSeriesIds);
+  const [customSeries, setCustomSeries] = useState<string[]>(customSeriesIds);
+  const [customBooks, setCustomBooks] = useState<string[]>(customBookIds);
   const { data: series } = useApi(() => api.series(), []);
+  const { data: books } = useApi(() => api.booksByIds(customBooks), [customBooks.join()]);
   const titles = new Map(series?.map((s) => [s.id, s.title]));
+  const rows = [
+    ...customSeries.map((id) => ({ key: `s:${id}`, kind: "series" as const, id, to: `/series/${id}`, title: titles.get(id) ?? id, scope: "シリーズ共通" })),
+    ...customBooks.map((id) => {
+      const b = books?.find((x) => x.id === id);
+      return { key: `b:${id}`, kind: "book" as const, id, to: `/books/${id}`, title: b ? `${titles.get(b.seriesId) ?? ""} ${b.title}`.trim() : id, scope: "この巻だけ" };
+    }),
+  ];
 
   const patch = (p: Partial<GlobalReaderPrefs>) => {
     const next = { ...prefs, ...p };
     setPrefs(next);
     setGlobalPrefs(next);
   };
-  const reset = (ids: string[]) => {
-    ids.forEach((id) => setSeriesPrefs(id, { mode: "global" }));
-    setCustom(customSeriesIds());
-    toast.success(ids.length > 1 ? "すべての作品を全体設定に戻しました" : "全体設定に戻しました");
+  const reset = (targets: { kind: "series" | "book"; id: string }[]) => {
+    targets.forEach((t) => (t.kind === "series" ? setSeriesPrefs : setBookPrefs)(t.id, { mode: "global" }));
+    setCustomSeries(customSeriesIds());
+    setCustomBooks(customBookIds());
+    toast.success(targets.length > 1 ? "すべて全体設定に戻しました" : "全体設定に戻しました");
   };
 
   return (
     <Page>
-      <PageHeader title="リーダー設定" meta="すべての作品に使う表示設定です。作品ごとの設定は、リーダーの表示設定で選べます。" />
+      <PageHeader title="リーダー設定" meta="すべての作品に使う表示設定です。シリーズや巻ごとの設定は、リーダーの表示設定で選べます。" />
 
       <div className="max-w-[640px] space-y-10">
         <section>
@@ -83,19 +95,20 @@ export default function Screen() {
         </section>
 
         <section>
-          <SectionTitle action={custom.length > 1 ? <Button variant="secondary" size="compact" onClick={() => reset(custom)}>すべて戻す</Button> : undefined}>
-            独自の設定がある作品
+          <SectionTitle action={rows.length > 1 ? <Button variant="secondary" size="compact" onClick={() => reset(rows)}>すべて戻す</Button> : undefined}>
+            独自の設定があるシリーズと巻
           </SectionTitle>
-          {custom.length === 0 ? (
+          {rows.length === 0 ? (
             <p className={cn(typeClass("body"), "text-muted-foreground")}>ありません。すべての作品がこの設定で開きます。</p>
           ) : (
             <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-              {custom.map((id) => (
-                <li key={id} className="flex items-center justify-between gap-3 px-4 py-2">
-                  <Link to={`/series/${id}`} className={cn(typeClass("body"), "min-w-0 truncate text-foreground hover:underline")}>
-                    {titles.get(id) ?? id}
+              {rows.map((r) => (
+                <li key={r.key} className="flex items-center gap-3 px-4 py-2">
+                  <Link to={r.to} className={cn(typeClass("body"), "min-w-0 flex-1 truncate text-foreground hover:underline")}>
+                    {r.title}
                   </Link>
-                  <Button variant="secondary" size="compact" onClick={() => reset([id])}>
+                  <span className={cn(typeClass("caption"), "shrink-0 text-muted-foreground")}>{r.scope}</span>
+                  <Button variant="secondary" size="compact" onClick={() => reset([r])}>
                     全体設定に戻す
                   </Button>
                 </li>

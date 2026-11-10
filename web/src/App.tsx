@@ -25,6 +25,7 @@ const AdminTasks = lazy(() => import("@/routes/admin/tasks"));
 const AdminMedia = lazy(() => import("@/routes/admin/media"));
 const AdminSettings = lazy(() => import("@/routes/admin/settings"));
 const ReaderSettingsView = lazy(() => import("@/routes/settings/reader"));
+const AccountSettings = lazy(() => import("@/routes/settings/account"));
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login />, errorElement: <RouteError /> },
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
       { path: "admin/media", element: <AdminMedia /> },
       { path: "admin/settings", element: <AdminSettings /> },
       { path: "settings/reader", element: <ReaderSettingsView /> },
+      { path: "settings/account", element: <AccountSettings /> },
       { path: "*", element: <Dashboard /> },
     ],
   },

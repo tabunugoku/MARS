@@ -9,7 +9,7 @@ import {
   Minimize,
   EyeOff,
 } from "@keyline-icons/react";
-import { api, useApi, effectivePrefs, getGlobalPrefs, getSeriesPrefs, setSeriesPrefs, type Book, type ReaderPrefs, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
+import { api, useApi, effectivePrefs, getBookPrefs, getGlobalPrefs, getSeriesPrefs, scopeOf, setBookPrefs, setSeriesPrefs, type Book, type ReaderPrefs, type ReaderScope, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
 import { pageArt, coverArt } from "@/lib/art";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
@@ -100,15 +100,29 @@ function ReaderBody({
   incognito: boolean;
   onExit: () => void;
 }) {
-  // The global reader settings are the master; this series follows them or
-  // keeps its own (chosen in the 表示設定 panel).
-  const [seriesPrefs, setSeriesPrefsState] = useState<SeriesReaderPrefs>(() => getSeriesPrefs(book.seriesId));
+  // The global reader settings are the master; the series and this volume
+  // can each keep their own (volume > series > global), chosen in 表示設定.
   const [globalPrefs] = useState(getGlobalPrefs);
-  const prefs = useMemo(() => effectivePrefs(seriesPrefs, globalPrefs, defaultDirection), [seriesPrefs, globalPrefs, defaultDirection]);
-  const changePrefs = (p: SeriesReaderPrefs) => {
-    setSeriesPrefsState(p);
+  const [seriesPrefs, setSeriesState] = useState<SeriesReaderPrefs>(() => getSeriesPrefs(book.seriesId));
+  const [bookPrefs, setBookState] = useState<SeriesReaderPrefs>(() => getBookPrefs(book.id));
+  const scope = scopeOf(seriesPrefs, bookPrefs);
+  const prefs = useMemo(() => effectivePrefs(seriesPrefs, bookPrefs, globalPrefs, defaultDirection), [seriesPrefs, bookPrefs, globalPrefs, defaultDirection]);
+  const saveSeries = (p: SeriesReaderPrefs) => {
+    setSeriesState(p);
     setSeriesPrefs(book.seriesId, p);
   };
+  const saveBook = (p: SeriesReaderPrefs) => {
+    setBookState(p);
+    setBookPrefs(book.id, p);
+  };
+  const changeScope = (s: ReaderScope) => {
+    if (s === scope) return;
+    if (s === "book") return saveBook({ mode: "custom", prefs });
+    saveBook({ mode: "global" });
+    // 全体設定 also clears the series' shared set; シリーズ共通 starts from what is on screen.
+    saveSeries(s === "series" ? { mode: "custom", prefs } : { mode: "global" });
+  };
+  const changePrefs = (p: ReaderPrefs) => (scope === "book" ? saveBook : saveSeries)({ mode: "custom", prefs: p });
   const [chrome, setChrome] = useState(true);
   const [panel, setPanel] = useState<"none" | "settings" | "pages">("none");
   const [fullscreen, setFullscreen] = useState(false);
@@ -343,7 +357,7 @@ function ReaderBody({
           onClose={() => setPanel("none")}
         />
       )}
-      <ReaderSettings open={panel === "settings"} series={seriesPrefs} prefs={prefs} onChange={changePrefs} onClose={() => setPanel("none")} />
+      <ReaderSettings open={panel === "settings"} scope={scope} prefs={prefs} onScope={changeScope} onChange={changePrefs} onClose={() => setPanel("none")} />
     </div>
   );
 }

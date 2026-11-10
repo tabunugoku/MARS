@@ -1,8 +1,10 @@
-// Reader display preferences. The global set is the master; each series
-// either follows it or keeps its own. Synchronous on purpose: the reader needs
-// them before its first frame. Today they live in localStorage; with the Go
-// server they become per-user settings (GET/PUT /api/me/reader-prefs and
-// /api/me/series/:id/reader-prefs) cached here.
+// Reader display preferences. The global set is the master. A series can keep
+// its own set (shared by all its volumes), and a single volume can keep its
+// own on top of that: volume > series > global. Synchronous on purpose: the
+// reader needs them before its first frame. Today they live in localStorage;
+// with the Go server they become per-user settings (GET/PUT
+// /api/me/reader-prefs, /api/me/series/:id/reader-prefs and
+// /api/me/books/:id/reader-prefs) cached here.
 import type { ReadingDirection } from "./types";
 
 export interface ReaderPrefs {
@@ -20,9 +22,13 @@ export interface GlobalReaderPrefs extends Omit<ReaderPrefs, "direction"> {
 
 export type SeriesReaderPrefs = { mode: "global" } | { mode: "custom"; prefs: ReaderPrefs };
 
+/** Where a volume's settings come from. */
+export type ReaderScope = "global" | "series" | "book";
+
 const GLOBAL_KEY = "cn-reader-global";
 const SERIES_KEY = (id: string) => `cn-reader-series-${id}`;
 const SERIES_PREFIX = "cn-reader-series-";
+const BOOK_PREFIX = "cn-reader-book-";
 
 export const DEFAULT_GLOBAL: GlobalReaderPrefs = { direction: "series", spread: "off", fit: "screen", bg: "black" };
 
@@ -51,14 +57,30 @@ export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs) {
   else localStorage.setItem(SERIES_KEY(seriesId), JSON.stringify(p));
 }
 
-/** Series ids that keep their own settings. */
-export function customSeriesIds(): string[] {
+export function getBookPrefs(bookId: string): SeriesReaderPrefs {
+  const v = read<SeriesReaderPrefs>(BOOK_PREFIX + bookId);
+  return v?.mode === "custom" && v.prefs ? v : { mode: "global" };
+}
+export function setBookPrefs(bookId: string, p: SeriesReaderPrefs) {
+  if (p.mode === "global") localStorage.removeItem(BOOK_PREFIX + bookId);
+  else localStorage.setItem(BOOK_PREFIX + bookId, JSON.stringify(p));
+}
+
+function idsWith(prefix: string) {
   const ids: string[] = [];
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i);
-    if (k?.startsWith(SERIES_PREFIX) && getSeriesPrefs(k.slice(SERIES_PREFIX.length)).mode === "custom") ids.push(k.slice(SERIES_PREFIX.length));
+    if (k?.startsWith(prefix) && read<SeriesReaderPrefs>(k)?.mode === "custom") ids.push(k.slice(prefix.length));
   }
   return ids;
+}
+/** Series ids that keep their own settings. */
+export const customSeriesIds = () => idsWith(SERIES_PREFIX);
+/** Volume (book) ids that keep their own settings. */
+export const customBookIds = () => idsWith(BOOK_PREFIX);
+
+export function scopeOf(series: SeriesReaderPrefs, book: SeriesReaderPrefs): ReaderScope {
+  return book.mode === "custom" ? "book" : series.mode === "custom" ? "series" : "global";
 }
 
 /** The global set applied to one series. */
@@ -66,9 +88,11 @@ export function resolveGlobal(g: GlobalReaderPrefs, seriesDirection: ReadingDire
   return { ...g, direction: g.direction === "series" ? seriesDirection : g.direction };
 }
 
-/** What the reader actually uses for a series. */
-export function effectivePrefs(sp: SeriesReaderPrefs, g: GlobalReaderPrefs, seriesDirection: ReadingDirection): ReaderPrefs {
-  return sp.mode === "custom" ? sp.prefs : resolveGlobal(g, seriesDirection);
+/** What the reader actually uses for a volume: its own, else its series', else global. */
+export function effectivePrefs(series: SeriesReaderPrefs, book: SeriesReaderPrefs, g: GlobalReaderPrefs, seriesDirection: ReadingDirection): ReaderPrefs {
+  if (book.mode === "custom") return book.prefs;
+  if (series.mode === "custom") return series.prefs;
+  return resolveGlobal(g, seriesDirection);
 }
 
 export const DIRECTION_LABEL: Record<ReadingDirection, string> = { rtl: "右→左", ltr: "左→右", vertical: "縦", webtoon: "縦スクロール" };
