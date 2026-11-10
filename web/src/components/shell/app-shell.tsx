@@ -38,7 +38,7 @@ function Topbar() {
   return (
     <SidebarInsetTopbar className="relative pr-2">
       <div className="flex-1" />
-      <Tooltip content={theme === "dark" ? "ライトテーマ" : "ダークテーマ"} side="bottom">
+      <Tooltip content={theme === "dark" ? "ダークテーマ（クリックでライト）" : "ライトテーマ（クリックでダーク）"} side="bottom">
         <Button variant="ghost" size="icon" aria-label="テーマを切り替え" onClick={(e) => toggle(e.currentTarget)}>
           <ThemeGlyph dark={theme === "dark"} />
         </Button>
@@ -47,17 +47,18 @@ function Topbar() {
   );
 }
 
-// Sun and moon share one cell: the one leaving turns away and shrinks while
-// the other turns in, so the swap reads as the dial turning, not a blink.
+// The glyph shows the theme in use (moon = dark, sun = light), not the one a
+// click switches to. Sun and moon share one cell: the one leaving turns away
+// and shrinks while the other turns in, so the swap reads as a dial turning.
 const glyphSpring = { type: "spring", mass: 0.8, stiffness: 320, damping: 20 } as const;
 function ThemeGlyph({ dark }: { dark: boolean }) {
   const shown = { rotate: 0, scale: 1, opacity: 1 };
   return (
     <span className="relative grid size-4 place-items-center [&>*]:col-start-1 [&>*]:row-start-1">
-      <motion.span initial={false} animate={dark ? shown : { rotate: 90, scale: 0.4, opacity: 0 }} transition={glyphSpring}>
+      <motion.span initial={false} animate={dark ? { rotate: 90, scale: 0.4, opacity: 0 } : shown} transition={glyphSpring}>
         <Sun size={16} />
       </motion.span>
-      <motion.span initial={false} animate={dark ? { rotate: -90, scale: 0.4, opacity: 0 } : shown} transition={glyphSpring}>
+      <motion.span initial={false} animate={dark ? shown : { rotate: -90, scale: 0.4, opacity: 0 }} transition={glyphSpring}>
         <Moon size={16} />
       </motion.span>
     </span>

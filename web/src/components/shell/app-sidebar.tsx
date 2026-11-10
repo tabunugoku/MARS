@@ -145,8 +145,8 @@ export function AppSidebar() {
             <>
               <MenuItem
                 index={0}
-                icon={I(theme === "dark" ? Sun : Moon)}
-                label={theme === "dark" ? "ライトテーマ" : "ダークテーマ"}
+                icon={I(theme === "dark" ? Moon : Sun)}
+                label={theme === "dark" ? "テーマ: ダーク" : "テーマ: ライト"}
                 onSelect={() => toggle()}
               />
               <MenuItem index={1} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
