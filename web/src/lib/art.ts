@@ -84,7 +84,7 @@ export function pageArt(seed: number, page: number, opts: { webtoon?: boolean; c
     }
     y += rowH + g;
   }
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">
 <defs><pattern id="dots" width="12" height="12" patternUnits="userSpaceOnUse" patternTransform="rotate(30)"><rect width="12" height="12" fill="${paper}"/><circle cx="6" cy="6" r="2.4" fill="${ink}" opacity=".5"/></pattern></defs>
 <rect width="${W}" height="${H}" fill="${paper}"/>${panels}
 <text x="${W / 2}" y="${H - 22}" font-size="22" font-family="Inter,sans-serif" fill="#8a877f" text-anchor="middle">${page}</text>

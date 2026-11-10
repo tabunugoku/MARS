@@ -1,7 +1,7 @@
+@import "@fontsource-variable/inter/opsz.css";
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -979,4 +979,16 @@
     syntax: "<number>";
     inherits: false;
     initial-value: 1;
+}
+
+
+/* ComiNavi: utilities for the tokens in styles/tokens.css */
+@theme inline {
+  --font-sans: "Inter Variable", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+    "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif;
+  --font-heading: var(--font-sans);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-soft: var(--brand-soft);
+  --color-reader: var(--reader-bg);
 }

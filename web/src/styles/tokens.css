@@ -2,17 +2,9 @@
  * Only overrides colours and the font stack; spacing, radii, type roles and
  * springs stay on the Fluid system. See .claude/skills/cominavi-design. */
 
-@import "@fontsource-variable/inter/opsz.css";
 
-@theme inline {
-  --font-sans: "Inter Variable", "Hiragino Sans", "Hiragino Kaku Gothic ProN",
-    "Yu Gothic UI", "Meiryo", "Noto Sans JP", system-ui, sans-serif;
-  --font-heading: var(--font-sans);
-  --color-brand: var(--brand);
-  --color-brand-foreground: var(--brand-foreground);
-  --color-brand-soft: var(--brand-soft);
-  --color-reader: var(--reader-bg);
-}
+
+/* Tailwind @theme mappings for these tokens live in index.css (bottom). */
 
 /* Light: paper. Warm off-white so covers don't sit on clinical white. */
 :root {
