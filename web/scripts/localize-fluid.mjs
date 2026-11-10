@@ -1,5 +1,6 @@
 // Fluid components ship a few hard-coded English strings (screen-reader
-// names, one tooltip) with no prop to override them. Rather than hand-edit
+// names, one tooltip) with no prop to override them, plus one layout rule
+// ComiNavi overrides (button icon padding). Rather than hand-edit
 // components/ui/, this script swaps them for Japanese. It is idempotent: run
 // it again after any `shadcn add --overwrite` (npm run localize:fluid).
 // When the app gets a real i18n layer, these become lookups instead.
@@ -21,6 +22,14 @@ const table = {
   "sidebar-menu.tsx": [['<span className="sr-only">, unread</span>', '<span className="sr-only">、未読あり</span>']],
   "mobile-drawer.tsx": [['aria-label="Navigation"', 'aria-label="ナビゲーション"']],
   "input.tsx": [['direction === 1 ? "Increase" : "Decrease"', 'direction === 1 ? "増やす" : "減らす"']],
+  // Not a string: ComiNavi centres every button's content exactly, so an
+  // icon gets the same side padding as text (Fluid pulls it 4px closer).
+  "button.tsx": [
+    ['{ size: "compact", iconLeft: true, className: "pl-2" }', '{ size: "compact", iconLeft: true, className: "" }'],
+    ['{ size: "default", iconLeft: true, className: "pl-3" }', '{ size: "default", iconLeft: true, className: "" }'],
+    ['{ size: "compact", iconRight: true, className: "pr-2" }', '{ size: "compact", iconRight: true, className: "" }'],
+    ['{ size: "default", iconRight: true, className: "pr-3" }', '{ size: "default", iconRight: true, className: "" }'],
+  ],
 };
 
 let changed = 0;

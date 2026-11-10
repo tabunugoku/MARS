@@ -41,12 +41,12 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
             onClick={() => onChange(v)}
             className={cn(
               typeClass("caption"),
-              "h-9 pointer-coarse:h-11 whitespace-nowrap rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
+              "inline-flex h-9 pointer-coarse:h-11 items-center justify-center whitespace-nowrap rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
               value === v ? "bg-white text-neutral-900" : "text-white/80 hover:bg-white/10",
             )}
             style={{ fontVariationSettings: value === v ? fontWeights.semibold : fontWeights.normal }}
           >
-            {text}
+            <span className="[text-box:trim-both_cap_alphabetic]">{text}</span>
           </button>
         ))}
       </div>
@@ -75,8 +75,8 @@ export function ReaderSettings({ open, prefs, onChange, onClose }: { open: boole
             <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
               表示設定
             </p>
-            <button type="button" onClick={onClose} className={cn(typeClass("caption"), "rounded px-2 py-1 text-white/70 hover:text-white")}>
-              閉じる
+            <button type="button" onClick={onClose} className={cn(typeClass("caption"), "inline-flex h-7 items-center rounded px-2 text-white/70 hover:text-white")}>
+              <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
             </button>
           </div>
           <Segmented

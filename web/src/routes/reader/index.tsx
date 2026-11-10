@@ -432,8 +432,8 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
     <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/8 bg-reader pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white" role="dialog" aria-label="ページ一覧">
       <div className="mb-2 flex items-center justify-between px-4">
         <p className={typeClass("subtitle")}>ページ一覧</p>
-        <button type="button" onClick={onClose} className={cn(typeClass("caption"), "rounded px-2 py-1 text-white/70 hover:text-white")}>
-          閉じる
+        <button type="button" onClick={onClose} className={cn(typeClass("caption"), "inline-flex h-7 items-center rounded px-2 text-white/70 hover:text-white")}>
+          <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
         </button>
       </div>
       <div ref={ref} dir={rtl ? "rtl" : "ltr"} className="shelf-scroll flex gap-2 overflow-x-auto px-4 pb-1">

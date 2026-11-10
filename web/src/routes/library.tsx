@@ -229,10 +229,10 @@ export default function Screen() {
               aria-label={`${c.label}を外す`}
               className={cn(
                 typeClass("body"),
-                "inline-flex h-9 items-center gap-1 rounded-full bg-muted pl-3 pr-2 text-foreground outline-none focus-visible:ring-2 ring-[var(--focus-ring)]",
+                "inline-flex h-9 items-center gap-1 rounded-full bg-muted px-3 text-foreground outline-none focus-visible:ring-2 ring-[var(--focus-ring)]",
               )}
             >
-              {c.label}
+              <span className="[text-box:trim-both_cap_alphabetic]">{c.label}</span>
               <X size={14} />
             </button>
           ))}

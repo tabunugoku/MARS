@@ -98,7 +98,7 @@ export default function Screen() {
             )}
             style={{ fontVariationSettings: fontWeights.semibold }}
           >
-            ログイン
+            <span className="[text-box:trim-both_cap_alphabetic]">ログイン</span>
           </button>
         </form>
 

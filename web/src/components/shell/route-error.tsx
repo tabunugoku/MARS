@@ -16,11 +16,11 @@ export function RouteError() {
         {chunk ? "再読み込みすると最新の画面になります。" : "時間をおいてもう一度お試しください。"}
       </p>
       <div className="mt-2 flex gap-3">
-        <button type="button" onClick={() => location.reload()} className={cn(typeClass("body"), "h-9 rounded-lg bg-foreground px-4 text-background")}>
-          再読み込み
+        <button type="button" onClick={() => location.reload()} className={cn(typeClass("body"), "inline-flex h-9 items-center rounded-lg bg-foreground px-4 text-background")}>
+          <span className="[text-box:trim-both_cap_alphabetic]">再読み込み</span>
         </button>
         <Link to="/" className={cn(typeClass("body"), "flex h-9 items-center rounded-lg px-4 text-muted-foreground hover:text-foreground")}>
-          ホームへ
+          <span className="[text-box:trim-both_cap_alphabetic]">ホームへ</span>
         </Link>
       </div>
     </div>

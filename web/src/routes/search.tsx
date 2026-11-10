@@ -191,7 +191,7 @@ export default function Screen() {
                     "inline-flex h-7 items-center rounded-full border border-border px-3 text-foreground hover:bg-hover outline-none focus-visible:ring-2 ring-[var(--focus-ring)]",
                   )}
                 >
-                  {g}
+                  <span className="[text-box:trim-both_cap_alphabetic]">{g}</span>
                 </Link>
               ))}
             </div>

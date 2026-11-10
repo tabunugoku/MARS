@@ -55,10 +55,10 @@ const buttonVariants = cva(
     // An icon sits 4px closer to its edge than text does: 12px default and
     // 8px compact, against the 16px / 12px base padding.
     compoundVariants: [
-      { size: "compact", iconLeft: true, className: "pl-2" },
-      { size: "default", iconLeft: true, className: "pl-3" },
-      { size: "compact", iconRight: true, className: "pr-2" },
-      { size: "default", iconRight: true, className: "pr-3" },
+      { size: "compact", iconLeft: true, className: "" },
+      { size: "default", iconLeft: true, className: "" },
+      { size: "compact", iconRight: true, className: "" },
+      { size: "default", iconRight: true, className: "" },
     ],
     defaultVariants: {
       variant: "primary",
