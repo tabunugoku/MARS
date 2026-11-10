@@ -1,13 +1,13 @@
-/* Glow experiment (branch exp/glow). Everything here sits under html.cn-glow,
-   so removing the class gives back the flat design exactly. The idea stays on
-   the night chart: light comes only from what the chart would light — the
+/* Glow: the only light in an otherwise flat design (adopted after the
+   exp/glow trial; the flat version is tag design/flat-v1). It stays on the
+   night chart: light comes only from what the chart would light — the
    cyan "you are here" dot like a beacon, the violet route already travelled,
    the one call to action, the compass needle catching starlight. Surfaces,
    text and chrome stay flat. Dots and small marks use filter: drop-shadow so
    their rings (box-shadow) survive; the CTA uses box-shadow because its hover
    already animates filter. */
 
-html.cn-glow {
+:root {
   --glow-brand: color-mix(in oklab, var(--brand) 70%, transparent);
   --glow-brand-soft: color-mix(in oklab, var(--brand) 35%, transparent);
   --glow-here: color-mix(in oklab, var(--here) 85%, transparent);
@@ -15,7 +15,7 @@ html.cn-glow {
   --glow-star: color-mix(in oklab, var(--foreground) 55%, transparent);
 }
 /* Chart paper: light reads as ink bleeding, so it is smaller and fainter. */
-html.cn-glow:not(.dark) {
+:root:not(.dark) {
   --glow-brand: color-mix(in oklab, var(--brand) 40%, transparent);
   --glow-brand-soft: color-mix(in oklab, var(--brand) 18%, transparent);
   --glow-here: color-mix(in oklab, var(--here) 55%, transparent);
@@ -24,29 +24,29 @@ html.cn-glow:not(.dark) {
 }
 
 /* "You are here": nav dot, DotTrack position, reader rail thumb. */
-.cn-glow .bg-here {
+.bg-here {
   filter: drop-shadow(0 0 4px var(--glow-here)) drop-shadow(0 0 12px var(--glow-here-soft));
 }
 
 /* The route travelled: DotTrack dots, cover progress bars, reader rail. */
-.cn-glow .bg-brand:not(a):not(button) {
+.bg-brand:not(a):not(button) {
   filter: drop-shadow(0 0 4px var(--glow-brand));
 }
-.cn-glow [data-reader] .text-brand {
+[data-reader] .text-brand {
   filter: drop-shadow(0 0 3px var(--glow-brand));
 }
 
 /* The one call to action. Kept off while focused so the focus ring shows. */
-.cn-glow a.bg-brand:not(:focus-visible),
-.cn-glow button.bg-brand:not(:focus-visible) {
+a.bg-brand:not(:focus-visible),
+button.bg-brand:not(:focus-visible) {
   box-shadow:
     0 0 0 1px color-mix(in oklab, var(--brand) 60%, white 0%),
     0 0 22px -2px var(--glow-brand),
     0 10px 32px -6px var(--glow-brand);
   transition-property: filter, transform, box-shadow;
 }
-.cn-glow a.bg-brand:not(:focus-visible):hover,
-.cn-glow button.bg-brand:not(:focus-visible):hover {
+a.bg-brand:not(:focus-visible):hover,
+button.bg-brand:not(:focus-visible):hover {
   box-shadow:
     0 0 0 1px var(--brand),
     0 0 28px 2px var(--glow-brand),
@@ -54,23 +54,23 @@ html.cn-glow:not(.dark) {
 }
 
 /* The logo tile, lit from within. */
-.cn-glow [data-app-mark] {
+[data-app-mark] {
   filter: drop-shadow(0 0 10px var(--glow-brand));
 }
 
 /* The backdrop compass needle catches a little starlight (dark only). */
-.cn-glow [data-compass] g {
+[data-compass] g {
   filter: drop-shadow(0 0 10px var(--glow-star));
 }
 
 /* A lifted cover throws violet light on the chart below it. */
 @media (hover: hover) {
-  .cn-glow .group:hover [data-cover-lift] {
+  .group:hover [data-cover-lift] {
     filter: drop-shadow(0 12px 22px var(--glow-brand-soft));
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cn-glow a.bg-brand,
-  .cn-glow button.bg-brand { transition-property: filter; }
+  a.bg-brand,
+  button.bg-brand { transition-property: filter; }
 }

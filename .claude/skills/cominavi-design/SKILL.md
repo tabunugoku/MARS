@@ -9,8 +9,15 @@ ComiNavi (Comic Navigator) is a self-hosted comic server. The direction is
 **a night chart and a compass, printed in screentone dots**: covers are the
 content, the chrome is flat and dark, and the richness comes from dots and
 motion that answer what the reader does. Dark ("night chart") is the default;
-light ("chart paper") must look equally finished. Everything is flat: no
-gradients, glows, blur, glass or coloured shadows.
+light ("chart paper") must look equally finished. Surfaces, text and chrome
+are flat: no gradients, blur, glass or coloured shadows. The one exception is
+**light from the chart itself**, all of it in `web/src/styles/glow.css`: the
+cyan "you are here" marks glow like a beacon, the violet route already read
+(`DotTrack`, progress bars, the reader rail) gives off a little light, the
+brand CTA and the logo are lit, and a lifted cover throws violet light below
+it. Those come for free from `bg-here`, `bg-brand`, `BrandAction` and the
+cards, so never add a glow by hand, and never light anything else (cards,
+panels, headings, icons, secondary buttons).
 
 ## Before you write code
 
