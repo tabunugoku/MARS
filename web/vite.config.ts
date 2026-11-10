@@ -5,6 +5,12 @@ import { defineConfig } from 'vite'
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  resolve: { alias: { '@': path.resolve(import.meta.dirname, './src') } },
+  resolve: {
+    alias: {
+      '@': path.resolve(import.meta.dirname, './src'),
+      // Fluid's icon-context imports Lucide defaults we never show; see the stub.
+      'lucide-react': path.resolve(import.meta.dirname, './src/lib/lucide-stub.ts'),
+    },
+  },
   server: { port: 5173, strictPort: true },
 })
