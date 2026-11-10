@@ -31,7 +31,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
   return (
     <fieldset className="space-y-2">
       <legend className={cn(typeClass("caption"), "text-white/60")}>{label}</legend>
-      <div className="grid gap-1 rounded-lg bg-white/8 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0,1fr))` }} role="radiogroup">
+      <div className="grid gap-1 rounded-lg bg-white/8 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(max-content,1fr))` }} role="radiogroup">
         {options.map(([v, text]) => (
           <button
             key={v}
@@ -41,7 +41,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
             onClick={() => onChange(v)}
             className={cn(
               typeClass("caption"),
-              "h-9 pointer-coarse:h-11 rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
+              "h-9 pointer-coarse:h-11 whitespace-nowrap rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
               value === v ? "bg-white text-neutral-900" : "text-white/80 hover:bg-white/10",
             )}
             style={{ fontVariationSettings: value === v ? fontWeights.semibold : fontWeights.normal }}
@@ -98,7 +98,7 @@ export function ReaderSettings({ open, prefs, onChange, onClose }: { open: boole
               options={[
                 ["off", "単ページ"],
                 ["on", "見開き"],
-                ["cover", "表紙だけ単"],
+                ["cover", "表紙だけ単ページ"],
               ]}
             />
           )}
