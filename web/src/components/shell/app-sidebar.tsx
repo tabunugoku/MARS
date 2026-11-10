@@ -43,11 +43,14 @@ function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconCompo
   const active = exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   return (
     <SidebarMenuItem className="relative">
+      {/* The route: one faint dot per row in the gutter, and the cyan
+          "you are here" dot that glides along it to the current row. */}
+      <span aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1 rounded-full bg-foreground/20" />
       {active && (
         <motion.span
           layoutId="cn-nav-here"
           aria-hidden
-          className="absolute -left-2.5 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here"
+          className="absolute -left-3 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here ring-[3px] ring-here/20"
           transition={{ type: "spring", mass: 0.6, stiffness: 380, damping: 26 }}
         />
       )}
@@ -67,7 +70,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar variant="inset">
-      <SidebarHeader>
+      <SidebarHeader className="pl-4">
         <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label="ComiNavi ホーム">
           <AppMark size={28} className="-ml-1" />
           <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
@@ -86,7 +89,7 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        <SidebarGroup>
+        <SidebarGroup className="pl-4">
           <SidebarMenu>
             <NavRow to="/" exact icon={I(House)} label="ホーム" />
             <NavRow to="/collections" icon={I(Grid2x2)} label="コレクション" />
@@ -94,7 +97,7 @@ export function AppSidebar() {
           </SidebarMenu>
         </SidebarGroup>
 
-        <SidebarGroup collapsible>
+        <SidebarGroup collapsible className="pl-4">
           <SidebarGroupLabel>ライブラリ</SidebarGroupLabel>
           <SidebarMenu>
             <NavRow to="/libraries/all" icon={I(LibraryBig)} label="すべて" />
@@ -105,7 +108,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {me?.role === "admin" && (
-          <SidebarGroup collapsible>
+          <SidebarGroup collapsible className="pl-4">
             <SidebarGroupLabel>管理</SidebarGroupLabel>
             <SidebarMenu>
               <NavRow to="/admin/libraries" icon={I(LibraryBig)} label="ライブラリ設定" />
@@ -118,7 +121,7 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter>
+      <SidebarFooter className="pl-4">
         <SidebarUserFooter
           name={me?.name ?? "…"}
           avatar={
