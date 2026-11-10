@@ -3,7 +3,7 @@
 
 | 参考サイト | 採るもの |
 |---|---|
-| kinetics.colorion.co | ダークの配色の考え方（ほぼ黒 `#0E0E10` の地、低彩度のグレーの文字、アクセント1色）、バネとグライドのイージング、Bookmark Toggle、Filmstrip Scrubber、Page Peel（ページめくり）、Tab Pill Glide |
+| kinetics.colorion.co | ほぼ黒の地、等幅の注釈（`// 前回の続き`）、カウントアップする数字、押すと縮むボタン、慣性で追いつく針（羅針盤の背景）、バネとグライドのイージング、Bookmark Toggle、Filmstrip Scrubber、Page Peel（ページめくり）、Tab Pill Glide |
 | library.aimran.es | 章ごとの読書進捗、スワイプで閉じるライトボックス、シマーのスケルトン、ブックマーク保存ボタン、スナップするカルーセル。`prefers-reduced-motion` への対応 |
 | ding.yusufcengiz.dev | トースト（`@yusufceng1z/ding-react`）。重ねずに1つを形を変えて更新する方式を、スキャン完了や既読にした通知に使う |
 | inspora.design | 全体の構成の参考（ダーク・ライトの切り替え、フィルターのドロップダウン、フォルダ型のカード） |

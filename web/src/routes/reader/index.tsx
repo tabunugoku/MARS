@@ -276,7 +276,7 @@ function ReaderBody({
         initial={false}
         animate={{ y: chrome ? 0 : "-100%", opacity: chrome ? 1 : 0 }}
         transition={{ type: "spring", duration: 0.24, bounce: 0 }}
-        className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-2 pb-6 pt-[max(env(safe-area-inset-top),8px)] text-white"
+        className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 border-b border-white/8 bg-reader/90 px-2 pb-2 pt-[max(env(safe-area-inset-top),8px)] text-white"
         style={{ pointerEvents: chrome ? "auto" : "none" }}
         inert={!chrome}
       >
@@ -311,25 +311,15 @@ function ReaderBody({
           initial={false}
           animate={{ y: chrome ? 0 : "100%", opacity: chrome ? 1 : 0 }}
           transition={{ type: "spring", duration: 0.24, bounce: 0 }}
-          className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 to-black/0 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-8 text-white"
+          className="absolute inset-x-0 bottom-0 z-20 border-t border-white/8 bg-reader/90 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white"
           style={{ pointerEvents: chrome ? "auto" : "none" }}
           inert={!chrome}
         >
           <div className="mx-auto flex max-w-3xl items-center gap-3">
-            <span className={cn(typeClass("caption"), "w-16 tabular-nums text-white/80")}>
-              {currentPage} / {book.pageCount}
+            <span className={cn(typeClass("caption"), "w-20 font-mono tabular-nums text-white/80")}>
+              P.{currentPage} / {book.pageCount}
             </span>
-            {/* Slider runs in reading direction: RTL books fill from the right. */}
-            <input
-              type="range"
-              min={1}
-              max={book.pageCount}
-              value={currentPage}
-              onChange={(e) => goToPage(Number(e.target.value))}
-              aria-label="ページ"
-              dir={forward === -1 ? "rtl" : "ltr"}
-              className="h-1 flex-1 cursor-pointer accent-[var(--brand)]"
-            />
+            <DotRail value={currentPage} max={book.pageCount} rtl={forward === -1} onChange={goToPage} />
             <span className={cn(typeClass("caption"), "w-16 text-right text-white/60")}>
               {prefs.direction === "rtl" ? "右から左" : prefs.direction === "ltr" ? "左から右" : "縦"}
             </span>
@@ -439,7 +429,7 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
     ref.current?.querySelector<HTMLElement>(`[data-page="${current}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [current]);
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 bg-black/85 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white backdrop-blur" role="dialog" aria-label="ページ一覧">
+    <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/8 bg-reader pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white" role="dialog" aria-label="ページ一覧">
       <div className="mb-2 flex items-center justify-between px-4">
         <p className={typeClass("subtitle")}>ページ一覧</p>
         <button type="button" onClick={onClose} className={cn(typeClass("caption"), "rounded px-2 py-1 text-white/70 hover:text-white")}>
@@ -514,6 +504,40 @@ function WebtoonView({
           <EndCard book={book} next={next} seriesId={book.seriesId} />
         </div>
       </div>
+    </div>
+  );
+}
+
+/** The page slider drawn as a route of dots: violet up to the current page,
+ *  a cyan dot where you are, faint dots ahead. Runs in reading direction (RTL
+ *  books fill from the right). The real control is a native range input laid
+ *  over it at opacity 0, so keyboard, touch and screen readers keep working. */
+function DotRail({ value, max, rtl, onChange }: { value: number; max: number; rtl: boolean; onChange: (page: number) => void }) {
+  const p = max > 1 ? (value - 1) / (max - 1) : 0;
+  const side = rtl ? "right" : "left";
+  const dots = "[background-image:radial-gradient(currentColor_1.5px,transparent_2px)] [background-size:9px_9px] [background-position:0_50%]";
+  return (
+    <div className="relative h-11 flex-1">
+      <div className={cn("absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 text-white/20", dots)} />
+      <div
+        className={cn("absolute inset-x-0 top-1/2 h-3 -translate-y-1/2 text-brand", dots)}
+        style={{ clipPath: rtl ? `inset(0 0 0 ${(1 - p) * 100}%)` : `inset(0 ${(1 - p) * 100}% 0 0)` }}
+      />
+      <span
+        aria-hidden
+        className="absolute top-1/2 size-3.5 -translate-y-1/2 rounded-full bg-here ring-4 ring-here/25"
+        style={{ [side]: `calc(${p * 100}% - 7px)` }}
+      />
+      <input
+        type="range"
+        min={1}
+        max={max}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        aria-label="ページ"
+        dir={rtl ? "rtl" : "ltr"}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
     </div>
   );
 }

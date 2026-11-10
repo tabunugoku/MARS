@@ -68,7 +68,7 @@ export function ReaderSettings({ open, prefs, onChange, onClose }: { open: boole
           animate={{ x: 0 }}
           exit={{ x: "100%", transition: spring.slow.exit }}
           transition={spring.slow}
-          className="absolute inset-y-0 right-0 z-30 flex w-full max-w-xs flex-col gap-5 overflow-y-auto bg-neutral-900/95 p-5 pt-[max(env(safe-area-inset-top),20px)] text-white shadow-2xl backdrop-blur"
+          className="absolute inset-y-0 right-0 z-30 flex w-full max-w-xs flex-col gap-5 overflow-y-auto border-l border-white/8 bg-reader p-5 pt-[max(env(safe-area-inset-top),20px)] text-white"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between">

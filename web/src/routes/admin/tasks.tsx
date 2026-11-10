@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { api, useApi, type Task, type TaskKind } from "@/api";
 import { EmptyState, Page, PageHeader, SectionTitle } from "@/components/media/layout";
+import { CountUp } from "@/components/media/count-up";
+import { DotTrack } from "@/components/media/dot-track";
 import { Block } from "@/components/media/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -97,17 +99,16 @@ export default function Screen() {
                       {t.libraryId ? libNames.get(t.libraryId) : "全ライブラリ"}
                     </p>
                     <div className="flex items-center gap-3">
-                      <div
-                        role="progressbar"
-                        aria-label={t.label}
-                        aria-valuemin={0}
-                        aria-valuemax={100}
-                        aria-valuenow={pct}
-                        className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
-                      >
-                        {running && <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />}
-                      </div>
-                      <span className={cn(typeClass("caption"), "w-9 text-right text-muted-foreground tabular-nums")}>{pct}%</span>
+                      <DotTrack
+                        total={24}
+                        value={running ? Math.round((pct / 100) * 24) : 0}
+                        label={t.label}
+                        size="sm"
+                        className="flex-1"
+                      />
+                      <span className={cn(typeClass("caption"), "w-9 text-right font-mono text-muted-foreground tabular-nums")}>
+                        <CountUp value={pct} />%
+                      </span>
                     </div>
                   </div>
                   <Button variant="ghost" onClick={() => abort(t.id)}>

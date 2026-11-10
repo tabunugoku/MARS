@@ -1,4 +1,5 @@
 import { useRef } from "react";
+import { DotTrack } from "@/components/media/dot-track";
 import { Link, useParams } from "react-router";
 import { Play } from "@keyline-icons/react";
 import { api, useApi, type Book } from "@/api";
@@ -113,10 +114,8 @@ function BookRow({
             <span className={cn(typeClass("caption"), "text-muted-foreground")}>既読</span>
           ) : p ? (
             <div className="space-y-1">
-              <div role="progressbar" aria-label="読書の進捗" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct} className="h-1 w-full overflow-hidden rounded-full bg-muted">
-                <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
-              </div>
-              <p className={cn(typeClass("caption"), "text-muted-foreground tabular-nums")}>
+              <DotTrack total={10} value={Math.round(pct / 10)} label="読書の進捗" size="sm" className="justify-end" />
+              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                 {p.page}/{book.pageCount}ページ
               </p>
             </div>

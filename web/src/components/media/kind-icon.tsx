@@ -1,21 +1,21 @@
-// Colour object icons (kubai-icons, exported as static SVG in 朱). They are
-// pictures of things — the app mark and each library kind — so they appear
-// where an object should read as an object: the logo, library headers, the
-// admin library list. Navigation rows keep Keyline line icons.
+// Library-kind tile: the kind's Keyline glyph in violet on a flat violet-tint
+// tile printed with screentone. Used where a library is introduced (the
+// library header, the admin library list); navigation rows use the bare glyph.
 import type { Library } from "@/api";
-import cominavi from "@/assets/icons/cominavi.svg";
-import manga from "@/assets/icons/manga.svg";
-import webtoon from "@/assets/icons/webtoon.svg";
-import comics from "@/assets/icons/comics.svg";
+import { LibraryGlyph } from "@/components/shell/library-glyph";
 import { cn } from "@/lib/utils";
 
-// Books (EPUB) has no object icon yet; it shares the tankobon until one is drawn.
-const byKind: Record<Library["kind"], string> = { manga, webtoon, comics, books: manga };
-
-export function AppMark({ size = 24, className }: { size?: number; className?: string }) {
-  return <img src={cominavi} width={size} height={size} alt="" aria-hidden className={cn("shrink-0 select-none", className)} draggable={false} />;
-}
+export { AppMark } from "@/components/brand/app-mark";
 
 export function KindIcon({ kind, size = 32, className }: { kind: Library["kind"]; size?: number; className?: string }) {
-  return <img src={byKind[kind]} width={size} height={size} alt="" aria-hidden className={cn("shrink-0 select-none", className)} draggable={false} />;
+  const Glyph = LibraryGlyph(kind);
+  return (
+    <span
+      aria-hidden
+      className={cn("tone-strong relative grid shrink-0 place-items-center rounded-[10px] bg-brand-soft text-brand", className)}
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.28) }}
+    >
+      <Glyph size={Math.round(size * 0.5)} strokeWidth={1.75} />
+    </span>
+  );
 }

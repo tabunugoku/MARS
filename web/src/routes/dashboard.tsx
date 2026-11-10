@@ -1,9 +1,11 @@
 import { Link } from "react-router";
 import { Play } from "@keyline-icons/react";
-import { api, formatDate, useApi, type Book, type Series } from "@/api";
+import { api, useApi, type Book, type Series } from "@/api";
 import { BookCard, SeriesCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
+import { CountUp } from "@/components/media/count-up";
+import { DotTrack } from "@/components/media/dot-track";
 import { EmptyState, Page, Shelf, ShelfItem } from "@/components/media/layout";
 import { Block, CoverSkeleton } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
@@ -12,6 +14,12 @@ import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 
 type Row = { title: string; books?: Book[]; series?: Series[] };
+
+// Chart-coordinate style date for the context line: 2026.11.09
+const ymd = (iso: string) => {
+  const d = new Date(iso);
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
+};
 
 export default function Screen() {
   const { data } = useApi(
@@ -42,12 +50,16 @@ export default function Screen() {
     return (
       <Page>
         <h1 className="sr-only">ホーム</h1>
-        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5" aria-hidden>
+        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone" aria-hidden>
           <Block className="aspect-[2/3] w-[96px] shrink-0 rounded-[6px] sm:w-[120px]" />
           <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
             <Block className="h-5 w-2/3" />
             <Block className="h-4 w-1/2" />
-            <Block className="mt-auto h-1 w-full rounded-full" />
+            <div className="mt-auto flex flex-wrap gap-1.5 pt-3" aria-hidden>
+              {Array.from({ length: 20 }, (_, i) => (
+                <Block key={i} className="size-2 rounded-full" />
+              ))}
+            </div>
           </div>
         </section>
         {[0, 1].map((r) => (
@@ -99,14 +111,14 @@ export default function Screen() {
       <h1 className="sr-only">ホーム</h1>
 
       {hero && (
-        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5">
+        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone">
           <div className="w-[96px] shrink-0 sm:w-[120px]">
             <Cover seed={hero.coverSeed} title={heroSeriesTitle} label={String(hero.number)} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {hero.progress && (
-              <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                前回の続き · {formatDate(hero.progress.readAt)}
+              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
+                {`// 前回の続き · ${ymd(hero.progress.readAt)}`}
               </p>
             )}
             <h2 className={cn(typeClass("title"), "line-clamp-2")} style={{ fontVariationSettings: fontWeights.semibold }}>
@@ -114,18 +126,9 @@ export default function Screen() {
             </h2>
             <p className={cn(typeClass("body"), "line-clamp-2 text-muted-foreground")}>{hero.title}</p>
             <div className="mt-auto space-y-1.5 pt-3">
-              <div
-                role="progressbar"
-                aria-label="読書の進捗"
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={heroPct}
-                className="h-1 w-full overflow-hidden rounded-full bg-muted"
-              >
-                <div className="h-full rounded-full bg-brand" style={{ width: `${heroPct}%` }} />
-              </div>
-              <p className={cn(typeClass("caption"), "text-muted-foreground tabular-nums")}>
-                残り {hero.pageCount - heroPage} ページ
+              <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label="読書の進捗" />
+              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
+                P.<CountUp value={heroPage} /> / {hero.pageCount} · 残り {hero.pageCount - heroPage} ページ
               </p>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">

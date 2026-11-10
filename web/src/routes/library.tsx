@@ -5,6 +5,7 @@ import { toast } from "@yusufceng1z/ding-react";
 import { ArrowUpDown, CircleCheck, MoreHorizontal, Radar, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
 import { api, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
+import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { KindIcon } from "@/components/media/kind-icon";
 import { GridSkeleton } from "@/components/media/skeletons";
@@ -98,9 +99,11 @@ export default function Screen() {
       )
     : library && { series: library.seriesCount, books: library.bookCount, size: library.sizeBytes };
   const title = isAll ? "すべてのライブラリ" : (library?.name ?? "ライブラリ");
-  const meta = totals
-    ? `シリーズ ${totals.series} · 本 ${totals.books} · ${formatBytes(totals.size)}`
-    : undefined;
+  const meta = totals ? (
+    <span className="font-mono">
+      シリーズ <CountUp value={totals.series} /> · 本 <CountUp value={totals.books} /> · {formatBytes(totals.size)}
+    </span>
+  ) : undefined;
 
   const scanItems = [
     { label: "スキャン", icon: Scan, run: () => toast.success("スキャンを開始しました") },
@@ -120,7 +123,7 @@ export default function Screen() {
 
   const header = (
     <PageHeader
-      icon={library ? <KindIcon kind={library.kind} size={56} /> : undefined}
+      icon={library ? <KindIcon kind={library.kind} size={52} /> : undefined}
       title={title}
       meta={meta}
       actions={
@@ -157,8 +160,8 @@ export default function Screen() {
     <Page>
       {header}
 
-      <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-background/90 py-2 backdrop-blur">
-        <p className={cn(typeClass("caption"), "text-muted-foreground tabular-nums")}>{series.length} シリーズ</p>
+      <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
+        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{series.length} シリーズ</p>
         <div className="flex items-center gap-2">
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
             <SelectTrigger aria-label="並び順" />

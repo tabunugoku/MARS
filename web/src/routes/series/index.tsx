@@ -6,6 +6,8 @@ import { toast } from "@yusufceng1z/ding-react";
 import { api, formatDate, statusLabel, useApi } from "@/api";
 import { BookCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
+import { CountUp } from "@/components/media/count-up";
+import { DotTrack } from "@/components/media/dot-track";
 import { BrandAction } from "@/components/media/brand-action";
 import { CoverGrid, EmptyState, Page } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
@@ -48,7 +50,7 @@ function SeriesPage({ id }: { id: string }) {
             <Block className="h-4 w-24" />
             <Block className="h-8 w-2/3" />
             <Block className="h-4 w-1/2" />
-            <Block className="h-1 w-full rounded-full" />
+            <Block className="h-2 w-2/3 rounded-full" />
             <Block className="mt-2 h-9 w-40" />
           </div>
         </div>
@@ -66,7 +68,6 @@ function SeriesPage({ id }: { id: string }) {
 
   const { series, library, books } = data;
   const total = series.totalBookCount ?? series.bookCount;
-  const pct = total ? Math.min(100, Math.round((series.booksRead / total) * 100)) : 0;
 
   // Primary action: resume the book in progress, else the first unread one;
   // when everything is read, start over from book 1.
@@ -87,8 +88,8 @@ function SeriesPage({ id }: { id: string }) {
     <Badge key="status" variant="dot">
       {statusLabel[series.status]}
     </Badge>,
-    series.language || null,
-    series.ageRating ? `${series.ageRating}+` : null,
+    series.language ? <span className="font-mono">{series.language}</span> : null,
+    series.ageRating ? <span className="font-mono">{`${series.ageRating}+`}</span> : null,
   ];
 
   return (
@@ -126,19 +127,10 @@ function SeriesPage({ id }: { id: string }) {
           </div>
 
           <div className="mt-1 space-y-1.5">
-            <p className={cn(typeClass("caption"), "text-muted-foreground tabular-nums")}>
-              {series.booksRead} / {total} 巻 既読
+            <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
+              <CountUp value={series.booksRead} /> / {total} 巻 既読
             </p>
-            <div
-              role="progressbar"
-              aria-label="既読の進捗"
-              aria-valuemin={0}
-              aria-valuemax={100}
-              aria-valuenow={pct}
-              className="h-1 w-full overflow-hidden rounded-full bg-muted"
-            >
-              <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
-            </div>
+            <DotTrack total={series.bookCount} value={series.booksRead} label="既読の巻数" />
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">

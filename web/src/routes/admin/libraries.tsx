@@ -131,7 +131,7 @@ export default function Screen() {
                   <TableRow key={l.id} index={i}>
                     <TableCell>
                       <div className="flex items-center gap-2 whitespace-nowrap">
-                        <KindIcon kind={l.kind} size={24} />
+                        <KindIcon kind={l.kind} size={28} />
                         <span className="text-foreground" style={{ fontVariationSettings: fontWeights.semibold }}>
                           {l.name}
                         </span>

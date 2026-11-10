@@ -10,6 +10,7 @@ import { House, LibraryBig, Search, Grid2x2, Sun, Moon } from "@keyline-icons/re
 import { AppSidebar } from "./app-sidebar";
 import { useTheme } from "./theme";
 import { PageSkeleton } from "@/components/media/skeletons";
+import { CompassBackdrop } from "@/components/brand/compass-backdrop";
 
 /** Desktop: inset sidebar + content card. Mobile (<768px): bottom tabs, and
  *  the sidebar becomes a drawer opened from the "ライブラリ" tab. */
@@ -18,8 +19,9 @@ export function AppShell() {
     <SidebarProvider peek="hover">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
+        <CompassBackdrop />
         <Topbar />
-        <div className="min-h-0 flex-1 overflow-y-auto pb-20 md:pb-0" id="cn-scroll">
+        <div className="relative min-h-0 flex-1 overflow-y-auto pb-20 md:pb-0" id="cn-scroll">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
           </Suspense>
@@ -33,7 +35,7 @@ export function AppShell() {
 function Topbar() {
   const { theme, toggle } = useTheme();
   return (
-    <SidebarInsetTopbar className="pr-2">
+    <SidebarInsetTopbar className="relative pr-2">
       <div className="flex-1" />
       <Tooltip content={theme === "dark" ? "ライトテーマ" : "ダークテーマ"} side="bottom">
         <Button variant="ghost" size="icon" aria-label="テーマを切り替え" onClick={toggle}>
@@ -73,7 +75,7 @@ function BottomTabs() {
   return (
     <nav
       aria-label="メインナビゲーション"
-      className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       <Tab to="/" label="ホーム" icon={<House size={18} />} active={pathname === "/"} />
       <Tab label="ライブラリ" icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} onClick={() => setOpenMobile(true)} />

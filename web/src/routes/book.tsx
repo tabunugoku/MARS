@@ -5,6 +5,7 @@ import { toast } from "@yusufceng1z/ding-react";
 import { api, formatBytes, formatDate, useApi, type Author, type MediaStatus } from "@/api";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
+import { DotTrack } from "@/components/media/dot-track";
 import { EmptyState, Page, SectionTitle } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
 import { Badge } from "@/components/ui/badge";
@@ -62,7 +63,7 @@ function BookPage({ id }: { id: string }) {
             <Block className="h-4 w-24" />
             <Block className="h-8 w-2/3" />
             <Block className="h-4 w-1/2" />
-            <Block className="h-1 w-full rounded-full" />
+            <div className="flex flex-wrap gap-1.5">{Array.from({ length: 24 }, (_, i) => <Block key={i} className="size-2 rounded-full" />)}</div>
             <Block className="mt-2 h-9 w-40" />
           </div>
         </div>
@@ -82,6 +83,7 @@ function BookPage({ id }: { id: string }) {
   const completed = readOverride ?? !!book.progress?.completed;
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
+  const dots = Math.min(book.pageCount, 60);
   const shownPages = allPages ? book.pageCount : Math.min(PREVIEW_PAGES, book.pageCount);
   const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
 
@@ -138,7 +140,7 @@ function BookPage({ id }: { id: string }) {
           <h1 className={cn(typeClass("display"), "break-words")} style={{ fontVariationSettings: fontWeights.bold }}>
             {book.title}
           </h1>
-          <p className={cn(typeClass("body"), "text-muted-foreground")}>
+          <p className={cn(typeClass("body"), "font-mono text-muted-foreground")}>
             第{book.number}巻 · {book.pageCount}ページ · {book.format.toUpperCase()} · {formatBytes(book.sizeBytes)}
           </p>
 
@@ -147,19 +149,10 @@ function BookPage({ id }: { id: string }) {
               <Badge variant="dot">既読</Badge>
             ) : book.progress ? (
               <>
-                <p className={cn(typeClass("caption"), "text-muted-foreground tabular-nums")}>
+                <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                   {page} / {book.pageCount} ページ
                 </p>
-                <div
-                  role="progressbar"
-                  aria-label="読書の進捗"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={pct}
-                  className="h-1 w-full overflow-hidden rounded-full bg-muted"
-                >
-                  <div className="h-full rounded-full bg-brand" style={{ width: `${pct}%` }} />
-                </div>
+                <DotTrack total={dots} value={Math.round((pct / 100) * dots)} label="読書の進捗" />
               </>
             ) : null}
           </div>

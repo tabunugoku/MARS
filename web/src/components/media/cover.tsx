@@ -37,7 +37,7 @@ export const Cover = memo(function Cover({ seed, title, label, progress, unread,
         </span>
       )}
       {read && (
-        <span className="absolute bottom-2 right-1.5 rounded-full bg-black/60 px-1.5 text-[11px] leading-5 text-white backdrop-blur-sm">
+        <span className="absolute bottom-2 right-1.5 rounded-full bg-black/70 px-1.5 text-[11px] leading-5 text-white">
           既読
         </span>
       )}

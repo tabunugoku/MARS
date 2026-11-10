@@ -33,7 +33,8 @@ import {
 } from "@keyline-icons/react";
 import { useTheme } from "./theme";
 import { LibraryGlyph } from "./library-glyph";
-import { AppMark } from "@/components/media/kind-icon";
+import { AppMark } from "@/components/brand/app-mark";
+import { motion } from "motion/react";
 
 const I = (c: unknown) => c as IconComponent;
 
@@ -41,7 +42,15 @@ function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconCompo
   const { pathname } = useLocation();
   const active = exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem className="relative">
+      {active && (
+        <motion.span
+          layoutId="cn-nav-here"
+          aria-hidden
+          className="absolute -left-2.5 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here"
+          transition={{ type: "spring", mass: 0.6, stiffness: 380, damping: 26 }}
+        />
+      )}
       <SidebarMenuButton asChild icon={icon} isActive={active}>
         <Link to={to}>{label}</Link>
       </SidebarMenuButton>

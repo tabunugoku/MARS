@@ -1,57 +1,109 @@
 /* ComiNavi design tokens — loaded after index.css (shadcn + Fluid).
- * Only overrides colours and the font stack; spacing, radii, type roles and
- * springs stay on the Fluid system. See .claude/skills/cominavi-design. */
-
-
+ * Direction: a night chart and a compass, printed in screentone dots.
+ * Flat everywhere: no gradients, glows or coloured shadows. Neutrals carry a
+ * hair of violet; the one accent is violet; cyan marks only "you are here"
+ * (reading position, the selected nav row, the compass needle tip).
+ * See .claude/skills/cominavi-design for the rules. */
 
 /* Tailwind @theme mappings for these tokens live in index.css (bottom). */
 
-/* Light: paper. Warm off-white so covers don't sit on clinical white. */
+/* Light: chart paper. */
 :root {
-  --brand: oklch(0.6 0.19 33);            /* 朱 shu — the one accent */
+  --brand: oklch(0.53 0.25 293);          /* violet — actions, selection, progress */
   --brand-foreground: oklch(0.99 0 0);
-  --brand-soft: oklch(0.6 0.19 33 / 12%);
-  --fluid-accent: oklch(0.6 0.19 33);
-  --background: oklch(0.985 0.003 80);
-  --sidebar: oklch(0.965 0.004 80);
-  --card: oklch(0.972 0.004 80);         /* a step below the near-white inset panel */
-  --reader-bg: oklch(0.2 0 0);
-  --cover-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px -4px rgb(0 0 0 / 0.12);
+  --brand-soft: oklch(0.53 0.25 293 / 10%);
+  --here: oklch(0.6 0.15 237);            /* cyan — "you are here" only */
+  --fluid-accent: oklch(0.53 0.25 293);
+  --dot: oklch(0.3 0.04 290 / 11%);       /* screentone on surfaces */
+  --dot-strong: oklch(0.3 0.04 290 / 22%);
+  --background: oklch(0.975 0.005 290);
+  --foreground: oklch(0.2 0.02 290);
+  --sidebar: oklch(0.96 0.007 290);
+  --card: oklch(0.955 0.008 290);
+  --popover: oklch(0.99 0.003 290);
+  --muted: oklch(0.93 0.01 290);
+  --secondary: oklch(0.93 0.01 290);
+  --accent: oklch(0.93 0.01 290);
+  --muted-foreground: oklch(0.5 0.025 290);
+  --selected: oklch(0.86 0.02 290);
+  --surface-1: oklch(0.98 0.004 290);
+  --surface-2: oklch(0.99 0.003 290);
+  --surface-3: oklch(1 0 0);
+  --reader-bg: oklch(0.2 0.01 290);
+  --cover-shadow: 0 1px 2px rgb(20 10 40 / 0.08), 0 4px 12px -4px rgb(20 10 40 / 0.14);
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
 }
 
-/* Dark (default): ink. Near-black with a hair of warmth, low-chroma greys. */
+/* Dark (default): night chart. #0C0B12 ground, #13111C panel, #1B1826 card. */
 .dark {
-  --brand: oklch(0.7 0.17 38);
-  --brand-foreground: oklch(0.16 0.01 40);
-  --brand-soft: oklch(0.7 0.17 38 / 16%);
-  --fluid-accent: oklch(0.7 0.17 38);
-  --background: oklch(0.165 0.003 60);
-  --sidebar: oklch(0.145 0.003 60);
-  --card: oklch(0.235 0.003 60);         /* one step above the inset panel (surface-2) */
-  --popover: oklch(0.22 0.003 60);
-  --muted-foreground: oklch(0.68 0.006 70);
+  --brand: oklch(0.6 0.24 295);           /* ≈ #8B47FF */
+  --brand-foreground: oklch(0.99 0 0);
+  --brand-soft: oklch(0.6 0.24 295 / 16%);
+  --here: oklch(0.76 0.14 235);           /* ≈ #47BFFF */
+  --fluid-accent: oklch(0.68 0.2 295);
+  --dot: oklch(1 0 0 / 7%);
+  --dot-strong: oklch(1 0 0 / 14%);
+  --background: oklch(0.14 0.012 290);
+  --foreground: oklch(0.95 0.008 290);
+  --sidebar: oklch(0.14 0.012 290);
+  --card: oklch(0.215 0.02 290);
+  --card-foreground: oklch(0.95 0.008 290);
+  --popover: oklch(0.23 0.02 290);
+  --popover-foreground: oklch(0.95 0.008 290);
+  --muted: oklch(0.26 0.018 290);
+  --secondary: oklch(0.26 0.018 290);
+  --accent: oklch(0.26 0.018 290);
+  --muted-foreground: oklch(0.7 0.022 290);
   --border: oklch(1 0 0 / 8%);
+  --input: oklch(1 0 0 / 12%);
   --sidebar-border: oklch(1 0 0 / 7%);
-  --surface-1: oklch(0.185 0.003 60);
-  --surface-2: oklch(0.205 0.003 60);
-  --surface-3: oklch(0.225 0.003 60);
-  --reader-bg: oklch(0.1 0 0);
-  --cover-shadow: 0 0 0 1px rgb(255 255 255 / 0.04), 0 6px 16px -6px rgb(0 0 0 / 0.6);
+  --selected: oklch(0.32 0.02 290);
+  --surface-1: oklch(0.165 0.014 290);
+  --surface-2: oklch(0.18 0.016 290);
+  --surface-3: oklch(0.2 0.017 290);
+  --surface-4: oklch(0.22 0.018 290);
+  --surface-5: oklch(0.24 0.018 290);
+  --surface-6: oklch(0.26 0.018 290);
+  --surface-7: oklch(0.28 0.018 290);
+  --surface-8: oklch(0.3 0.018 290);
+  --reader-bg: oklch(0.09 0.008 290);
+  --cover-shadow: 0 0 0 1px rgb(255 255 255 / 0.05), 0 6px 16px -6px rgb(0 0 0 / 0.6);
 }
 
 html, body, #root { height: 100%; }
 body { -webkit-font-smoothing: antialiased; }
+
+/* Screentone: a dot grid painted with a radial fill (flat dots, not a gradient
+   wash). .tone is the quiet ground texture; .tone-strong is for small areas. */
+.tone { background-image: radial-gradient(var(--dot) 1px, transparent 1.4px); background-size: 12px 12px; }
+.tone-strong { background-image: radial-gradient(var(--dot-strong) 1.1px, transparent 1.5px); background-size: 8px 8px; }
 
 /* Horizontal shelves: hide the scrollbar, keep the scroll. */
 .shelf-scroll { scrollbar-width: none; scroll-snap-type: x proximity; }
 .shelf-scroll::-webkit-scrollbar { display: none; }
 .shelf-scroll > * { scroll-snap-align: start; }
 
-/* Skeleton shimmer (Aimran library reference) — static under reduced motion. */
-@keyframes cn-shimmer { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+/* Loading: a screentone field whose dots brighten in a travelling band,
+   instead of a shimmer sweep. The band is an alpha mask over a second dot
+   layer, so every pixel is still a flat dot. Static under reduced motion. */
+@keyframes cn-tone-wave { from { mask-position: -100% 0; } to { mask-position: 200% 0; } }
 .cn-shimmer {
-  background: linear-gradient(90deg, var(--muted) 0%, color-mix(in oklab, var(--muted), var(--foreground) 6%) 50%, var(--muted) 100%);
-  background-size: 200% 100%;
-  animation: cn-shimmer 1.4s linear infinite;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--muted);
+  background-image: radial-gradient(var(--dot) 1px, transparent 1.4px);
+  background-size: 8px 8px;
 }
-@media (prefers-reduced-motion: reduce) { .cn-shimmer { animation: none; } }
+.cn-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(var(--brand) 1.2px, transparent 1.6px);
+  background-size: 8px 8px;
+  opacity: 0.55;
+  mask-image: linear-gradient(90deg, transparent, #000 50%, transparent);
+  mask-size: 50% 100%;
+  mask-repeat: no-repeat;
+  animation: cn-tone-wave 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .cn-shimmer::after { animation: none; opacity: 0; } }

@@ -81,7 +81,7 @@ export function Shelf({ title, to, children }: { title: ReactNode; to?: string; 
       >
         {title}
       </SectionTitle>
-      <div ref={ref} className="shelf-scroll -mx-4 flex scroll-px-4 gap-4 overflow-x-auto px-4 md:-mx-8 md:scroll-px-8 md:px-8">
+      <div ref={ref} className="shelf-scroll -mx-4 -my-3 flex scroll-px-4 gap-4 overflow-x-auto px-4 py-3 md:-mx-8 md:scroll-px-8 md:px-8">
         {children}
       </div>
     </section>

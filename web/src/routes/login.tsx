@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { AppMark } from "@/components/media/kind-icon";
+import { AppMark } from "@/components/brand/app-mark";
 import { Cover } from "@/components/media/cover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -28,11 +28,16 @@ export default function Screen() {
 
   return (
     <div className="relative flex min-h-dvh overflow-hidden bg-background">
-      <div aria-hidden className="hidden md:block md:w-[55%] md:overflow-hidden">
-        <div className="grid grid-cols-6 gap-3 p-6 opacity-40">
+      <div aria-hidden className="relative hidden md:block md:w-[55%] md:overflow-hidden">
+        <div className="grid grid-cols-6 gap-3 p-6">
           {WALL.map((i) => (
             <Cover key={i} seed={i} title={String(i)} />
           ))}
+        </div>
+        <div className="absolute inset-0 bg-background/70 tone" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+          <AppMark size={96} />
+          <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>// Comic Navigator</p>
         </div>
       </div>
 
@@ -87,7 +92,7 @@ export default function Screen() {
             type="submit"
             className={cn(
               "inline-flex h-9 pointer-coarse:h-11 w-full items-center justify-center rounded-lg bg-brand px-4 text-brand-foreground",
-              "transition-[filter,box-shadow] duration-80 hover:brightness-110 active:shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)] active:brightness-95",
+              "transition-[filter,transform] duration-200 ease-[cubic-bezier(0.34,1.45,0.64,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
               "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               typeClass("body"),
             )}
