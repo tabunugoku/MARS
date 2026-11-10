@@ -143,7 +143,7 @@ function SeriesPage({ id }: { id: string }) {
               既読にする
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="ghost">その他</Button>} />
+              <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="メタデータを編集" onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
                 <MenuItem index={1} label="ZIP でダウンロード" />

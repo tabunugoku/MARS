@@ -34,7 +34,7 @@ export function BrandAction({
       style={{ fontVariationSettings: fontWeights.semibold }}
     >
       {Icon && <Icon size={16} />}
-      {children}
+      <span className="[text-box:trim-both_cap_alphabetic]">{children}</span>
     </Link>
   );
 }

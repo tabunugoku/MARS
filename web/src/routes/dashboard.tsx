@@ -135,7 +135,7 @@ export default function Screen() {
               <BrandAction to={`/read/${hero.id}`} icon={Play}>
                 続きから読む
               </BrandAction>
-              <Button variant="ghost" asChild>
+              <Button variant="secondary" asChild>
                 <Link to={`/books/${hero.id}`}>巻の詳細</Link>
               </Button>
             </div>

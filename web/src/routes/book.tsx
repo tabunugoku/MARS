@@ -165,7 +165,7 @@ function BookPage({ id }: { id: string }) {
               <Link to={`/read/${book.id}?page=1`}>最初から読む</Link>
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="ghost">その他</Button>} />
+              <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="シークレットモードで読む" onSelect={() => navigate(`/read/${book.id}?incognito=1`)} />
                 <MenuItem index={1} label={completed ? "未読にする" : "既読にする"} onSelect={toggleRead} />

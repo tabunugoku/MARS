@@ -22,6 +22,10 @@
   --card: oklch(0.955 0.008 290);
   --popover: oklch(0.99 0.003 290);
   --muted: oklch(0.93 0.01 290);
+  /* Secondary button fill (Fluid reads --tint). Opaque, so screentone and
+     the backdrop never show through a button; one step off the card. */
+  --tint: oklch(0.895 0.014 290);
+  --tint-hover: oklch(0.915 0.012 290);
   --secondary: oklch(0.93 0.01 290);
   --accent: oklch(0.93 0.01 290);
   --muted-foreground: oklch(0.5 0.025 290);
@@ -51,6 +55,8 @@
   --popover: oklch(0.23 0.02 290);
   --popover-foreground: oklch(0.95 0.008 290);
   --muted: oklch(0.26 0.018 290);
+  --tint: oklch(0.305 0.022 290);
+  --tint-hover: oklch(0.275 0.02 290);
   --secondary: oklch(0.26 0.018 290);
   --accent: oklch(0.26 0.018 290);
   --muted-foreground: oklch(0.7 0.022 290);
