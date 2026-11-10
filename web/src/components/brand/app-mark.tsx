@@ -8,7 +8,7 @@ export const MARK_TILT = 35;
 
 export function AppMark({ size = 24, className }: { size?: number; className?: string }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 32 32" aria-hidden className={className} focusable="false">
+    <svg data-app-mark width={size} height={size} viewBox="0 0 32 32" aria-hidden className={className} focusable="false">
       <rect width="32" height="32" rx="8" fill="#8B47FF" />
       {Array.from({ length: 12 }, (_, i) => {
         const a = (i / 12) * Math.PI * 2;

@@ -52,6 +52,7 @@ export function CompassBackdrop() {
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       <div className="tone absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent_70%)] opacity-70" />
       <svg
+        data-compass
         viewBox={`${-R - 8} ${-R - 8} ${2 * R + 16} ${2 * R + 16}`}
         className="fixed -bottom-[200px] -right-[180px] size-[560px] text-foreground opacity-[0.11] max-md:-right-[300px] max-md:-bottom-[260px] dark:opacity-[0.13]"
       >
