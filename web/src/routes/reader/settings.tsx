@@ -41,7 +41,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
             onClick={() => onChange(v)}
             className={cn(
               typeClass("caption"),
-              "h-8 rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
+              "h-9 pointer-coarse:h-11 rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
               value === v ? "bg-white text-neutral-900" : "text-white/80 hover:bg-white/10",
             )}
             style={{ fontVariationSettings: value === v ? fontWeights.semibold : fontWeights.normal }}

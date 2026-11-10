@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Clock, Search, X } from "@keyline-icons/react";
 import { api, useApi } from "@/api";
@@ -66,6 +66,9 @@ export default function Screen() {
   const term = q.trim();
 
   const [text, setText] = useState(q);
+  // The ?q= value this component last wrote, or accepted from the URL.
+  const lastQ = useRef(q);
+  const writeTimer = useRef<number | undefined>(undefined);
   const [recent, setRecent] = useState<string[]>(readRecent);
   const [tab, setTab] = useState<TabKey>("all");
 
@@ -79,24 +82,38 @@ export default function Screen() {
     [library.data],
   );
 
+  // External ?q= change (sidebar search, back/forward): adopt it and drop any
+  // pending write of the old text so it cannot overwrite the new query.
+  useEffect(() => {
+    if (q === lastQ.current) return;
+    window.clearTimeout(writeTimer.current);
+    lastQ.current = q;
+    setText(q);
+  }, [q]);
+
   // Debounced write of the input into ?q= (replace, so back still leaves the page).
   useEffect(() => {
-    const t = window.setTimeout(() => {
-      if (text.trim() === term) return;
+    if (text.trim() === term) return;
+    writeTimer.current = window.setTimeout(() => {
+      const nextQ = text.trim() ? text : "";
+      lastQ.current = nextQ;
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          if (text.trim()) next.set("q", text);
+          if (nextQ) next.set("q", nextQ);
           else next.delete("q");
           return next;
         },
         { replace: true },
       );
     }, 200);
-    return () => window.clearTimeout(t);
+    return () => window.clearTimeout(writeTimer.current);
     // Only the typed text drives the write; `term` is read at the moment it changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [text]);
+
+  // Unmount: never write a stale query after the page is gone.
+  useEffect(() => () => window.clearTimeout(writeTimer.current), []);
 
   // A query that stays on screen for a second counts as a recent search.
   useEffect(() => {

@@ -105,7 +105,8 @@ function BookPage({ id }: { id: string }) {
           <Tooltip content="前の巻">
             <Button
               variant="ghost"
-              size="icon-compact"
+              size="icon"
+              className="pointer-coarse:h-11 pointer-coarse:w-11"
               aria-label="前の巻"
               disabled={!adjacent.prev}
               onClick={() => adjacent.prev && navigate(`/books/${adjacent.prev.id}`)}
@@ -116,7 +117,8 @@ function BookPage({ id }: { id: string }) {
           <Tooltip content="次の巻">
             <Button
               variant="ghost"
-              size="icon-compact"
+              size="icon"
+              className="pointer-coarse:h-11 pointer-coarse:w-11"
               aria-label="次の巻"
               disabled={!adjacent.next}
               onClick={() => adjacent.next && navigate(`/books/${adjacent.next.id}`)}

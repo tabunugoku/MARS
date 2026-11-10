@@ -117,7 +117,9 @@ export function useApi<T>(fn: () => Promise<T>, deps: DependencyList): { data: T
   const [state, setState] = useState<{ data: T | undefined; loading: boolean }>({ data: undefined, loading: true });
   useEffect(() => {
     let live = true;
-    setState((s) => ({ data: s.data, loading: true }));
+    // New parameters mean new data: never show the previous request's result
+    // under the new heading (search query, library id, …).
+    setState({ data: undefined, loading: true });
     fn().then((data) => live && setState({ data, loading: false }));
     return () => {
       live = false;

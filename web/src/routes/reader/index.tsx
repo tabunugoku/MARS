@@ -53,15 +53,21 @@ export default function Reader() {
   const navigate = useNavigate();
   const incognito = params.get("incognito") === "1";
 
-  const { data } = useApi(async () => {
+  const { data, loading } = useApi(async () => {
     const book = await api.book(bookId);
     if (!book) return null;
     const [series, adj] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(book.id)]);
     return { book, series, adj };
   }, [bookId]);
 
+  if (loading && !data) return <div className="fixed inset-0 bg-black" aria-busy />;
   if (!data) {
-    return <div className="fixed inset-0 bg-black" aria-busy />;
+    return (
+      <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black text-white">
+        <p className={typeClass("title")}>この本は見つかりませんでした</p>
+        <Link to="/" className={cn(typeClass("body"), "text-white/70 underline-offset-4 hover:underline")}>ホームへ戻る</Link>
+      </div>
+    );
   }
   return (
     <ReaderBody
@@ -108,16 +114,27 @@ function ReaderBody({
   const atEnd = viewIndex === views.length;
   const currentPage = atEnd ? book.pageCount : views[viewIndex].pages[0];
 
-  // Re-anchor when the spread layout changes so the same page stays in view.
-  const anchor = useRef(currentPage);
-  anchor.current = currentPage;
+  // The page the reader is "on", independent of grouping (Infinity = end card).
+  // When the spread layout changes, re-find it in the new views. This effect
+  // is declared before the one that records the anchor, so it reads the page
+  // from the previous layout, not the one recomputed with the stale index.
+  const anchor = useRef<number>(currentPage);
+  const [webtoonPage, setWebtoonPage] = useState(currentPage);
   useEffect(() => {
-    setVi(Math.max(0, views.findIndex((v) => v.pages.includes(anchor.current))));
+    const a = anchor.current;
+    setVi(a === Infinity ? views.length : Math.max(0, views.findIndex((v) => v.pages.includes(a))));
+    setWebtoonPage(a === Infinity ? book.pageCount : a);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [views]);
+  useEffect(() => {
+    if (!webtoon) anchor.current = atEnd ? Infinity : currentPage;
+  }, [atEnd, currentPage, webtoon]);
+  const [jump, setJump] = useState<{ page: number; n: number } | null>(null);
 
   const axis = prefs.direction === "vertical" ? "y" : "x";
   const forward = prefs.direction === "rtl" ? -1 : 1;
 
+  const stageRef = useRef<HTMLDivElement>(null);
   const commit = useCallback(
     (d: 1 | -1) => {
       setVi((i) => Math.max(0, Math.min(views.length, i + d)));
@@ -126,7 +143,6 @@ function ReaderBody({
     [views.length],
   );
 
-  const stageRef = useRef<HTMLDivElement>(null);
   const onTap = useCallback(
     (e: PointerEvent) => {
       const el = stageRef.current;
@@ -144,6 +160,7 @@ function ReaderBody({
   );
 
   const swipe = usePageSwipe({
+    stageRef,
     axis,
     forward,
     canPrev: viewIndex > 0,
@@ -155,10 +172,14 @@ function ReaderBody({
 
   // Keyboard: arrows follow the direction; space/PageDown always advance.
   useEffect(() => {
-    if (webtoon) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.target as HTMLElement)?.closest("input,textarea,select,[role=slider]")) return;
       const k = e.key;
+      // Shared shortcuts work in every mode and inside panels.
+      if (k === "Escape") return panel !== "none" ? setPanel("none") : onExit();
+      if (k === "m" || k === "M") return setChrome((c) => !c);
+      // Page keys yield to focused controls and open panels (radios, slider, buttons keep their own keys).
+      if (webtoon || panel !== "none") return;
+      if ((e.target as HTMLElement)?.closest("input,textarea,select,button,a,[role=slider],[role=radio]")) return;
       let d: 0 | 1 | -1 = 0;
       if (k === " " || k === "PageDown") d = 1;
       else if (k === "PageUp") d = -1;
@@ -168,8 +189,6 @@ function ReaderBody({
       else if (k === "ArrowUp") d = axis === "y" ? -1 : 0;
       else if (k === "Home") return setVi(0);
       else if (k === "End") return setVi(views.length - 1);
-      else if (k === "m" || k === "M") return setChrome((c) => !c);
-      else if (k === "Escape") return panel !== "none" ? setPanel("none") : onExit();
       if (d) {
         e.preventDefault();
         swipe.turn(d);
@@ -190,9 +209,14 @@ function ReaderBody({
   }, []);
 
   const goToPage = (p: number) => {
-    setVi(Math.max(0, views.findIndex((v) => v.pages.includes(p))));
+    if (webtoon) {
+      anchor.current = p;
+      setWebtoonPage(p);
+      setJump((j) => ({ page: p, n: (j?.n ?? 0) + 1 }));
+    } else setVi(Math.max(0, views.findIndex((v) => v.pages.includes(p))));
     setPanel("none");
   };
+  const shownPage = webtoon ? webtoonPage : currentPage;
 
   // Neighbour views are mounted beside the current one (prev/next) so a turn
   // shows decoded pixels; two further views are preloaded invisibly.
@@ -206,7 +230,17 @@ function ReaderBody({
   return (
     <div className={cn("fixed inset-0 select-none overflow-clip", tone)} data-reader>
       {webtoon ? (
-        <WebtoonView book={book} startPage={currentPage} onPage={(p) => (anchor.current = p)} onToggleChrome={() => setChrome((c) => !c)} />
+        <WebtoonView
+          book={book}
+          next={next}
+          startPage={webtoonPage}
+          jump={jump}
+          onPage={(p) => {
+            anchor.current = p;
+            setWebtoonPage(p);
+          }}
+          onToggleChrome={() => setChrome((c) => !c)}
+        />
       ) : (
         <div
           ref={stageRef}
@@ -226,6 +260,7 @@ function ReaderBody({
                   className="absolute inset-0 flex items-center justify-center"
                   style={{ transform: axis === "x" ? `translateX(${shift}%)` : `translateY(${d * 100}%)` }}
                   aria-hidden={d !== 0}
+                  inert={d !== 0}
                 >
                   {node}
                 </div>
@@ -243,6 +278,7 @@ function ReaderBody({
         transition={{ type: "spring", duration: 0.24, bounce: 0 }}
         className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 bg-gradient-to-b from-black/80 to-black/0 px-2 pb-6 pt-[max(env(safe-area-inset-top),8px)] text-white"
         style={{ pointerEvents: chrome ? "auto" : "none" }}
+        inert={!chrome}
       >
         <IconBtn label="閉じる" onClick={onExit}>
           <ChevronLeft size={20} />
@@ -277,6 +313,7 @@ function ReaderBody({
           transition={{ type: "spring", duration: 0.24, bounce: 0 }}
           className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 to-black/0 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-8 text-white"
           style={{ pointerEvents: chrome ? "auto" : "none" }}
+          inert={!chrome}
         >
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <span className={cn(typeClass("caption"), "w-16 tabular-nums text-white/80")}>
@@ -303,7 +340,7 @@ function ReaderBody({
       {panel === "pages" && (
         <PageStrip
           book={book}
-          current={currentPage}
+          current={shownPage}
           rtl={forward === -1}
           onPick={goToPage}
           onClose={() => setPanel("none")}
@@ -430,8 +467,26 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
 }
 
 /** Continuous vertical scroll for webtoons: native scroll, pages lazy-load as they near the viewport. */
-function WebtoonView({ book, startPage, onPage, onToggleChrome }: { book: Book; startPage: number; onPage: (p: number) => void; onToggleChrome: () => void }) {
+function WebtoonView({
+  book,
+  next,
+  startPage,
+  jump,
+  onPage,
+  onToggleChrome,
+}: {
+  book: Book;
+  next: Book | null;
+  startPage: number;
+  jump: { page: number; n: number } | null;
+  onPage: (p: number) => void;
+  onToggleChrome: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  // Explicit jumps (page list) scroll; ordinary scrolling only reports.
+  useEffect(() => {
+    if (jump) ref.current?.querySelector(`[data-page="${jump.page}"]`)?.scrollIntoView({ block: "start" });
+  }, [jump]);
   useEffect(() => {
     ref.current?.querySelector(`[data-page="${startPage}"]`)?.scrollIntoView({ block: "start" });
     const io = new IntersectionObserver(
@@ -455,6 +510,9 @@ function WebtoonView({ book, startPage, onPage, onToggleChrome }: { book: Book; 
             className="block aspect-[800/1280] w-full"
           />
         ))}
+        <div className="flex justify-center py-16">
+          <EndCard book={book} next={next} seriesId={book.seriesId} />
+        </div>
       </div>
     </div>
   );

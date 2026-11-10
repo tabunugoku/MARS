@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
 import { ArrowUpDown, CircleCheck, MoreHorizontal, Radar, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
-import { api, formatBytes, statusLabel, useApi, type SeriesQuery, type SeriesSort, type SeriesStatus } from "@/api";
+import { api, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { GridSkeleton } from "@/components/media/skeletons";
@@ -22,7 +22,8 @@ const SORTS: { value: SeriesSort; label: string }[] = [
   { value: "created", label: "追加日" },
   { value: "bookCount", label: "巻数" },
 ];
-const READ_STATES: { value: "unread" | "inProgress" | "read"; label: string }[] = [
+type ReadState = "unread" | "inProgress" | "read";
+const READ_STATES: { value: ReadState; label: string }[] = [
   { value: "unread", label: "未読" },
   { value: "inProgress", label: "読みかけ" },
   { value: "read", label: "既読" },
@@ -39,10 +40,11 @@ export default function Screen() {
   const scope = isAll ? undefined : libraryId;
 
   // URL is the source of truth for sort and filters (comma-separated lists).
-  const sort = (params.get("sort") ?? "title") as SeriesSort;
+  // Unknown values from the URL are dropped (sort falls back to "title").
+  const sort = parseSort(params.get("sort"));
   const desc = params.get("desc") === "1";
-  const read = list(params.get("read")) as NonNullable<SeriesQuery["readState"]>;
-  const status = list(params.get("status")) as SeriesStatus[];
+  const read = list(params.get("read")).filter(isReadState);
+  const status = list(params.get("status")).filter(isStatus);
   const genre = list(params.get("genre"));
   const filterCount = read.length + status.length + genre.length;
 
@@ -263,6 +265,22 @@ export default function Screen() {
 
 function list(raw: string | null): string[] {
   return raw ? raw.split(",").filter(Boolean) : [];
+}
+
+function isSort(v: string | null): v is SeriesSort {
+  return SORTS.some((s) => s.value === v);
+}
+
+function parseSort(raw: string | null): SeriesSort {
+  return isSort(raw) ? raw : "title";
+}
+
+function isReadState(v: string): v is ReadState {
+  return READ_STATES.some((r) => r.value === v);
+}
+
+function isStatus(v: string): v is SeriesStatus {
+  return STATUSES.includes(v as SeriesStatus);
 }
 
 function FilterGroup({ title, children }: { title: string; children: ReactNode }) {
