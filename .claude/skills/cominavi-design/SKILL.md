@@ -79,7 +79,8 @@ gradients, glows, blur, glass or coloured shadows.
   No looping motion except loading states. Already built in, so don't
   re-implement: card hover lift with the violet dot spotlight
   (`SeriesCard`/`BookCard`), the compass backdrop that turns per route, the
-  gliding cyan dot on the active nav row, dot-wave skeletons.
+  gliding cyan dot on the active nav row, dot-wave skeletons, the screentone
+  wipe on theme switch (call `toggle(buttonEl)` from `useTheme`).
 - **Toasts**: `toast.success(...)` (an object, not a function) from `@yusufceng1z/ding-react` for confirmations
   ("既読にしました", "スキャンを開始しました"). One short sentence.
 - **Accessibility**: real `<button>`/`<a>`; every icon-only button has an

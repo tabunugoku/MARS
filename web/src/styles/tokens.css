@@ -107,3 +107,32 @@ body { -webkit-font-smoothing: antialiased; }
   animation: cn-tone-wave 1.6s linear infinite;
 }
 @media (prefers-reduced-motion: reduce) { .cn-shimmer::after { animation: none; opacity: 0; } }
+
+/* Theme switch: the new theme is printed over the old one as screentone.
+   A circle of dots spreads from the control (--cn-wipe-x/y, set by
+   ThemeProvider); the dots grow as it travels, and a solid core follows behind
+   until the screen is covered. Mask = core ∪ (dots ∩ circle). Only runs while
+   <html> has .cn-tone-wipe; reduced motion switches at once (no transition). */
+@property --cn-wipe-r { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --cn-wipe-dot { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --cn-wipe-core { syntax: "<length>"; inherits: false; initial-value: 0px; }
+.cn-tone-wipe::view-transition-old(root),
+.cn-tone-wipe::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+.cn-tone-wipe::view-transition-new(root) {
+  --cn-cell: 10px;
+  mask-image:
+    radial-gradient(circle at var(--cn-wipe-x) var(--cn-wipe-y), #000 var(--cn-wipe-core), transparent calc(var(--cn-wipe-core) + 1px)),
+    radial-gradient(circle, #000 var(--cn-wipe-dot), transparent calc(var(--cn-wipe-dot) + 0.75px)),
+    radial-gradient(circle at var(--cn-wipe-x) var(--cn-wipe-y), #000 var(--cn-wipe-r), transparent calc(var(--cn-wipe-r) + 1px));
+  mask-size: 100% 100%, var(--cn-cell) var(--cn-cell), 100% 100%;
+  mask-repeat: no-repeat, repeat, no-repeat;
+  mask-position: 0 0, var(--cn-wipe-x) var(--cn-wipe-y), 0 0;
+  mask-composite: add, intersect, add;
+  animation: cn-tone-wipe 720ms cubic-bezier(0.45, 0.05, 0.25, 1) both;
+}
+@keyframes cn-tone-wipe {
+  0% { --cn-wipe-r: 0px; --cn-wipe-dot: 0.6px; --cn-wipe-core: 0px; }
+  30% { --cn-wipe-dot: 1.6px; --cn-wipe-core: 0px; }
+  70% { --cn-wipe-dot: 3.6px; }
+  100% { --cn-wipe-r: calc(var(--cn-wipe-reach) + 40px); --cn-wipe-dot: 7.5px; --cn-wipe-core: calc(var(--cn-wipe-reach) + 1px); }
+}

@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import { useLocation } from "react-router";
 import { motion } from "motion/react";
+import { useTheme } from "@/components/shell/theme";
 
 // The chart behind every screen: a screentone dot grid over the content panel
 // and a large compass rose half off the bottom-right corner, drawn in dots and
 // hairlines at low contrast. Its needle turns to a new heading on each route —
 // the app navigating — on a spring that overshoots a little and settles; it
-// never loops. Pointer-transparent and hidden from assistive tech.
+// never loops. Switching theme swings it half a turn. Pointer-transparent and hidden from assistive tech.
 
 /** Stable heading (deg) per route section, so returning to a screen points the
  *  needle the same way. */
@@ -21,7 +22,9 @@ const R = 260;
 
 export function CompassBackdrop() {
   const { pathname } = useLocation();
-  const deg = heading(pathname);
+  const { theme } = useTheme();
+  // Day and night point opposite ways: switching theme swings the needle 180°.
+  const deg = heading(pathname) + (theme === "light" ? 180 : 0);
   const ticks = useMemo(
     () =>
       Array.from({ length: 72 }, (_, i) => {

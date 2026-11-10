@@ -11,6 +11,7 @@ import { AppSidebar } from "./app-sidebar";
 import { useTheme } from "./theme";
 import { PageSkeleton } from "@/components/media/skeletons";
 import { CompassBackdrop } from "@/components/brand/compass-backdrop";
+import { motion } from "motion/react";
 
 /** Desktop: inset sidebar + content card. Mobile (<768px): bottom tabs, and
  *  the sidebar becomes a drawer opened from the "ライブラリ" tab. */
@@ -38,11 +39,28 @@ function Topbar() {
     <SidebarInsetTopbar className="relative pr-2">
       <div className="flex-1" />
       <Tooltip content={theme === "dark" ? "ライトテーマ" : "ダークテーマ"} side="bottom">
-        <Button variant="ghost" size="icon" aria-label="テーマを切り替え" onClick={toggle}>
-          {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+        <Button variant="ghost" size="icon" aria-label="テーマを切り替え" onClick={(e) => toggle(e.currentTarget)}>
+          <ThemeGlyph dark={theme === "dark"} />
         </Button>
       </Tooltip>
     </SidebarInsetTopbar>
+  );
+}
+
+// Sun and moon share one cell: the one leaving turns away and shrinks while
+// the other turns in, so the swap reads as the dial turning, not a blink.
+const glyphSpring = { type: "spring", mass: 0.8, stiffness: 320, damping: 20 } as const;
+function ThemeGlyph({ dark }: { dark: boolean }) {
+  const shown = { rotate: 0, scale: 1, opacity: 1 };
+  return (
+    <span className="relative grid size-4 place-items-center [&>*]:col-start-1 [&>*]:row-start-1">
+      <motion.span initial={false} animate={dark ? shown : { rotate: 90, scale: 0.4, opacity: 0 }} transition={glyphSpring}>
+        <Sun size={16} />
+      </motion.span>
+      <motion.span initial={false} animate={dark ? { rotate: -90, scale: 0.4, opacity: 0 } : shown} transition={glyphSpring}>
+        <Moon size={16} />
+      </motion.span>
+    </span>
   );
 }
 
