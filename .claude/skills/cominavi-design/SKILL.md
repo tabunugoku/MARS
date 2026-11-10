@@ -55,7 +55,7 @@ light ("paper") must look equally finished.
   `ease-[cubic-bezier(0.16,1,0.3,1)]`. Animate transform/opacity only.
   Respect reduced motion (`motion-reduce:` / MotionConfig is already global).
   No entrance animations on page load; motion answers an action.
-- **Toasts**: `toast` from `@yusufceng1z/ding-react` for confirmations
+- **Toasts**: `toast.success(...)` (an object, not a function) from `@yusufceng1z/ding-react` for confirmations
   ("既読にしました", "スキャンを開始しました"). One short sentence.
 - **Accessibility**: real `<button>`/`<a>`; every icon-only button has an
   `aria-label` in Japanese and a `Tooltip`; visible focus

@@ -5,6 +5,7 @@ import { FluidProvider } from "@/lib/fluid-provider";
 import { keylineSlots } from "@/lib/icons";
 import { ThemeProvider, useTheme } from "@/components/shell/theme";
 import { AppShell } from "@/components/shell/app-shell";
+import { RouteError } from "@/components/shell/route-error";
 
 // Every screen is its own chunk; only the shell ships in the first load.
 const Login = lazy(() => import("@/routes/login"));
@@ -25,10 +26,11 @@ const AdminMedia = lazy(() => import("@/routes/admin/media"));
 const AdminSettings = lazy(() => import("@/routes/admin/settings"));
 
 const router = createBrowserRouter([
-  { path: "/login", element: <Login /> },
-  { path: "/read/:bookId", element: <Reader /> },
+  { path: "/login", element: <Login />, errorElement: <RouteError /> },
+  { path: "/read/:bookId", element: <Reader />, errorElement: <RouteError /> },
   {
     element: <AppShell />,
+    errorElement: <RouteError />,
     children: [
       { index: true, element: <Dashboard /> },
       { path: "libraries/:libraryId", element: <LibraryView /> },

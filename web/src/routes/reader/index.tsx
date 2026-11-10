@@ -204,13 +204,13 @@ function ReaderBody({
   const tone = bgClass[prefs.bg];
 
   return (
-    <div className={cn("fixed inset-0 select-none overflow-hidden", tone)} data-reader>
+    <div className={cn("fixed inset-0 select-none overflow-clip", tone)} data-reader>
       {webtoon ? (
         <WebtoonView book={book} startPage={currentPage} onPage={(p) => (anchor.current = p)} onToggleChrome={() => setChrome((c) => !c)} />
       ) : (
         <div
           ref={stageRef}
-          className="absolute inset-0 touch-none"
+          className="absolute inset-0 touch-none overflow-clip"
           style={{ touchAction: prefs.fit === "width" && axis === "x" ? "pan-y" : "none" }}
           {...swipe.handlers}
         >
