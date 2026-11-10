@@ -30,6 +30,7 @@ import {
   Sun,
   Moon,
   LogOut,
+  BookOpen,
 } from "@keyline-icons/react";
 import { useTheme } from "./theme";
 import { LibraryGlyph } from "./library-glyph";
@@ -137,8 +138,9 @@ export function AppSidebar() {
                 label={theme === "dark" ? "ライトテーマ" : "ダークテーマ"}
                 onSelect={() => toggle()}
               />
-              <MenuItem index={1} icon={I(Settings)} label="アカウント設定" onSelect={() => navigate("/account")} />
-              <MenuItem index={2} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
+              <MenuItem index={1} icon={I(BookOpen)} label="リーダー設定" onSelect={() => navigate("/settings/reader")} />
+              <MenuItem index={2} icon={I(Settings)} label="アカウント設定" onSelect={() => navigate("/account")} />
+              <MenuItem index={3} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
             </>
           }
         />

@@ -6,6 +6,7 @@ import * as db from "@/mock/data";
 import type { Book, Series, SeriesQuery } from "./types";
 
 export * from "./types";
+export * from "./reader-prefs";
 
 const LATENCY = 120;
 const delay = <T,>(v: T): Promise<T> =>

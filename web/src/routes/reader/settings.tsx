@@ -1,37 +1,22 @@
 import { AnimatePresence, motion } from "motion/react";
-import type { ReadingDirection } from "@/api";
+import { Link } from "react-router";
+import { BG_LABEL, DIRECTION_LABEL, FIT_LABEL, SPREAD_LABEL, type ReaderPrefs, type SeriesReaderPrefs } from "@/api";
 import { spring } from "@/lib/springs";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 
-export interface ReaderPrefs {
-  direction: ReadingDirection;
-  spread: "off" | "on" | "cover";
-  fit: "screen" | "width" | "height" | "original";
-  bg: "black" | "gray" | "white";
-}
+const opts = <T extends string>(labels: Record<T, string>) => Object.entries(labels) as [T, string][];
 
-const KEY = (seriesId: string) => `cn-reader-${seriesId}`;
-
-/** Per-series reader preferences (a manga and a webtoon need different ones). */
-export function loadPrefs(seriesId: string, direction: ReadingDirection): ReaderPrefs {
-  const base: ReaderPrefs = { direction, spread: "off", fit: "screen", bg: "black" };
-  try {
-    return { ...base, ...JSON.parse(localStorage.getItem(KEY(seriesId)) ?? "{}") };
-  } catch {
-    return base;
-  }
-}
-export function savePrefs(seriesId: string, p: ReaderPrefs) {
-  localStorage.setItem(KEY(seriesId), JSON.stringify(p));
-}
-
-function Segmented<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
+function Segmented<T extends string>({ label, value, options, onChange, disabled }: { label: string; value: T; options: [T, string][]; onChange: (v: T) => void; disabled?: boolean }) {
   return (
-    <fieldset className="space-y-2">
+    <fieldset className="space-y-2" disabled={disabled}>
       <legend className={cn(typeClass("caption"), "text-white/60")}>{label}</legend>
-      <div className="grid gap-1 rounded-lg bg-white/8 p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(max-content,1fr))` }} role="radiogroup">
+      <div
+        className={cn("grid gap-1 rounded-lg bg-white/8 p-1", disabled && "opacity-50")}
+        style={{ gridTemplateColumns: `repeat(${options.length}, minmax(max-content,1fr))` }}
+        role="radiogroup"
+      >
         {options.map(([v, text]) => (
           <button
             key={v}
@@ -42,7 +27,7 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
             className={cn(
               typeClass("caption"),
               "inline-flex h-9 pointer-coarse:h-11 items-center justify-center whitespace-nowrap rounded-md px-2 transition-colors duration-80 outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
-              value === v ? "bg-white text-neutral-900" : "text-white/80 hover:bg-white/10",
+              value === v ? "bg-white text-neutral-900" : "text-white/80 enabled:hover:bg-white/10",
             )}
             style={{ fontVariationSettings: value === v ? fontWeights.semibold : fontWeights.normal }}
           >
@@ -54,8 +39,26 @@ function Segmented<T extends string>({ label, value, options, onChange }: { labe
   );
 }
 
-export function ReaderSettings({ open, prefs, onChange, onClose }: { open: boolean; prefs: ReaderPrefs; onChange: (p: ReaderPrefs) => void; onClose: () => void }) {
-  const set = <K extends keyof ReaderPrefs>(k: K) => (v: ReaderPrefs[K]) => onChange({ ...prefs, [k]: v });
+/** The reader's 表示設定 panel. A series either follows the global reader
+ *  settings (the master, edited at /settings/reader) or keeps its own. While
+ *  it follows, the controls show the values in effect but can't be changed;
+ *  choosing この作品だけ starts from those same values. */
+export function ReaderSettings({
+  open,
+  series,
+  prefs,
+  onChange,
+  onClose,
+}: {
+  open: boolean;
+  series: SeriesReaderPrefs;
+  /** The values in effect (global resolved for this series, or its own). */
+  prefs: ReaderPrefs;
+  onChange: (p: SeriesReaderPrefs) => void;
+  onClose: () => void;
+}) {
+  const custom = series.mode === "custom";
+  const set = <K extends keyof ReaderPrefs>(k: K) => (v: ReaderPrefs[K]) => onChange({ mode: "custom", prefs: { ...prefs, [k]: v } });
   const paged = prefs.direction !== "webtoon";
   return (
     <AnimatePresence>
@@ -79,52 +82,32 @@ export function ReaderSettings({ open, prefs, onChange, onClose }: { open: boole
               <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
             </button>
           </div>
-          <Segmented
-            label="読み方向"
-            value={prefs.direction}
-            onChange={set("direction")}
-            options={[
-              ["rtl", "右→左"],
-              ["ltr", "左→右"],
-              ["vertical", "縦"],
-              ["webtoon", "縦スクロール"],
-            ]}
-          />
-          {paged && (
+
+          <div className="space-y-2">
             <Segmented
-              label="見開き"
-              value={prefs.spread}
-              onChange={set("spread")}
+              label="この作品の設定"
+              value={series.mode}
+              onChange={(m) => onChange(m === "custom" ? { mode: "custom", prefs } : { mode: "global" })}
               options={[
-                ["off", "単ページ"],
-                ["on", "見開き"],
-                ["cover", "表紙だけ単ページ"],
+                ["global", "全体設定に従う"],
+                ["custom", "この作品だけ"],
               ]}
             />
-          )}
-          {paged && (
-            <Segmented
-              label="表示サイズ"
-              value={prefs.fit}
-              onChange={set("fit")}
-              options={[
-                ["screen", "画面"],
-                ["width", "幅"],
-                ["height", "高さ"],
-                ["original", "原寸"],
-              ]}
-            />
-          )}
-          <Segmented
-            label="背景"
-            value={prefs.bg}
-            onChange={set("bg")}
-            options={[
-              ["black", "黒"],
-              ["gray", "グレー"],
-              ["white", "白"],
-            ]}
-          />
+            <p className={cn(typeClass("caption"), "text-white/60")}>
+              {custom ? "この作品は下の設定で開きます。" : "全体設定の値を使っています。"}
+              <Link to="/settings/reader" className="ml-1 text-white/80 underline underline-offset-2 hover:text-white">
+                全体設定を開く
+              </Link>
+            </p>
+          </div>
+
+          <div className="h-px bg-white/8" />
+
+          <Segmented label="読み方向" value={prefs.direction} onChange={set("direction")} options={opts(DIRECTION_LABEL)} disabled={!custom} />
+          {paged && <Segmented label="見開き" value={prefs.spread} onChange={set("spread")} options={opts(SPREAD_LABEL)} disabled={!custom} />}
+          {paged && <Segmented label="表示サイズ" value={prefs.fit} onChange={set("fit")} options={opts(FIT_LABEL)} disabled={!custom} />}
+          <Segmented label="背景" value={prefs.bg} onChange={set("bg")} options={opts(BG_LABEL)} disabled={!custom} />
+
           <div className={cn(typeClass("caption"), "mt-auto space-y-1 text-white/60")}>
             <p>キー操作: ← → ページ送り / Space 次へ / M メニュー / Esc 閉じる</p>
             <p>画面の左右をタップでページ送り、中央でメニュー。</p>

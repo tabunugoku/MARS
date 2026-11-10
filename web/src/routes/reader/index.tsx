@@ -9,14 +9,14 @@ import {
   Minimize,
   EyeOff,
 } from "@keyline-icons/react";
-import { api, useApi, type Book, type ReadingDirection } from "@/api";
+import { api, useApi, effectivePrefs, getGlobalPrefs, getSeriesPrefs, setSeriesPrefs, type Book, type ReaderPrefs, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
 import { pageArt, coverArt } from "@/lib/art";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { BrandAction } from "@/components/media/brand-action";
 import { usePageSwipe } from "./use-page-swipe";
-import { ReaderSettings, type ReaderPrefs, loadPrefs, savePrefs } from "./settings";
+import { ReaderSettings } from "./settings";
 
 // ---------------------------------------------------------------------------
 // Reader. Priorities, in order: a page turn never waits (neighbours are
@@ -100,8 +100,15 @@ function ReaderBody({
   incognito: boolean;
   onExit: () => void;
 }) {
-  const [prefs, setPrefs] = useState<ReaderPrefs>(() => loadPrefs(book.seriesId, defaultDirection));
-  useEffect(() => savePrefs(book.seriesId, prefs), [book.seriesId, prefs]);
+  // The global reader settings are the master; this series follows them or
+  // keeps its own (chosen in the 表示設定 panel).
+  const [seriesPrefs, setSeriesPrefsState] = useState<SeriesReaderPrefs>(() => getSeriesPrefs(book.seriesId));
+  const [globalPrefs] = useState(getGlobalPrefs);
+  const prefs = useMemo(() => effectivePrefs(seriesPrefs, globalPrefs, defaultDirection), [seriesPrefs, globalPrefs, defaultDirection]);
+  const changePrefs = (p: SeriesReaderPrefs) => {
+    setSeriesPrefsState(p);
+    setSeriesPrefs(book.seriesId, p);
+  };
   const [chrome, setChrome] = useState(true);
   const [panel, setPanel] = useState<"none" | "settings" | "pages">("none");
   const [fullscreen, setFullscreen] = useState(false);
@@ -336,7 +343,7 @@ function ReaderBody({
           onClose={() => setPanel("none")}
         />
       )}
-      <ReaderSettings open={panel === "settings"} prefs={prefs} onChange={setPrefs} onClose={() => setPanel("none")} />
+      <ReaderSettings open={panel === "settings"} series={seriesPrefs} prefs={prefs} onChange={changePrefs} onClose={() => setPanel("none")} />
     </div>
   );
 }
