@@ -32,12 +32,12 @@ export const Cover = memo(function Cover({ seed, title, label, progress, unread,
         className="size-full object-cover"
       />
       {unread !== undefined && unread > 0 && (
-        <span className="absolute right-1.5 top-1.5 min-w-5 rounded-full bg-brand px-1.5 text-center text-[11px] leading-5 text-brand-foreground tabular-nums">
+        <span className="absolute bottom-2 right-1.5 min-w-5 rounded-full bg-brand px-1.5 text-center text-[11px] leading-5 text-brand-foreground tabular-nums">
           {unread}
         </span>
       )}
       {read && (
-        <span className="absolute right-1.5 top-1.5 rounded-full bg-black/60 px-1.5 text-[11px] leading-5 text-white backdrop-blur-sm">
+        <span className="absolute bottom-2 right-1.5 rounded-full bg-black/60 px-1.5 text-[11px] leading-5 text-white backdrop-blur-sm">
           既読
         </span>
       )}

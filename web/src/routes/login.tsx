@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
-import { BookOpen } from "@keyline-icons/react";
+import { AppMark } from "@/components/media/kind-icon";
 import { Cover } from "@/components/media/cover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -39,9 +39,7 @@ export default function Screen() {
       <main className="flex flex-1 flex-col items-center justify-center p-6">
         <form onSubmit={submit} noValidate className="flex w-full max-w-[360px] flex-col gap-6">
           <div className="flex items-center gap-2">
-            <span className="grid size-8 place-items-center rounded-[8px] bg-brand text-brand-foreground">
-              <BookOpen size={16} aria-hidden />
-            </span>
+            <AppMark size={40} className="-ml-1" />
             <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
               ComiNavi
             </span>
@@ -88,7 +86,7 @@ export default function Screen() {
           <button
             type="submit"
             className={cn(
-              "inline-flex h-9 w-full items-center justify-center rounded-lg bg-brand px-4 text-brand-foreground",
+              "inline-flex h-9 pointer-coarse:h-11 w-full items-center justify-center rounded-lg bg-brand px-4 text-brand-foreground",
               "transition-[filter,box-shadow] duration-80 hover:brightness-110 active:shadow-[inset_0_0_0_1px_rgb(0_0_0/0.15)] active:brightness-95",
               "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               typeClass("body"),

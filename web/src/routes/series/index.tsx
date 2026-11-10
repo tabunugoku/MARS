@@ -1,3 +1,4 @@
+import type { IconComponent } from "@/lib/icon-context";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowDown, ArrowUp, ChevronLeft, Play } from "@keyline-icons/react";
@@ -92,19 +93,19 @@ function SeriesPage({ id }: { id: string }) {
 
   return (
     <Page>
+      <Link
+        to={`/libraries/${series.libraryId}`}
+        className={cn(typeClass("caption"), "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3", "mb-4 pointer-coarse:mb-1")}
+      >
+        <ChevronLeft size={14} />
+        {library?.name ?? "ライブラリ"}
+      </Link>
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="mx-auto w-[160px] shrink-0 md:mx-0 md:w-[220px]">
           <Cover seed={series.coverSeed} title={series.title} priority />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
-          <Link
-            to={`/libraries/${series.libraryId}`}
-            className={cn(typeClass("caption"), "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground")}
-          >
-            <ChevronLeft size={14} />
-            {library?.name ?? "ライブラリ"}
-          </Link>
 
           <h1 className={cn(typeClass("display"), "break-words")} style={{ fontVariationSettings: fontWeights.bold }}>
             {series.title}
@@ -163,7 +164,7 @@ function SeriesPage({ id }: { id: string }) {
           {series.summary && (
             <div className="space-y-1">
               <p className={cn(typeClass("body"), "text-muted-foreground", !more && "line-clamp-3")}>{series.summary}</p>
-              <Button variant="ghost" size="compact" onClick={() => setMore((m) => !m)}>
+              <Button variant="ghost" size="compact" className="pointer-coarse:h-11" onClick={() => setMore((m) => !m)}>
                 {more ? "閉じる" : "続きを読む"}
               </Button>
             </div>
@@ -175,7 +176,7 @@ function SeriesPage({ id }: { id: string }) {
                 <Link
                   key={g}
                   to={`/libraries/${series.libraryId}?genre=${encodeURIComponent(g)}`}
-                  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
+                  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] pointer-coarse:py-2"
                 >
                   <Badge variant="dot">{g}</Badge>
                 </Link>
@@ -196,8 +197,13 @@ function SeriesPage({ id }: { id: string }) {
           <TabsItem index={1} label="情報" />
         </Tabs>
         {tab === 0 && books.length > 1 && (
-          <Button variant="ghost" size="compact" onClick={() => setOrder((o) => (o === "asc" ? "desc" : "asc"))}>
-            {order === "asc" ? <ArrowUp /> : <ArrowDown />}
+          <Button
+            variant="ghost"
+            size="compact"
+            className="pointer-coarse:h-11"
+            leadingIcon={(order === "asc" ? ArrowUp : ArrowDown) as IconComponent}
+            onClick={() => setOrder((o) => (o === "asc" ? "desc" : "asc"))}
+          >
             {order === "asc" ? "巻数の昇順" : "巻数の降順"}
           </Button>
         )}

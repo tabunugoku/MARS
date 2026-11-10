@@ -127,7 +127,7 @@ function SidebarSheet({ side, open, onClose, children }: SidebarSheetProps) {
             >
               {/* Radix's TitleWarning checks for a rendered DialogTitle, so
                   ship a visually hidden one as the accessible name. */}
-              <DialogPrimitive.Title className="sr-only">Sidebar</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="sr-only">サイドバー</DialogPrimitive.Title>
               <SurfaceProvider value={level}>{children}</SurfaceProvider>
             </motion.div>
           </DialogPrimitive.Content>

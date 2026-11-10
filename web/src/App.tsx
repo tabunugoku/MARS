@@ -53,7 +53,7 @@ const router = createBrowserRouter([
 
 function ThemedToaster() {
   const { theme } = useTheme();
-  return <Toaster position="bottom-center" theme={theme} />;
+  return <Toaster position="bottom-center" theme={theme} labels={{ region: "通知", dismiss: "通知を閉じる" }} />;
 }
 
 export default function App() {

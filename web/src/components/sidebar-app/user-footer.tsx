@@ -48,12 +48,12 @@ export function SidebarUserFooter({
   const icons = useIcons();
   const ChevronsUpDown = icons["chevrons-up-down"];
   return (
-    <SidebarMenu aria-label="User" className={cn(className)}>
+    <SidebarMenu aria-label="ユーザー" className={cn(className)}>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownTrigger
             render={
-              <SidebarMenuButton aria-label="Open user menu">
+              <SidebarMenuButton aria-label="ユーザーメニューを開く">
                 <span className="-ml-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center">
                   {avatar}
                 </span>

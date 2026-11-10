@@ -76,7 +76,7 @@ export function MobileDrawer({
           <DialogPrimitive.Content
             asChild
             forceMount
-            aria-label="Navigation"
+            aria-label="ナビゲーション"
             // Radix warns when Content has no Description; opting out with an
             // explicit undefined clears the rendered attribute, which is what
             // the DescriptionWarning in @radix-ui/react-dialog checks.

@@ -1,3 +1,4 @@
+import type { IconComponent } from "@/lib/icon-context";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
@@ -5,6 +6,7 @@ import { ArrowUpDown, CircleCheck, MoreHorizontal, Radar, Scan, Settings, Slider
 import { api, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
+import { KindIcon } from "@/components/media/kind-icon";
 import { GridSkeleton } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,7 +15,6 @@ import { MenuItem } from "@/components/ui/menu-item";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
-import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 
 const SORTS: { value: SeriesSort; label: string }[] = [
@@ -119,6 +120,7 @@ export default function Screen() {
 
   const header = (
     <PageHeader
+      icon={library ? <KindIcon kind={library.kind} size={56} /> : undefined}
       title={title}
       meta={meta}
       actions={
@@ -182,14 +184,9 @@ export default function Screen() {
             variant="secondary"
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((o) => !o)}
+            leadingIcon={SlidersHorizontal as IconComponent}
           >
-            <SlidersHorizontal size={16} />
-            絞り込み
-            {filterCount > 0 && (
-              <span className={cn(typeClass("caption"), "text-brand tabular-nums")} style={{ fontVariationSettings: fontWeights.semibold }}>
-                {filterCount}
-              </span>
-            )}
+            {filterCount > 0 ? `絞り込み ${filterCount}` : "絞り込み"}
           </Button>
         </div>
       </div>

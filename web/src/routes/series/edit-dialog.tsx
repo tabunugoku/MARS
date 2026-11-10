@@ -1,3 +1,4 @@
+import type { IconComponent } from "@/lib/icon-context";
 import { useState, type ReactNode } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { Lock, Plus, Unlock, X } from "@keyline-icons/react";
@@ -215,8 +216,7 @@ export function EditDialog({
                 </Tooltip>
               </div>
             ))}
-            <Button variant="secondary" onClick={() => set("authors", [...form.authors, { name: "", role: "writer" }])}>
-              <Plus />
+            <Button variant="secondary" leadingIcon={Plus as IconComponent} onClick={() => set("authors", [...form.authors, { name: "", role: "writer" }])}>
               著者を追加
             </Button>
           </TabsPanel>

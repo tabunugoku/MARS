@@ -21,6 +21,8 @@ the same code becomes the production frontend once the Go API exists.
 
 - `npm run dev` — dev server on http://localhost:5173
 - `npm run build` — typecheck + production build (must pass before handing back)
+- `npm run localize:fluid` — rerun after any `shadcn add --overwrite`: swaps
+  the few hard-coded English strings in `components/ui/` for Japanese
 
 ## Layout
 

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { RefreshCw, SquarePen, Bin } from "@keyline-icons/react";
 import { api, formatBytes, useApi, type Library } from "@/api";
-import { LibraryGlyph } from "@/components/shell/library-glyph";
+import { KindIcon } from "@/components/media/kind-icon";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Button } from "@/components/ui/button";
 import {
@@ -127,12 +127,11 @@ export default function Screen() {
             </TableHeader>
             <TableBody>
               {libs.map((l, i) => {
-                const Glyph = LibraryGlyph(l.kind);
                 return (
                   <TableRow key={l.id} index={i}>
                     <TableCell>
                       <div className="flex items-center gap-2 whitespace-nowrap">
-                        <Glyph size={16} />
+                        <KindIcon kind={l.kind} size={24} />
                         <span className="text-foreground" style={{ fontVariationSettings: fontWeights.semibold }}>
                           {l.name}
                         </span>

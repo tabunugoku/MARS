@@ -20,7 +20,6 @@ import { fontWeights } from "@/lib/font-weight";
 import { typeClass } from "@/lib/type-scale";
 import {
   House,
-  BookOpen,
   Bookmarks,
   Grid2x2,
   LibraryBig,
@@ -34,6 +33,7 @@ import {
 } from "@keyline-icons/react";
 import { useTheme } from "./theme";
 import { LibraryGlyph } from "./library-glyph";
+import { AppMark } from "@/components/media/kind-icon";
 
 const I = (c: unknown) => c as IconComponent;
 
@@ -60,9 +60,7 @@ export function AppSidebar() {
     <Sidebar variant="inset">
       <SidebarHeader>
         <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label="ComiNavi ホーム">
-          <span className="flex size-6 items-center justify-center rounded-md bg-brand text-brand-foreground">
-            <BookOpen size={14} />
-          </span>
+          <AppMark size={28} className="-ml-1" />
           <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
             ComiNavi
           </span>
@@ -74,7 +72,7 @@ export function AppSidebar() {
             navigate(`/search?q=${encodeURIComponent(String(q ?? ""))}`);
           }}
         >
-          <SidebarSearchField name="q" placeholder="シリーズ・巻・著者を検索" shortcut="/" />
+          <SidebarSearchField name="q" placeholder="シリーズ・巻・著者を検索" aria-label="検索" shortcut="/" />
         </form>
       </SidebarHeader>
 

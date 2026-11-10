@@ -21,6 +21,7 @@ light ("paper") must look equally finished.
    - `web/src/components/media/cover.tsx` — `Cover` (the only cover renderer)
    - `web/src/components/media/skeletons.tsx` — `GridSkeleton`, `Block`
    - `web/src/components/media/brand-action.tsx` — `BrandAction`, the brand CTA
+   - `web/src/components/media/kind-icon.tsx` — `AppMark`, `KindIcon` (colour object icons)
    - `web/src/api/index.ts` — `api.*`, `useApi`, formatters, `statusLabel`
 3. UI controls come from `web/src/components/ui/*` (Fluid Functionalism on
    shadcn). Read the component file before using it; props differ from stock
@@ -46,6 +47,12 @@ light ("paper") must look equally finished.
   14 in captions, 18 in tabs). If Keyline lacks a glyph, look it up with the
   IconMCP server; never mix in a second icon style. Check the name exists:
   `node -e "console.log(!!require('@keyline-icons/react').Name)"` in `web/`.
+  The one exception is `AppMark` / `KindIcon`: colour pictures of the app and
+  of each library kind, for the logo, library headers and the admin library
+  list only — never in navigation rows, buttons or text.
+- **Buttons with an icon** pass it as `leadingIcon={X as IconComponent}`, never
+  as a child: children become one label span, so an icon child stacks above
+  the text.
 - **Spacing** on the 4px grid via Tailwind (`gap-2`, `p-4`, …). Page gutter
   and max width come from `Page`; don't add your own outer padding.
 - **Covers** are always `Cover`/`SeriesCard`/`BookCard`; grids are always

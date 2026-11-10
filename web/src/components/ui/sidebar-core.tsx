@@ -772,7 +772,7 @@ const SidebarShell = forwardRef<HTMLDivElement, SidebarShellProps>(
                 intent delay, click mode on press. */}
             <button
               type="button"
-              aria-label="Peek sidebar"
+              aria-label="サイドバーを一時表示"
               aria-expanded={isPeeking}
               className={cn(
                 "group/peek-strip absolute inset-y-0 z-40 w-3 cursor-pointer outline-none",
@@ -968,7 +968,7 @@ const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
                 re-applies it — otherwise the shortcut row would sit taller
                 than a tooltip without a chip. */}
             <span className="[text-box:trim-both_cap_alphabetic]">
-              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+              {collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
             </span>
             <ShortcutKbd>{shortcutKey}</ShortcutKbd>
           </span>
@@ -979,7 +979,7 @@ const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
           variant="ghost"
           size={size ?? iconSize}
           data-sidebar="trigger"
-          aria-label="Toggle Sidebar"
+          aria-label="サイドバーの表示切り替え"
           onClick={(event) => {
             onClick?.(event);
             toggleSidebar();
@@ -1124,7 +1124,7 @@ const SidebarRail = forwardRef<HTMLButtonElement, SidebarRailProps>(
           }}
           type="button"
           data-sidebar="rail"
-          aria-label="Resize or collapse sidebar"
+          aria-label="サイドバーの幅を変える"
           tabIndex={-1}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}

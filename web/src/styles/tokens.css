@@ -14,7 +14,7 @@
   --fluid-accent: oklch(0.6 0.19 33);
   --background: oklch(0.985 0.003 80);
   --sidebar: oklch(0.965 0.004 80);
-  --card: oklch(0.995 0.002 80);
+  --card: oklch(0.972 0.004 80);         /* a step below the near-white inset panel */
   --reader-bg: oklch(0.2 0 0);
   --cover-shadow: 0 1px 2px rgb(0 0 0 / 0.08), 0 4px 12px -4px rgb(0 0 0 / 0.12);
 }
@@ -27,7 +27,7 @@
   --fluid-accent: oklch(0.7 0.17 38);
   --background: oklch(0.165 0.003 60);
   --sidebar: oklch(0.145 0.003 60);
-  --card: oklch(0.2 0.003 60);
+  --card: oklch(0.235 0.003 60);         /* one step above the inset panel (surface-2) */
   --popover: oklch(0.22 0.003 60);
   --muted-foreground: oklch(0.68 0.006 70);
   --border: oklch(1 0 0 / 8%);

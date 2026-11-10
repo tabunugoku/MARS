@@ -11,12 +11,14 @@ export function Page({ children, className }: { children: ReactNode; className?:
   return <div className={cn("mx-auto w-full max-w-[1400px] px-4 pb-12 pt-2 md:px-8", className)}>{children}</div>;
 }
 
-export function PageHeader({ title, meta, actions, back }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; back?: { to: string; label: string } }) {
+export function PageHeader({ title, meta, actions, back, icon }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; back?: { to: string; label: string }; icon?: ReactNode }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="flex min-w-0 items-center gap-3">
+        {icon}
       <div className="min-w-0 space-y-1">
         {back && (
-          <Link to={back.to} className={cn(typeClass("caption"), "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground")}>
+          <Link to={back.to} className={cn(typeClass("caption"), "inline-flex items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3")}>
             <ChevronLeft size={14} />
             {back.label}
           </Link>
@@ -25,6 +27,7 @@ export function PageHeader({ title, meta, actions, back }: { title: ReactNode; m
           {title}
         </h1>
         {meta && <p className={cn(typeClass("body"), "text-muted-foreground")}>{meta}</p>}
+      </div>
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
     </header>
@@ -78,7 +81,7 @@ export function Shelf({ title, to, children }: { title: ReactNode; to?: string; 
       >
         {title}
       </SectionTitle>
-      <div ref={ref} className="shelf-scroll -mx-4 flex gap-4 overflow-x-auto px-4 md:-mx-8 md:px-8">
+      <div ref={ref} className="shelf-scroll -mx-4 flex scroll-px-4 gap-4 overflow-x-auto px-4 md:-mx-8 md:scroll-px-8 md:px-8">
         {children}
       </div>
     </section>

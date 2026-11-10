@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Play } from "@keyline-icons/react";
-import { api, useApi, type Book, type Series } from "@/api";
+import { api, formatDate, useApi, type Book, type Series } from "@/api";
 import { BookCard, SeriesCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -42,8 +42,8 @@ export default function Screen() {
     return (
       <Page>
         <h1 className="sr-only">ホーム</h1>
-        <section className="mb-10 flex flex-col gap-4 rounded-[12px] bg-card p-4 sm:flex-row md:p-5" aria-hidden>
-          <Block className="aspect-[2/3] w-[120px] shrink-0 rounded-[6px]" />
+        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5" aria-hidden>
+          <Block className="aspect-[2/3] w-[96px] shrink-0 rounded-[6px] sm:w-[120px]" />
           <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
             <Block className="h-5 w-2/3" />
             <Block className="h-4 w-1/2" />
@@ -99,11 +99,16 @@ export default function Screen() {
       <h1 className="sr-only">ホーム</h1>
 
       {hero && (
-        <section className="mb-10 flex flex-col gap-4 rounded-[12px] bg-card p-4 sm:flex-row md:p-5">
-          <div className="w-[120px] shrink-0">
+        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5">
+          <div className="w-[96px] shrink-0 sm:w-[120px]">
             <Cover seed={hero.coverSeed} title={heroSeriesTitle} label={String(hero.number)} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
+            {hero.progress && (
+              <p className={cn(typeClass("caption"), "text-muted-foreground")}>
+                前回の続き · {formatDate(hero.progress.readAt)}
+              </p>
+            )}
             <h2 className={cn(typeClass("title"), "line-clamp-2")} style={{ fontVariationSettings: fontWeights.semibold }}>
               {heroSeriesTitle}
             </h2>

@@ -1078,7 +1078,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
           </span>
         )}
         <MenuRowLabel content={content} lit={lit} emphasized={effectiveActive} textClass={textClass} />
-        {status === "unread" && <span className="sr-only">, unread</span>}
+        {status === "unread" && <span className="sr-only">、未読あり</span>}
       </>
     );
 
