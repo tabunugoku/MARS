@@ -8,7 +8,8 @@
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "localize:fluid": "node scripts/localize-fluid.mjs"
+    "localize:fluid": "node scripts/localize-fluid.mjs",
+    "budget": "vite build && node scripts/check-budget.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

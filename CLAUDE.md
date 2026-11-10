@@ -23,6 +23,8 @@ the same code becomes the production frontend once the Go API exists.
 - `npm run build` — typecheck + production build (must pass before handing back)
 - `npm run localize:fluid` — rerun after any `shadcn add --overwrite`: swaps
   the few hard-coded English strings in `components/ui/` for Japanese
+- `npm run budget` — production build plus the JS budget check below; exits 1
+  when over
 
 ## Layout
 
@@ -39,7 +41,14 @@ the same code becomes the production frontend once the Go API exists.
 
 - Icons: Keyline (`@keyline-icons/react`). For missing glyphs use the
   project MCP server `iconmcp` (`.mcp.json`).
+- Fluid's icon slots: `lucide-react` is aliased to a blank stub
+  (`src/lib/lucide-stub.ts`), so only the slots mapped in `src/lib/icons.ts`
+  draw anything. After installing a Fluid component, grep it for
+  `useIcons()` and map each slot it reads to Keyline. An unmapped slot draws
+  an empty box and warns `[icons]` in the dev console.
 - Skills in this repo: `cominavi-design`, `shadcn`,
   `vercel-react-best-practices`, `web-design-guidelines`.
-- Initial JS budget: 260 KB gzip for the shell chunk (React, router, motion,
-  Fluid shell). Screens are separate chunks; keep each under 30 KB gzip.
+- Initial JS budget: 260 KB gzip for everything loaded before the first
+  screen (the entry chunk and its static imports: React, router, motion,
+  Fluid shell), not just the `index-*.js` chunk. Screens are lazy chunks;
+  keep each under 30 KB gzip. `npm run budget` checks both.
