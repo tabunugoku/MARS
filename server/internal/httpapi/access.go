@@ -4,26 +4,66 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"log/slog"
 	"net/http"
 )
 
-// adminOnly lists the operations a normal user may not call. They get 403.
-var adminOnly = map[string]bool{
-	"CreateLibrary": true, "UpdateLibrary": true, "DeleteLibrary": true, "ScanLibrary": true,
-	"ListTasks": true, "CancelTask": true, "ListMediaIssues": true,
-	"ListUsers": true, "CreateUser": true, "UpdateUser": true, "DeleteUser": true,
+type access int
+
+const (
+	anyone access = iota + 1 // signed in, any role (sign-in itself is checked in authenticate)
+	adminOnly
+)
+
+// opAccess classifies every operation. One that is missing here is refused
+// for everyone (TestEveryOperationClassified catches it first), so a new
+// endpoint can never be open to normal users by accident.
+var opAccess = map[string]access{
+	// Public or own account
+	"GetHealth": anyone, "GetLoginScreen": anyone, "GetPublicCover": anyone,
+	"Login": anyone, "Logout": anyone, "Setup": anyone,
+	"GetMe": anyone, "ChangePassword": anyone,
+	"ListApiKeys": anyone, "CreateApiKey": anyone, "DeleteApiKey": anyone,
+	"GetReaderPrefs": anyone, "SetGlobalReaderPrefs": anyone,
+	"SetSeriesReaderPrefs": anyone, "DeleteSeriesReaderPrefs": anyone,
+	"SetBookReaderPrefs": anyone, "DeleteBookReaderPrefs": anyone,
+
+	// Reading (always within libScope)
+	"ListLibraries": anyone, "GetLibrary": anyone,
+	"ListSeries": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
+	"GetBook": anyone, "GetBookThumbnail": anyone, "ListBookPages": anyone, "GetBookPage": anyone,
+	"GetAdjacentBooks": anyone, "GetDashboard": anyone, "Search": anyone,
+	"SetBookProgress": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,
+	"ListCollections": anyone, "GetCollection": anyone, "ListCollectionSeries": anyone,
+	"ListReadLists": anyone, "GetReadList": anyone, "ListReadListBooks": anyone,
+
+	// Administration
+	"CreateLibrary": adminOnly, "UpdateLibrary": adminOnly, "DeleteLibrary": adminOnly, "ScanLibrary": adminOnly,
+	"ListTasks": adminOnly, "CancelTask": adminOnly, "ListMediaIssues": adminOnly, "EmptyTrash": adminOnly,
+	"ListUsers": adminOnly, "CreateUser": adminOnly, "UpdateUser": adminOnly, "DeleteUser": adminOnly,
+	"GetSettings": adminOnly, "UpdateSettings": adminOnly,
+	"UpdateSeries": adminOnly, "UpdateBook": adminOnly,
+	"CreateCollection": adminOnly, "UpdateCollection": adminOnly, "DeleteCollection": adminOnly,
+	"CreateReadList": adminOnly, "UpdateReadList": adminOnly, "DeleteReadList": adminOnly,
 }
 
 func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {
-	if !adminOnly[op] {
+	switch opAccess[op] {
+	case anyone:
 		return f
+	case adminOnly:
+		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
+			if !currentUser(ctx).IsAdmin() {
+				writeError(w, http.StatusForbidden, "管理者だけが使える操作です")
+				return nil, nil
+			}
+			return f(ctx, w, r, req)
+		}
 	}
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
-		if !currentUser(ctx).IsAdmin() {
-			writeError(w, http.StatusForbidden, "管理者だけが使える操作です")
-			return nil, nil
-		}
-		return f(ctx, w, r, req)
+		slog.Error("operation has no access rule", "op", op)
+		writeError(w, http.StatusForbidden, "この操作は許可されていません")
+		return nil, nil
 	}
 }
 

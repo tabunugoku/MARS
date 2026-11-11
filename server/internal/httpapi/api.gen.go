@@ -25,28 +25,28 @@ import (
 
 // Defines values for AuthorRole.
 const (
-	Colorist   AuthorRole = "colorist"
-	Cover      AuthorRole = "cover"
-	Editor     AuthorRole = "editor"
-	Penciller  AuthorRole = "penciller"
-	Translator AuthorRole = "translator"
-	Writer     AuthorRole = "writer"
+	AuthorRoleColorist   AuthorRole = "colorist"
+	AuthorRoleCover      AuthorRole = "cover"
+	AuthorRoleEditor     AuthorRole = "editor"
+	AuthorRolePenciller  AuthorRole = "penciller"
+	AuthorRoleTranslator AuthorRole = "translator"
+	AuthorRoleWriter     AuthorRole = "writer"
 )
 
 // Valid indicates whether the value is a known member of the AuthorRole enum.
 func (e AuthorRole) Valid() bool {
 	switch e {
-	case Colorist:
+	case AuthorRoleColorist:
 		return true
-	case Cover:
+	case AuthorRoleCover:
 		return true
-	case Editor:
+	case AuthorRoleEditor:
 		return true
-	case Penciller:
+	case AuthorRolePenciller:
 		return true
-	case Translator:
+	case AuthorRoleTranslator:
 		return true
-	case Writer:
+	case AuthorRoleWriter:
 		return true
 	default:
 		return false
@@ -74,6 +74,99 @@ func (e BookFormat) Valid() bool {
 	case Epub:
 		return true
 	case Pdf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GlobalReaderPrefsBg.
+const (
+	GlobalReaderPrefsBgBlack GlobalReaderPrefsBg = "black"
+	GlobalReaderPrefsBgGray  GlobalReaderPrefsBg = "gray"
+	GlobalReaderPrefsBgWhite GlobalReaderPrefsBg = "white"
+)
+
+// Valid indicates whether the value is a known member of the GlobalReaderPrefsBg enum.
+func (e GlobalReaderPrefsBg) Valid() bool {
+	switch e {
+	case GlobalReaderPrefsBgBlack:
+		return true
+	case GlobalReaderPrefsBgGray:
+		return true
+	case GlobalReaderPrefsBgWhite:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GlobalReaderPrefsDirection.
+const (
+	GlobalReaderPrefsDirectionLtr      GlobalReaderPrefsDirection = "ltr"
+	GlobalReaderPrefsDirectionRtl      GlobalReaderPrefsDirection = "rtl"
+	GlobalReaderPrefsDirectionSeries   GlobalReaderPrefsDirection = "series"
+	GlobalReaderPrefsDirectionVertical GlobalReaderPrefsDirection = "vertical"
+	GlobalReaderPrefsDirectionWebtoon  GlobalReaderPrefsDirection = "webtoon"
+)
+
+// Valid indicates whether the value is a known member of the GlobalReaderPrefsDirection enum.
+func (e GlobalReaderPrefsDirection) Valid() bool {
+	switch e {
+	case GlobalReaderPrefsDirectionLtr:
+		return true
+	case GlobalReaderPrefsDirectionRtl:
+		return true
+	case GlobalReaderPrefsDirectionSeries:
+		return true
+	case GlobalReaderPrefsDirectionVertical:
+		return true
+	case GlobalReaderPrefsDirectionWebtoon:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GlobalReaderPrefsFit.
+const (
+	GlobalReaderPrefsFitHeight   GlobalReaderPrefsFit = "height"
+	GlobalReaderPrefsFitOriginal GlobalReaderPrefsFit = "original"
+	GlobalReaderPrefsFitScreen   GlobalReaderPrefsFit = "screen"
+	GlobalReaderPrefsFitWidth    GlobalReaderPrefsFit = "width"
+)
+
+// Valid indicates whether the value is a known member of the GlobalReaderPrefsFit enum.
+func (e GlobalReaderPrefsFit) Valid() bool {
+	switch e {
+	case GlobalReaderPrefsFitHeight:
+		return true
+	case GlobalReaderPrefsFitOriginal:
+		return true
+	case GlobalReaderPrefsFitScreen:
+		return true
+	case GlobalReaderPrefsFitWidth:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GlobalReaderPrefsSpread.
+const (
+	GlobalReaderPrefsSpreadCover GlobalReaderPrefsSpread = "cover"
+	GlobalReaderPrefsSpreadOff   GlobalReaderPrefsSpread = "off"
+	GlobalReaderPrefsSpreadOn    GlobalReaderPrefsSpread = "on"
+)
+
+// Valid indicates whether the value is a known member of the GlobalReaderPrefsSpread enum.
+func (e GlobalReaderPrefsSpread) Valid() bool {
+	switch e {
+	case GlobalReaderPrefsSpreadCover:
+		return true
+	case GlobalReaderPrefsSpreadOff:
+		return true
+	case GlobalReaderPrefsSpreadOn:
 		return true
 	default:
 		return false
@@ -185,6 +278,93 @@ func (e MediaStatus) Valid() bool {
 	}
 }
 
+// Defines values for ReadState.
+const (
+	InProgress ReadState = "inProgress"
+	Read       ReadState = "read"
+	Unread     ReadState = "unread"
+)
+
+// Valid indicates whether the value is a known member of the ReadState enum.
+func (e ReadState) Valid() bool {
+	switch e {
+	case InProgress:
+		return true
+	case Read:
+		return true
+	case Unread:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReaderPrefsBg.
+const (
+	ReaderPrefsBgBlack ReaderPrefsBg = "black"
+	ReaderPrefsBgGray  ReaderPrefsBg = "gray"
+	ReaderPrefsBgWhite ReaderPrefsBg = "white"
+)
+
+// Valid indicates whether the value is a known member of the ReaderPrefsBg enum.
+func (e ReaderPrefsBg) Valid() bool {
+	switch e {
+	case ReaderPrefsBgBlack:
+		return true
+	case ReaderPrefsBgGray:
+		return true
+	case ReaderPrefsBgWhite:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReaderPrefsFit.
+const (
+	ReaderPrefsFitHeight   ReaderPrefsFit = "height"
+	ReaderPrefsFitOriginal ReaderPrefsFit = "original"
+	ReaderPrefsFitScreen   ReaderPrefsFit = "screen"
+	ReaderPrefsFitWidth    ReaderPrefsFit = "width"
+)
+
+// Valid indicates whether the value is a known member of the ReaderPrefsFit enum.
+func (e ReaderPrefsFit) Valid() bool {
+	switch e {
+	case ReaderPrefsFitHeight:
+		return true
+	case ReaderPrefsFitOriginal:
+		return true
+	case ReaderPrefsFitScreen:
+		return true
+	case ReaderPrefsFitWidth:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReaderPrefsSpread.
+const (
+	ReaderPrefsSpreadCover ReaderPrefsSpread = "cover"
+	ReaderPrefsSpreadOff   ReaderPrefsSpread = "off"
+	ReaderPrefsSpreadOn    ReaderPrefsSpread = "on"
+)
+
+// Valid indicates whether the value is a known member of the ReaderPrefsSpread enum.
+func (e ReaderPrefsSpread) Valid() bool {
+	switch e {
+	case ReaderPrefsSpreadCover:
+		return true
+	case ReaderPrefsSpreadOff:
+		return true
+	case ReaderPrefsSpreadOn:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadingDirection.
 const (
 	ReadingDirectionLtr      ReadingDirection = "ltr"
@@ -229,22 +409,49 @@ func (e Role) Valid() bool {
 
 // Defines values for ScanInterval.
 const (
-	Daily  ScanInterval = "daily"
-	Hourly ScanInterval = "hourly"
-	Off    ScanInterval = "off"
-	Weekly ScanInterval = "weekly"
+	ScanIntervalDaily  ScanInterval = "daily"
+	ScanIntervalHourly ScanInterval = "hourly"
+	ScanIntervalOff    ScanInterval = "off"
+	ScanIntervalWeekly ScanInterval = "weekly"
 )
 
 // Valid indicates whether the value is a known member of the ScanInterval enum.
 func (e ScanInterval) Valid() bool {
 	switch e {
-	case Daily:
+	case ScanIntervalDaily:
 		return true
-	case Hourly:
+	case ScanIntervalHourly:
 		return true
-	case Off:
+	case ScanIntervalOff:
 		return true
-	case Weekly:
+	case ScanIntervalWeekly:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SeriesSort.
+const (
+	BookCount   SeriesSort = "bookCount"
+	Created     SeriesSort = "created"
+	ReleaseDate SeriesSort = "releaseDate"
+	Title       SeriesSort = "title"
+	Updated     SeriesSort = "updated"
+)
+
+// Valid indicates whether the value is a known member of the SeriesSort enum.
+func (e SeriesSort) Valid() bool {
+	switch e {
+	case BookCount:
+		return true
+	case Created:
+		return true
+	case ReleaseDate:
+		return true
+	case Title:
+		return true
+	case Updated:
 		return true
 	default:
 		return false
@@ -269,6 +476,96 @@ func (e SeriesStatus) Valid() bool {
 	case Hiatus:
 		return true
 	case Ongoing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServerSettingsThumbnailFormat.
+const (
+	ServerSettingsThumbnailFormatAvif ServerSettingsThumbnailFormat = "avif"
+	ServerSettingsThumbnailFormatJpeg ServerSettingsThumbnailFormat = "jpeg"
+	ServerSettingsThumbnailFormatWebp ServerSettingsThumbnailFormat = "webp"
+)
+
+// Valid indicates whether the value is a known member of the ServerSettingsThumbnailFormat enum.
+func (e ServerSettingsThumbnailFormat) Valid() bool {
+	switch e {
+	case ServerSettingsThumbnailFormatAvif:
+		return true
+	case ServerSettingsThumbnailFormatJpeg:
+		return true
+	case ServerSettingsThumbnailFormatWebp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServerSettingsThumbnailSize.
+const (
+	ServerSettingsThumbnailSizeLarge  ServerSettingsThumbnailSize = "large"
+	ServerSettingsThumbnailSizeMedium ServerSettingsThumbnailSize = "medium"
+	ServerSettingsThumbnailSizeSmall  ServerSettingsThumbnailSize = "small"
+	ServerSettingsThumbnailSizeXlarge ServerSettingsThumbnailSize = "xlarge"
+)
+
+// Valid indicates whether the value is a known member of the ServerSettingsThumbnailSize enum.
+func (e ServerSettingsThumbnailSize) Valid() bool {
+	switch e {
+	case ServerSettingsThumbnailSizeLarge:
+		return true
+	case ServerSettingsThumbnailSizeMedium:
+		return true
+	case ServerSettingsThumbnailSizeSmall:
+		return true
+	case ServerSettingsThumbnailSizeXlarge:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServerSettingsUpdateThumbnailFormat.
+const (
+	ServerSettingsUpdateThumbnailFormatAvif ServerSettingsUpdateThumbnailFormat = "avif"
+	ServerSettingsUpdateThumbnailFormatJpeg ServerSettingsUpdateThumbnailFormat = "jpeg"
+	ServerSettingsUpdateThumbnailFormatWebp ServerSettingsUpdateThumbnailFormat = "webp"
+)
+
+// Valid indicates whether the value is a known member of the ServerSettingsUpdateThumbnailFormat enum.
+func (e ServerSettingsUpdateThumbnailFormat) Valid() bool {
+	switch e {
+	case ServerSettingsUpdateThumbnailFormatAvif:
+		return true
+	case ServerSettingsUpdateThumbnailFormatJpeg:
+		return true
+	case ServerSettingsUpdateThumbnailFormatWebp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ServerSettingsUpdateThumbnailSize.
+const (
+	ServerSettingsUpdateThumbnailSizeLarge  ServerSettingsUpdateThumbnailSize = "large"
+	ServerSettingsUpdateThumbnailSizeMedium ServerSettingsUpdateThumbnailSize = "medium"
+	ServerSettingsUpdateThumbnailSizeSmall  ServerSettingsUpdateThumbnailSize = "small"
+	ServerSettingsUpdateThumbnailSizeXlarge ServerSettingsUpdateThumbnailSize = "xlarge"
+)
+
+// Valid indicates whether the value is a known member of the ServerSettingsUpdateThumbnailSize enum.
+func (e ServerSettingsUpdateThumbnailSize) Valid() bool {
+	switch e {
+	case ServerSettingsUpdateThumbnailSizeLarge:
+		return true
+	case ServerSettingsUpdateThumbnailSizeMedium:
+		return true
+	case ServerSettingsUpdateThumbnailSizeSmall:
+		return true
+	case ServerSettingsUpdateThumbnailSizeXlarge:
 		return true
 	default:
 		return false
@@ -329,6 +626,12 @@ func (e TaskState) Valid() bool {
 	}
 }
 
+// AdjacentBooks defines model for AdjacentBooks.
+type AdjacentBooks struct {
+	Next *Book `json:"next"`
+	Prev *Book `json:"prev"`
+}
+
 // ApiKey defines model for ApiKey.
 type ApiKey struct {
 	CreatedAt string  `json:"createdAt"`
@@ -368,6 +671,7 @@ type Book struct {
 	Id           string        `json:"id"`
 	Isbn         string        `json:"isbn"`
 	LibraryId    string        `json:"libraryId"`
+	LockedFields []string      `json:"lockedFields"`
 	MediaStatus  MediaStatus   `json:"mediaStatus"`
 	Number       float64       `json:"number"`
 	NumberSort   float64       `json:"numberSort"`
@@ -386,10 +690,86 @@ type Book struct {
 // BookFormat defines model for BookFormat.
 type BookFormat string
 
+// BookUpdate Fields to change; locking works as in SeriesUpdate
+type BookUpdate struct {
+	Authors      *[]Author `json:"authors,omitempty"`
+	Isbn         *string   `json:"isbn,omitempty"`
+	LockedFields *[]string `json:"lockedFields,omitempty"`
+	Number       *float64  `json:"number,omitempty"`
+	NumberSort   *float64  `json:"numberSort,omitempty"`
+	ReleaseDate  *string   `json:"releaseDate,omitempty"`
+	Summary      *string   `json:"summary,omitempty"`
+	Tags         *[]string `json:"tags,omitempty"`
+	Title        *string   `json:"title,omitempty"`
+}
+
+// Collection defines model for Collection.
+type Collection struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+
+	// Ordered Keep seriesIds order; otherwise shown by title
+	Ordered   bool     `json:"ordered"`
+	SeriesIds []string `json:"seriesIds"`
+}
+
+// CollectionCreate defines model for CollectionCreate.
+type CollectionCreate struct {
+	Name      string    `json:"name"`
+	Ordered   *bool     `json:"ordered,omitempty"`
+	SeriesIds *[]string `json:"seriesIds,omitempty"`
+}
+
+// CollectionUpdate defines model for CollectionUpdate.
+type CollectionUpdate struct {
+	Name    *string `json:"name,omitempty"`
+	Ordered *bool   `json:"ordered,omitempty"`
+
+	// SeriesIds Replaces the members (administrators see every library)
+	SeriesIds *[]string `json:"seriesIds,omitempty"`
+}
+
+// Dashboard defines model for Dashboard.
+type Dashboard struct {
+	// KeepReading Started, not finished, last read first
+	KeepReading []Book `json:"keepReading"`
+
+	// OnDeck First unread book of each series whose previous book is finished
+	OnDeck              []Book   `json:"onDeck"`
+	RecentlyAddedBooks  []Book   `json:"recentlyAddedBooks"`
+	RecentlyAddedSeries []Series `json:"recentlyAddedSeries"`
+
+	// RecentlyRead Finished, last read first
+	RecentlyRead          []Book   `json:"recentlyRead"`
+	RecentlyUpdatedSeries []Series `json:"recentlyUpdatedSeries"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	Message string `json:"message"`
 }
+
+// GlobalReaderPrefs defines model for GlobalReaderPrefs.
+type GlobalReaderPrefs struct {
+	Bg GlobalReaderPrefsBg `json:"bg"`
+
+	// Direction series follows each series' own direction
+	Direction GlobalReaderPrefsDirection `json:"direction"`
+	Fit       GlobalReaderPrefsFit       `json:"fit"`
+	Spread    GlobalReaderPrefsSpread    `json:"spread"`
+}
+
+// GlobalReaderPrefsBg defines model for GlobalReaderPrefs.Bg.
+type GlobalReaderPrefsBg string
+
+// GlobalReaderPrefsDirection series follows each series' own direction
+type GlobalReaderPrefsDirection string
+
+// GlobalReaderPrefsFit defines model for GlobalReaderPrefs.Fit.
+type GlobalReaderPrefsFit string
+
+// GlobalReaderPrefsSpread defines model for GlobalReaderPrefs.Spread.
+type GlobalReaderPrefsSpread string
 
 // Health defines model for Health.
 type Health struct {
@@ -502,11 +882,71 @@ type PasswordChange struct {
 	NewPassword     string `json:"newPassword"`
 }
 
+// ProgressUpdate defines model for ProgressUpdate.
+type ProgressUpdate struct {
+	Completed *bool `json:"completed,omitempty"`
+
+	// Page 1-based; at most the book's pageCount
+	Page int `json:"page"`
+}
+
+// ReadList defines model for ReadList.
+type ReadList struct {
+	BookIds []string `json:"bookIds"`
+	Id      string   `json:"id"`
+	Name    string   `json:"name"`
+	Summary string   `json:"summary"`
+}
+
+// ReadListCreate defines model for ReadListCreate.
+type ReadListCreate struct {
+	BookIds *[]string `json:"bookIds,omitempty"`
+	Name    string    `json:"name"`
+	Summary *string   `json:"summary,omitempty"`
+}
+
+// ReadListUpdate defines model for ReadListUpdate.
+type ReadListUpdate struct {
+	BookIds *[]string `json:"bookIds,omitempty"`
+	Name    *string   `json:"name,omitempty"`
+	Summary *string   `json:"summary,omitempty"`
+}
+
 // ReadProgress defines model for ReadProgress.
 type ReadProgress struct {
 	Completed bool   `json:"completed"`
 	Page      int    `json:"page"`
 	ReadAt    string `json:"readAt"`
+}
+
+// ReadState defines model for ReadState.
+type ReadState string
+
+// ReaderPrefs defines model for ReaderPrefs.
+type ReaderPrefs struct {
+	Bg        ReaderPrefsBg     `json:"bg"`
+	Direction ReadingDirection  `json:"direction"`
+	Fit       ReaderPrefsFit    `json:"fit"`
+	Spread    ReaderPrefsSpread `json:"spread"`
+}
+
+// ReaderPrefsBg defines model for ReaderPrefs.Bg.
+type ReaderPrefsBg string
+
+// ReaderPrefsFit defines model for ReaderPrefs.Fit.
+type ReaderPrefsFit string
+
+// ReaderPrefsSpread defines model for ReaderPrefs.Spread.
+type ReaderPrefsSpread string
+
+// ReaderPrefsAll defines model for ReaderPrefsAll.
+type ReaderPrefsAll struct {
+	// Books By book id
+	Books  map[string]ReaderPrefs `json:"books"`
+	Global GlobalReaderPrefs      `json:"global"`
+
+	// Series By series id
+	Series map[string]ReaderPrefs `json:"series"`
 }
 
 // ReadingDirection defines model for ReadingDirection.
@@ -517,6 +957,14 @@ type Role string
 
 // ScanInterval defines model for ScanInterval.
 type ScanInterval string
+
+// SearchResult defines model for SearchResult.
+type SearchResult struct {
+	Books       []Book       `json:"books"`
+	Collections []Collection `json:"collections"`
+	ReadLists   []ReadList   `json:"readLists"`
+	Series      []Series     `json:"series"`
+}
 
 // Series defines model for Series.
 type Series struct {
@@ -544,8 +992,76 @@ type Series struct {
 	UpdatedAt        string           `json:"updatedAt"`
 }
 
+// SeriesReadUpdate defines model for SeriesReadUpdate.
+type SeriesReadUpdate struct {
+	Completed bool `json:"completed"`
+}
+
+// SeriesSort releaseDate is the earliest release date among the series' books (series without one sort last)
+type SeriesSort string
+
 // SeriesStatus defines model for SeriesStatus.
 type SeriesStatus string
+
+// SeriesUpdate Fields to change. Every field given here is also locked, so scans and ComicInfo.xml leave it alone; lockedFields, when given, replaces the lock list instead.
+type SeriesUpdate struct {
+	AgeRating        *int              `json:"ageRating,omitempty"`
+	AlternateTitles  *[]string         `json:"alternateTitles,omitempty"`
+	Authors          *[]Author         `json:"authors,omitempty"`
+	Genres           *[]string         `json:"genres,omitempty"`
+	Language         *string           `json:"language,omitempty"`
+	LockedFields     *[]string         `json:"lockedFields,omitempty"`
+	Publisher        *string           `json:"publisher,omitempty"`
+	ReadingDirection *ReadingDirection `json:"readingDirection,omitempty"`
+	Status           *SeriesStatus     `json:"status,omitempty"`
+	Summary          *string           `json:"summary,omitempty"`
+	Tags             *[]string         `json:"tags,omitempty"`
+	Title            *string           `json:"title,omitempty"`
+	TitleSort        *string           `json:"titleSort,omitempty"`
+	TotalBookCount   *int              `json:"totalBookCount,omitempty"`
+}
+
+// ServerSettings defines model for ServerSettings.
+type ServerSettings struct {
+	DeleteEmptyCollections bool          `json:"deleteEmptyCollections"`
+	KoboSyncEnabled        bool          `json:"koboSyncEnabled"`
+	LoginBackdrop          LoginBackdrop `json:"loginBackdrop"`
+	OpdsEnabled            bool          `json:"opdsEnabled"`
+
+	// Port Takes effect after a restart
+	Port           int `json:"port"`
+	RememberMeDays int `json:"rememberMeDays"`
+	TaskThreads    int `json:"taskThreads"`
+
+	// ThumbnailFormat Only jpeg is produced today
+	ThumbnailFormat ServerSettingsThumbnailFormat `json:"thumbnailFormat"`
+	ThumbnailSize   ServerSettingsThumbnailSize   `json:"thumbnailSize"`
+}
+
+// ServerSettingsThumbnailFormat Only jpeg is produced today
+type ServerSettingsThumbnailFormat string
+
+// ServerSettingsThumbnailSize defines model for ServerSettings.ThumbnailSize.
+type ServerSettingsThumbnailSize string
+
+// ServerSettingsUpdate defines model for ServerSettingsUpdate.
+type ServerSettingsUpdate struct {
+	DeleteEmptyCollections *bool                                `json:"deleteEmptyCollections,omitempty"`
+	KoboSyncEnabled        *bool                                `json:"koboSyncEnabled,omitempty"`
+	LoginBackdrop          *LoginBackdrop                       `json:"loginBackdrop,omitempty"`
+	OpdsEnabled            *bool                                `json:"opdsEnabled,omitempty"`
+	Port                   *int                                 `json:"port,omitempty"`
+	RememberMeDays         *int                                 `json:"rememberMeDays,omitempty"`
+	TaskThreads            *int                                 `json:"taskThreads,omitempty"`
+	ThumbnailFormat        *ServerSettingsUpdateThumbnailFormat `json:"thumbnailFormat,omitempty"`
+	ThumbnailSize          *ServerSettingsUpdateThumbnailSize   `json:"thumbnailSize,omitempty"`
+}
+
+// ServerSettingsUpdateThumbnailFormat defines model for ServerSettingsUpdate.ThumbnailFormat.
+type ServerSettingsUpdateThumbnailFormat string
+
+// ServerSettingsUpdateThumbnailSize defines model for ServerSettingsUpdate.ThumbnailSize.
+type ServerSettingsUpdateThumbnailSize string
 
 // SetupRequest defines model for SetupRequest.
 type SetupRequest struct {
@@ -572,6 +1088,12 @@ type TaskKind string
 
 // TaskState defines model for TaskState.
 type TaskState string
+
+// TrashResult defines model for TrashResult.
+type TrashResult struct {
+	Books  int `json:"books"`
+	Series int `json:"series"`
+}
 
 // User defines model for User.
 type User struct {
@@ -629,13 +1151,51 @@ type TooManyRequests = Error
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Error
 
+// GetDashboardParams defines parameters for GetDashboard.
+type GetDashboardParams struct {
+	LibraryId *string `form:"libraryId,omitempty" json:"libraryId,omitempty"`
+}
+
+// SearchParams defines parameters for Search.
+type SearchParams struct {
+	Q string `form:"q" json:"q"`
+}
+
 // ListSeriesParams defines parameters for ListSeries.
 type ListSeriesParams struct {
 	LibraryId *string `form:"libraryId,omitempty" json:"libraryId,omitempty"`
+
+	// Search Substring of the title, an alternate title or an author
+	Search *string         `form:"search,omitempty" json:"search,omitempty"`
+	Status *[]SeriesStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// Genres Any of these genres
+	Genres *[]string `form:"genres,omitempty" json:"genres,omitempty"`
+
+	// ReadState For the caller
+	ReadState *[]ReadState `form:"readState,omitempty" json:"readState,omitempty"`
+	Sort      *SeriesSort  `form:"sort,omitempty" json:"sort,omitempty"`
+	Desc      *bool        `form:"desc,omitempty" json:"desc,omitempty"`
+
+	// Limit Page size; all when omitted
+	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// UpdateBookJSONRequestBody defines body for UpdateBook for application/json ContentType.
+type UpdateBookJSONRequestBody = BookUpdate
+
+// SetBookProgressJSONRequestBody defines body for SetBookProgress for application/json ContentType.
+type SetBookProgressJSONRequestBody = ProgressUpdate
+
+// CreateCollectionJSONRequestBody defines body for CreateCollection for application/json ContentType.
+type CreateCollectionJSONRequestBody = CollectionCreate
+
+// UpdateCollectionJSONRequestBody defines body for UpdateCollection for application/json ContentType.
+type UpdateCollectionJSONRequestBody = CollectionUpdate
 
 // CreateLibraryJSONRequestBody defines body for CreateLibrary for application/json ContentType.
 type CreateLibraryJSONRequestBody = LibraryCreate
@@ -648,6 +1208,30 @@ type CreateApiKeyJSONRequestBody = ApiKeyCreate
 
 // ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
 type ChangePasswordJSONRequestBody = PasswordChange
+
+// SetBookReaderPrefsJSONRequestBody defines body for SetBookReaderPrefs for application/json ContentType.
+type SetBookReaderPrefsJSONRequestBody = ReaderPrefs
+
+// SetGlobalReaderPrefsJSONRequestBody defines body for SetGlobalReaderPrefs for application/json ContentType.
+type SetGlobalReaderPrefsJSONRequestBody = GlobalReaderPrefs
+
+// SetSeriesReaderPrefsJSONRequestBody defines body for SetSeriesReaderPrefs for application/json ContentType.
+type SetSeriesReaderPrefsJSONRequestBody = ReaderPrefs
+
+// CreateReadListJSONRequestBody defines body for CreateReadList for application/json ContentType.
+type CreateReadListJSONRequestBody = ReadListCreate
+
+// UpdateReadListJSONRequestBody defines body for UpdateReadList for application/json ContentType.
+type UpdateReadListJSONRequestBody = ReadListUpdate
+
+// UpdateSeriesJSONRequestBody defines body for UpdateSeries for application/json ContentType.
+type UpdateSeriesJSONRequestBody = SeriesUpdate
+
+// MarkSeriesReadJSONRequestBody defines body for MarkSeriesRead for application/json ContentType.
+type MarkSeriesReadJSONRequestBody = SeriesReadUpdate
+
+// UpdateSettingsJSONRequestBody defines body for UpdateSettings for application/json ContentType.
+type UpdateSettingsJSONRequestBody = ServerSettingsUpdate
 
 // SetupJSONRequestBody defines body for Setup for application/json ContentType.
 type SetupJSONRequestBody = SetupRequest
@@ -669,15 +1253,48 @@ type ServerInterface interface {
 
 	// (GET /books/{bookId})
 	GetBook(w http.ResponseWriter, r *http.Request, bookId string)
+	// UpdateBook Edit book metadata (administrators only)
+	// (PATCH /books/{bookId})
+	UpdateBook(w http.ResponseWriter, r *http.Request, bookId string)
+	// GetAdjacentBooks The previous and next book in the series, for "next volume" in the reader
+	// (GET /books/{bookId}/adjacent)
+	GetAdjacentBooks(w http.ResponseWriter, r *http.Request, bookId string)
 
 	// (GET /books/{bookId}/pages)
 	ListBookPages(w http.ResponseWriter, r *http.Request, bookId string)
 	// GetBookPage One page image as stored in the archive (ETag, long private cache)
 	// (GET /books/{bookId}/pages/{page})
 	GetBookPage(w http.ResponseWriter, r *http.Request, bookId string, page int)
+	// ClearBookProgress Mark the book unread for the caller
+	// (DELETE /books/{bookId}/progress)
+	ClearBookProgress(w http.ResponseWriter, r *http.Request, bookId string)
+	// SetBookProgress Save the caller's reading position; completed defaults to page == pageCount
+	// (PUT /books/{bookId}/progress)
+	SetBookProgress(w http.ResponseWriter, r *http.Request, bookId string)
 	// GetBookThumbnail Cover thumbnail, JPEG
 	// (GET /books/{bookId}/thumbnail)
 	GetBookThumbnail(w http.ResponseWriter, r *http.Request, bookId string)
+	// ListCollections Collections with at least one series the caller may see
+	// (GET /collections)
+	ListCollections(w http.ResponseWriter, r *http.Request)
+
+	// (POST /collections)
+	CreateCollection(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /collections/{collectionId})
+	DeleteCollection(w http.ResponseWriter, r *http.Request, collectionId string)
+
+	// (GET /collections/{collectionId})
+	GetCollection(w http.ResponseWriter, r *http.Request, collectionId string)
+
+	// (PATCH /collections/{collectionId})
+	UpdateCollection(w http.ResponseWriter, r *http.Request, collectionId string)
+
+	// (GET /collections/{collectionId}/series)
+	ListCollectionSeries(w http.ResponseWriter, r *http.Request, collectionId string)
+	// GetDashboard Home shelves for the caller, newest first, at most 12-16 items each
+	// (GET /dashboard)
+	GetDashboard(w http.ResponseWriter, r *http.Request, params GetDashboardParams)
 	// GetHealth Liveness and version
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
@@ -714,24 +1331,78 @@ type ServerInterface interface {
 	// ChangePassword Change the password; other sessions are signed out
 	// (PUT /me/password)
 	ChangePassword(w http.ResponseWriter, r *http.Request)
+	// GetReaderPrefs The caller's global reader settings and every series and book override
+	// (GET /me/reader-prefs)
+	GetReaderPrefs(w http.ResponseWriter, r *http.Request)
+	// DeleteBookReaderPrefs Go back to the series (or global) settings for this book
+	// (DELETE /me/reader-prefs/books/{bookId})
+	DeleteBookReaderPrefs(w http.ResponseWriter, r *http.Request, bookId string)
+
+	// (PUT /me/reader-prefs/books/{bookId})
+	SetBookReaderPrefs(w http.ResponseWriter, r *http.Request, bookId string)
+
+	// (PUT /me/reader-prefs/global)
+	SetGlobalReaderPrefs(w http.ResponseWriter, r *http.Request)
+	// DeleteSeriesReaderPrefs Go back to the global settings for this series
+	// (DELETE /me/reader-prefs/series/{seriesId})
+	DeleteSeriesReaderPrefs(w http.ResponseWriter, r *http.Request, seriesId string)
+
+	// (PUT /me/reader-prefs/series/{seriesId})
+	SetSeriesReaderPrefs(w http.ResponseWriter, r *http.Request, seriesId string)
 	// ListMediaIssues Books that failed analysis or whose files are gone
 	// (GET /media/issues)
 	ListMediaIssues(w http.ResponseWriter, r *http.Request)
+	// GetPublicCover A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers)
+	// (GET /public/covers/{seriesId})
+	GetPublicCover(w http.ResponseWriter, r *http.Request, seriesId string)
 	// GetLoginScreen The only data the sign-in page reads before authentication
 	// (GET /public/login-screen)
 	GetLoginScreen(w http.ResponseWriter, r *http.Request)
-	// ListSeries Series, optionally in one library (filters and paging arrive in M3)
+	// ListReadLists Reading lists with at least one book the caller may see
+	// (GET /read-lists)
+	ListReadLists(w http.ResponseWriter, r *http.Request)
+
+	// (POST /read-lists)
+	CreateReadList(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /read-lists/{readListId})
+	DeleteReadList(w http.ResponseWriter, r *http.Request, readListId string)
+
+	// (GET /read-lists/{readListId})
+	GetReadList(w http.ResponseWriter, r *http.Request, readListId string)
+
+	// (PATCH /read-lists/{readListId})
+	UpdateReadList(w http.ResponseWriter, r *http.Request, readListId string)
+
+	// (GET /read-lists/{readListId}/books)
+	ListReadListBooks(w http.ResponseWriter, r *http.Request, readListId string)
+	// Search Substring search over titles, authors and ISBN (any length, Japanese included)
+	// (GET /search)
+	Search(w http.ResponseWriter, r *http.Request, params SearchParams)
+	// ListSeries Series the caller may see, filtered, sorted and paged
 	// (GET /series)
 	ListSeries(w http.ResponseWriter, r *http.Request, params ListSeriesParams)
 
 	// (GET /series/{seriesId})
 	GetSeries(w http.ResponseWriter, r *http.Request, seriesId string)
+	// UpdateSeries Edit series metadata (administrators only)
+	// (PATCH /series/{seriesId})
+	UpdateSeries(w http.ResponseWriter, r *http.Request, seriesId string)
 
 	// (GET /series/{seriesId}/books)
 	ListSeriesBooks(w http.ResponseWriter, r *http.Request, seriesId string)
+	// MarkSeriesRead Mark every book of the series read (completed true) or unread (false) for the caller
+	// (PUT /series/{seriesId}/read-progress)
+	MarkSeriesRead(w http.ResponseWriter, r *http.Request, seriesId string)
 	// GetSeriesThumbnail Cover of the series' first book, JPEG
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string)
+	// GetSettings Server settings (administrators only)
+	// (GET /settings)
+	GetSettings(w http.ResponseWriter, r *http.Request)
+	// UpdateSettings Change only the given fields, merged into the stored settings
+	// (PATCH /settings)
+	UpdateSettings(w http.ResponseWriter, r *http.Request)
 	// Setup Create the first administrator (only while no user exists)
 	// (POST /setup)
 	Setup(w http.ResponseWriter, r *http.Request)
@@ -741,6 +1412,9 @@ type ServerInterface interface {
 
 	// (POST /tasks/{taskId}/cancel)
 	CancelTask(w http.ResponseWriter, r *http.Request, taskId string)
+	// EmptyTrash Delete series and books whose files are gone (administrators only)
+	// (POST /trash/empty)
+	EmptyTrash(w http.ResponseWriter, r *http.Request)
 	// ListUsers All users (administrators only)
 	// (GET /users)
 	ListUsers(w http.ResponseWriter, r *http.Request)
@@ -818,6 +1492,58 @@ func (siw *ServerInterfaceWrapper) GetBook(w http.ResponseWriter, r *http.Reques
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateBook operation middleware
+func (siw *ServerInterfaceWrapper) UpdateBook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateBook(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAdjacentBooks operation middleware
+func (siw *ServerInterfaceWrapper) GetAdjacentBooks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAdjacentBooks(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListBookPages operation middleware
 func (siw *ServerInterfaceWrapper) ListBookPages(w http.ResponseWriter, r *http.Request) {
 
@@ -879,6 +1605,58 @@ func (siw *ServerInterfaceWrapper) GetBookPage(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// ClearBookProgress operation middleware
+func (siw *ServerInterfaceWrapper) ClearBookProgress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ClearBookProgress(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetBookProgress operation middleware
+func (siw *ServerInterfaceWrapper) SetBookProgress(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetBookProgress(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetBookThumbnail operation middleware
 func (siw *ServerInterfaceWrapper) GetBookThumbnail(w http.ResponseWriter, r *http.Request) {
 
@@ -896,6 +1674,171 @@ func (siw *ServerInterfaceWrapper) GetBookThumbnail(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetBookThumbnail(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCollections operation middleware
+func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollections(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCollection operation middleware
+func (siw *ServerInterfaceWrapper) CreateCollection(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCollection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCollection operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionId" -------------
+	var collectionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionId", r.PathValue("collectionId"), &collectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCollection(w, r, collectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCollection operation middleware
+func (siw *ServerInterfaceWrapper) GetCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionId" -------------
+	var collectionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionId", r.PathValue("collectionId"), &collectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCollection(w, r, collectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateCollection operation middleware
+func (siw *ServerInterfaceWrapper) UpdateCollection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionId" -------------
+	var collectionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionId", r.PathValue("collectionId"), &collectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateCollection(w, r, collectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCollectionSeries operation middleware
+func (siw *ServerInterfaceWrapper) ListCollectionSeries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionId" -------------
+	var collectionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionId", r.PathValue("collectionId"), &collectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCollectionSeries(w, r, collectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetDashboard operation middleware
+func (siw *ServerInterfaceWrapper) GetDashboard(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetDashboardParams
+
+	// ------------- Optional query parameter "libraryId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "libraryId", r.URL.Query(), &params.LibraryId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "libraryId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetDashboard(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1133,6 +2076,138 @@ func (siw *ServerInterfaceWrapper) ChangePassword(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// GetReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) GetReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReaderPrefs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteBookReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) DeleteBookReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteBookReaderPrefs(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetBookReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) SetBookReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetBookReaderPrefs(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetGlobalReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) SetGlobalReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetGlobalReaderPrefs(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteSeriesReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSeriesReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSeriesReaderPrefs(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSeriesReaderPrefs operation middleware
+func (siw *ServerInterfaceWrapper) SetSeriesReaderPrefs(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSeriesReaderPrefs(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMediaIssues operation middleware
 func (siw *ServerInterfaceWrapper) ListMediaIssues(w http.ResponseWriter, r *http.Request) {
 
@@ -1147,11 +2222,202 @@ func (siw *ServerInterfaceWrapper) ListMediaIssues(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// GetPublicCover operation middleware
+func (siw *ServerInterfaceWrapper) GetPublicCover(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPublicCover(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetLoginScreen operation middleware
 func (siw *ServerInterfaceWrapper) GetLoginScreen(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetLoginScreen(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReadLists operation middleware
+func (siw *ServerInterfaceWrapper) ListReadLists(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReadLists(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateReadList operation middleware
+func (siw *ServerInterfaceWrapper) CreateReadList(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateReadList(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteReadList operation middleware
+func (siw *ServerInterfaceWrapper) DeleteReadList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "readListId" -------------
+	var readListId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "readListId", r.PathValue("readListId"), &readListId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readListId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteReadList(w, r, readListId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetReadList operation middleware
+func (siw *ServerInterfaceWrapper) GetReadList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "readListId" -------------
+	var readListId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "readListId", r.PathValue("readListId"), &readListId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readListId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReadList(w, r, readListId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateReadList operation middleware
+func (siw *ServerInterfaceWrapper) UpdateReadList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "readListId" -------------
+	var readListId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "readListId", r.PathValue("readListId"), &readListId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readListId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateReadList(w, r, readListId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListReadListBooks operation middleware
+func (siw *ServerInterfaceWrapper) ListReadListBooks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "readListId" -------------
+	var readListId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "readListId", r.PathValue("readListId"), &readListId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readListId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListReadListBooks(w, r, readListId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Search operation middleware
+func (siw *ServerInterfaceWrapper) Search(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params SearchParams
+
+	// ------------- Required query parameter "q" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "q", r.URL.Query(), &params.Q, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "q"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "q", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Search(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1179,6 +2445,110 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "libraryId"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "search" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "search", r.URL.Query(), &params.Search, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "search"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "search", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "genres" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "genres", r.URL.Query(), &params.Genres, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "genres"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "genres", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "readState" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "readState", r.URL.Query(), &params.ReadState, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "readState"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readState", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "desc" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "desc", r.URL.Query(), &params.Desc, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "desc"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "desc", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "offset" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "offset", r.URL.Query(), &params.Offset, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "offset"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "offset", Err: err})
 		}
 		return
 	}
@@ -1220,6 +2590,32 @@ func (siw *ServerInterfaceWrapper) GetSeries(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// UpdateSeries operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSeries(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSeries(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListSeriesBooks operation middleware
 func (siw *ServerInterfaceWrapper) ListSeriesBooks(w http.ResponseWriter, r *http.Request) {
 
@@ -1246,6 +2642,32 @@ func (siw *ServerInterfaceWrapper) ListSeriesBooks(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r)
 }
 
+// MarkSeriesRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkSeriesRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkSeriesRead(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSeriesThumbnail operation middleware
 func (siw *ServerInterfaceWrapper) GetSeriesThumbnail(w http.ResponseWriter, r *http.Request) {
 
@@ -1263,6 +2685,34 @@ func (siw *ServerInterfaceWrapper) GetSeriesThumbnail(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSeriesThumbnail(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateSettings operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSettings(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1317,6 +2767,20 @@ func (siw *ServerInterfaceWrapper) CancelTask(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelTask(w, r, taskId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// EmptyTrash operation middleware
+func (siw *ServerInterfaceWrapper) EmptyTrash(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.EmptyTrash(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1536,9 +3000,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/libraries/{libraryId}/scan", wrapper.ScanLibrary)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series", wrapper.ListSeries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}", wrapper.GetSeries)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/series/{seriesId}", wrapper.UpdateSeries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}/books", wrapper.ListSeriesBooks)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}/thumbnail", wrapper.GetSeriesThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}", wrapper.GetBook)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/books/{bookId}", wrapper.UpdateBook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/thumbnail", wrapper.GetBookThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/pages", wrapper.ListBookPages)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/pages/{page}", wrapper.GetBookPage)
@@ -1557,6 +3023,34 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{userId}", wrapper.DeleteUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{userId}", wrapper.UpdateUser)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/series/{seriesId}/read-progress", wrapper.MarkSeriesRead)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/adjacent", wrapper.GetAdjacentBooks)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/books/{bookId}/progress", wrapper.ClearBookProgress)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/books/{bookId}/progress", wrapper.SetBookProgress)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/dashboard", wrapper.GetDashboard)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/search", wrapper.Search)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collections", wrapper.ListCollections)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collections", wrapper.CreateCollection)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/collections/{collectionId}", wrapper.DeleteCollection)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collections/{collectionId}", wrapper.GetCollection)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/collections/{collectionId}", wrapper.UpdateCollection)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collections/{collectionId}/series", wrapper.ListCollectionSeries)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/read-lists", wrapper.ListReadLists)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/read-lists", wrapper.CreateReadList)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/read-lists/{readListId}", wrapper.DeleteReadList)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/read-lists/{readListId}", wrapper.GetReadList)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/read-lists/{readListId}", wrapper.UpdateReadList)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/read-lists/{readListId}/books", wrapper.ListReadListBooks)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/reader-prefs", wrapper.GetReaderPrefs)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/reader-prefs/global", wrapper.SetGlobalReaderPrefs)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/reader-prefs/series/{seriesId}", wrapper.DeleteSeriesReaderPrefs)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/reader-prefs/series/{seriesId}", wrapper.SetSeriesReaderPrefs)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/reader-prefs/books/{bookId}", wrapper.DeleteBookReaderPrefs)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/reader-prefs/books/{bookId}", wrapper.SetBookReaderPrefs)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/settings", wrapper.GetSettings)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/settings", wrapper.UpdateSettings)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/trash/empty", wrapper.EmptyTrash)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/public/covers/{seriesId}", wrapper.GetPublicCover)
 
 	return m
 }
@@ -1679,6 +3173,93 @@ func (response GetBook404JSONResponse) VisitGetBookResponse(w http.ResponseWrite
 	return err
 }
 
+type UpdateBookRequestObject struct {
+	BookId string `json:"bookId"`
+	Body   *UpdateBookJSONRequestBody
+}
+
+type UpdateBookResponseObject interface {
+	VisitUpdateBookResponse(w http.ResponseWriter) error
+}
+
+type UpdateBook200JSONResponse Book
+
+func (response UpdateBook200JSONResponse) VisitUpdateBookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBook400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateBook400JSONResponse) VisitUpdateBookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateBook404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateBook404JSONResponse) VisitUpdateBookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdjacentBooksRequestObject struct {
+	BookId string `json:"bookId"`
+}
+
+type GetAdjacentBooksResponseObject interface {
+	VisitGetAdjacentBooksResponse(w http.ResponseWriter) error
+}
+
+type GetAdjacentBooks200JSONResponse AdjacentBooks
+
+func (response GetAdjacentBooks200JSONResponse) VisitGetAdjacentBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAdjacentBooks404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetAdjacentBooks404JSONResponse) VisitGetAdjacentBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListBookPagesRequestObject struct {
 	BookId string `json:"bookId"`
 }
@@ -1763,6 +3344,87 @@ func (response GetBookPage404JSONResponse) VisitGetBookPageResponse(w http.Respo
 	return err
 }
 
+type ClearBookProgressRequestObject struct {
+	BookId string `json:"bookId"`
+}
+
+type ClearBookProgressResponseObject interface {
+	VisitClearBookProgressResponse(w http.ResponseWriter) error
+}
+
+type ClearBookProgress204Response struct {
+}
+
+func (response ClearBookProgress204Response) VisitClearBookProgressResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ClearBookProgress404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ClearBookProgress404JSONResponse) VisitClearBookProgressResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBookProgressRequestObject struct {
+	BookId string `json:"bookId"`
+	Body   *SetBookProgressJSONRequestBody
+}
+
+type SetBookProgressResponseObject interface {
+	VisitSetBookProgressResponse(w http.ResponseWriter) error
+}
+
+type SetBookProgress200JSONResponse ReadProgress
+
+func (response SetBookProgress200JSONResponse) VisitSetBookProgressResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBookProgress400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetBookProgress400JSONResponse) VisitSetBookProgressResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBookProgress404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetBookProgress404JSONResponse) VisitSetBookProgressResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetBookThumbnailRequestObject struct {
 	BookId string `json:"bookId"`
 }
@@ -1798,6 +3460,238 @@ func (response GetBookThumbnail404JSONResponse) VisitGetBookThumbnailResponse(w 
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionsRequestObject struct {
+}
+
+type ListCollectionsResponseObject interface {
+	VisitListCollectionsResponse(w http.ResponseWriter) error
+}
+
+type ListCollections200JSONResponse []Collection
+
+func (response ListCollections200JSONResponse) VisitListCollectionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCollectionRequestObject struct {
+	Body *CreateCollectionJSONRequestBody
+}
+
+type CreateCollectionResponseObject interface {
+	VisitCreateCollectionResponse(w http.ResponseWriter) error
+}
+
+type CreateCollection201JSONResponse Collection
+
+func (response CreateCollection201JSONResponse) VisitCreateCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateCollection400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateCollection400JSONResponse) VisitCreateCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteCollectionRequestObject struct {
+	CollectionId string `json:"collectionId"`
+}
+
+type DeleteCollectionResponseObject interface {
+	VisitDeleteCollectionResponse(w http.ResponseWriter) error
+}
+
+type DeleteCollection204Response struct {
+}
+
+func (response DeleteCollection204Response) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteCollection404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteCollection404JSONResponse) VisitDeleteCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCollectionRequestObject struct {
+	CollectionId string `json:"collectionId"`
+}
+
+type GetCollectionResponseObject interface {
+	VisitGetCollectionResponse(w http.ResponseWriter) error
+}
+
+type GetCollection200JSONResponse Collection
+
+func (response GetCollection200JSONResponse) VisitGetCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCollection404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetCollection404JSONResponse) VisitGetCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCollectionRequestObject struct {
+	CollectionId string `json:"collectionId"`
+	Body         *UpdateCollectionJSONRequestBody
+}
+
+type UpdateCollectionResponseObject interface {
+	VisitUpdateCollectionResponse(w http.ResponseWriter) error
+}
+
+type UpdateCollection200JSONResponse Collection
+
+func (response UpdateCollection200JSONResponse) VisitUpdateCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCollection400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateCollection400JSONResponse) VisitUpdateCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateCollection404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateCollection404JSONResponse) VisitUpdateCollectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionSeriesRequestObject struct {
+	CollectionId string `json:"collectionId"`
+}
+
+type ListCollectionSeriesResponseObject interface {
+	VisitListCollectionSeriesResponse(w http.ResponseWriter) error
+}
+
+type ListCollectionSeries200JSONResponse []Series
+
+func (response ListCollectionSeries200JSONResponse) VisitListCollectionSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCollectionSeries404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListCollectionSeries404JSONResponse) VisitListCollectionSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetDashboardRequestObject struct {
+	Params GetDashboardParams
+}
+
+type GetDashboardResponseObject interface {
+	VisitGetDashboardResponse(w http.ResponseWriter) error
+}
+
+type GetDashboard200JSONResponse Dashboard
+
+func (response GetDashboard200JSONResponse) VisitGetDashboardResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2185,6 +4079,179 @@ func (response ChangePassword400JSONResponse) VisitChangePasswordResponse(w http
 	return err
 }
 
+type GetReaderPrefsRequestObject struct {
+}
+
+type GetReaderPrefsResponseObject interface {
+	VisitGetReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type GetReaderPrefs200JSONResponse ReaderPrefsAll
+
+func (response GetReaderPrefs200JSONResponse) VisitGetReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteBookReaderPrefsRequestObject struct {
+	BookId string `json:"bookId"`
+}
+
+type DeleteBookReaderPrefsResponseObject interface {
+	VisitDeleteBookReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type DeleteBookReaderPrefs204Response struct {
+}
+
+func (response DeleteBookReaderPrefs204Response) VisitDeleteBookReaderPrefsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetBookReaderPrefsRequestObject struct {
+	BookId string `json:"bookId"`
+	Body   *SetBookReaderPrefsJSONRequestBody
+}
+
+type SetBookReaderPrefsResponseObject interface {
+	VisitSetBookReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type SetBookReaderPrefs204Response struct {
+}
+
+func (response SetBookReaderPrefs204Response) VisitSetBookReaderPrefsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetBookReaderPrefs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetBookReaderPrefs400JSONResponse) VisitSetBookReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBookReaderPrefs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetBookReaderPrefs404JSONResponse) VisitSetBookReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetGlobalReaderPrefsRequestObject struct {
+	Body *SetGlobalReaderPrefsJSONRequestBody
+}
+
+type SetGlobalReaderPrefsResponseObject interface {
+	VisitSetGlobalReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type SetGlobalReaderPrefs204Response struct {
+}
+
+func (response SetGlobalReaderPrefs204Response) VisitSetGlobalReaderPrefsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetGlobalReaderPrefs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetGlobalReaderPrefs400JSONResponse) VisitSetGlobalReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSeriesReaderPrefsRequestObject struct {
+	SeriesId string `json:"seriesId"`
+}
+
+type DeleteSeriesReaderPrefsResponseObject interface {
+	VisitDeleteSeriesReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type DeleteSeriesReaderPrefs204Response struct {
+}
+
+func (response DeleteSeriesReaderPrefs204Response) VisitDeleteSeriesReaderPrefsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetSeriesReaderPrefsRequestObject struct {
+	SeriesId string `json:"seriesId"`
+	Body     *SetSeriesReaderPrefsJSONRequestBody
+}
+
+type SetSeriesReaderPrefsResponseObject interface {
+	VisitSetSeriesReaderPrefsResponse(w http.ResponseWriter) error
+}
+
+type SetSeriesReaderPrefs204Response struct {
+}
+
+func (response SetSeriesReaderPrefs204Response) VisitSetSeriesReaderPrefsResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetSeriesReaderPrefs400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetSeriesReaderPrefs400JSONResponse) VisitSetSeriesReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetSeriesReaderPrefs404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetSeriesReaderPrefs404JSONResponse) VisitSetSeriesReaderPrefsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMediaIssuesRequestObject struct {
 }
 
@@ -2202,6 +4269,45 @@ func (response ListMediaIssues200JSONResponse) VisitListMediaIssuesResponse(w ht
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPublicCoverRequestObject struct {
+	SeriesId string `json:"seriesId"`
+}
+
+type GetPublicCoverResponseObject interface {
+	VisitGetPublicCoverResponse(w http.ResponseWriter) error
+}
+
+type GetPublicCover200ImageResponse struct{ ImageImageResponse }
+
+func (response GetPublicCover200ImageResponse) VisitGetPublicCoverResponse(w http.ResponseWriter) error {
+
+	w.Header().Set("Content-Type", response.ContentType)
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetPublicCover404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetPublicCover404JSONResponse) VisitGetPublicCoverResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2227,6 +4333,238 @@ func (response GetLoginScreen200JSONResponse) VisitGetLoginScreenResponse(w http
 	return err
 }
 
+type ListReadListsRequestObject struct {
+}
+
+type ListReadListsResponseObject interface {
+	VisitListReadListsResponse(w http.ResponseWriter) error
+}
+
+type ListReadLists200JSONResponse []ReadList
+
+func (response ListReadLists200JSONResponse) VisitListReadListsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateReadListRequestObject struct {
+	Body *CreateReadListJSONRequestBody
+}
+
+type CreateReadListResponseObject interface {
+	VisitCreateReadListResponse(w http.ResponseWriter) error
+}
+
+type CreateReadList201JSONResponse ReadList
+
+func (response CreateReadList201JSONResponse) VisitCreateReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateReadList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateReadList400JSONResponse) VisitCreateReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteReadListRequestObject struct {
+	ReadListId string `json:"readListId"`
+}
+
+type DeleteReadListResponseObject interface {
+	VisitDeleteReadListResponse(w http.ResponseWriter) error
+}
+
+type DeleteReadList204Response struct {
+}
+
+func (response DeleteReadList204Response) VisitDeleteReadListResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteReadList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteReadList404JSONResponse) VisitDeleteReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReadListRequestObject struct {
+	ReadListId string `json:"readListId"`
+}
+
+type GetReadListResponseObject interface {
+	VisitGetReadListResponse(w http.ResponseWriter) error
+}
+
+type GetReadList200JSONResponse ReadList
+
+func (response GetReadList200JSONResponse) VisitGetReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReadList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetReadList404JSONResponse) VisitGetReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateReadListRequestObject struct {
+	ReadListId string `json:"readListId"`
+	Body       *UpdateReadListJSONRequestBody
+}
+
+type UpdateReadListResponseObject interface {
+	VisitUpdateReadListResponse(w http.ResponseWriter) error
+}
+
+type UpdateReadList200JSONResponse ReadList
+
+func (response UpdateReadList200JSONResponse) VisitUpdateReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateReadList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateReadList400JSONResponse) VisitUpdateReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateReadList404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateReadList404JSONResponse) VisitUpdateReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReadListBooksRequestObject struct {
+	ReadListId string `json:"readListId"`
+}
+
+type ListReadListBooksResponseObject interface {
+	VisitListReadListBooksResponse(w http.ResponseWriter) error
+}
+
+type ListReadListBooks200JSONResponse []Book
+
+func (response ListReadListBooks200JSONResponse) VisitListReadListBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListReadListBooks404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListReadListBooks404JSONResponse) VisitListReadListBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SearchRequestObject struct {
+	Params SearchParams
+}
+
+type SearchResponseObject interface {
+	VisitSearchResponse(w http.ResponseWriter) error
+}
+
+type Search200JSONResponse SearchResult
+
+func (response Search200JSONResponse) VisitSearchResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListSeriesRequestObject struct {
 	Params ListSeriesParams
 }
@@ -2235,15 +4573,25 @@ type ListSeriesResponseObject interface {
 	VisitListSeriesResponse(w http.ResponseWriter) error
 }
 
-type ListSeries200JSONResponse []Series
+type ListSeries200ResponseHeaders struct {
+	XTotalCount *int
+}
+
+type ListSeries200JSONResponse struct {
+	Body    []Series
+	Headers ListSeries200ResponseHeaders
+}
 
 func (response ListSeries200JSONResponse) VisitListSeriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
 		return err
 	}
 	w.Header().Set("Content-Type", "application/json")
+	if response.Headers.XTotalCount != nil {
+		w.Header().Set("X-Total-Count", fmt.Sprint(*response.Headers.XTotalCount))
+	}
 	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
@@ -2274,6 +4622,57 @@ func (response GetSeries200JSONResponse) VisitGetSeriesResponse(w http.ResponseW
 type GetSeries404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetSeries404JSONResponse) VisitGetSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSeriesRequestObject struct {
+	SeriesId string `json:"seriesId"`
+	Body     *UpdateSeriesJSONRequestBody
+}
+
+type UpdateSeriesResponseObject interface {
+	VisitUpdateSeriesResponse(w http.ResponseWriter) error
+}
+
+type UpdateSeries200JSONResponse Series
+
+func (response UpdateSeries200JSONResponse) VisitUpdateSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSeries400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateSeries400JSONResponse) VisitUpdateSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSeries404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateSeries404JSONResponse) VisitUpdateSeriesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -2321,6 +4720,37 @@ func (response ListSeriesBooks404JSONResponse) VisitListSeriesBooksResponse(w ht
 	return err
 }
 
+type MarkSeriesReadRequestObject struct {
+	SeriesId string `json:"seriesId"`
+	Body     *MarkSeriesReadJSONRequestBody
+}
+
+type MarkSeriesReadResponseObject interface {
+	VisitMarkSeriesReadResponse(w http.ResponseWriter) error
+}
+
+type MarkSeriesRead204Response struct {
+}
+
+func (response MarkSeriesRead204Response) VisitMarkSeriesReadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type MarkSeriesRead404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response MarkSeriesRead404JSONResponse) VisitMarkSeriesReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSeriesThumbnailRequestObject struct {
 	SeriesId string `json:"seriesId"`
 }
@@ -2356,6 +4786,63 @@ func (response GetSeriesThumbnail404JSONResponse) VisitGetSeriesThumbnailRespons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSettingsRequestObject struct {
+}
+
+type GetSettingsResponseObject interface {
+	VisitGetSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetSettings200JSONResponse ServerSettings
+
+func (response GetSettings200JSONResponse) VisitGetSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettingsRequestObject struct {
+	Body *UpdateSettingsJSONRequestBody
+}
+
+type UpdateSettingsResponseObject interface {
+	VisitUpdateSettingsResponse(w http.ResponseWriter) error
+}
+
+type UpdateSettings200JSONResponse ServerSettings
+
+func (response UpdateSettings200JSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateSettings400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateSettings400JSONResponse) VisitUpdateSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2457,6 +4944,27 @@ func (response CancelTask404JSONResponse) VisitCancelTaskResponse(w http.Respons
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type EmptyTrashRequestObject struct {
+}
+
+type EmptyTrashResponseObject interface {
+	VisitEmptyTrashResponse(w http.ResponseWriter) error
+}
+
+type EmptyTrash200JSONResponse TrashResult
+
+func (response EmptyTrash200JSONResponse) VisitEmptyTrashResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2624,15 +5132,48 @@ type StrictServerInterface interface {
 
 	// (GET /books/{bookId})
 	GetBook(ctx context.Context, request GetBookRequestObject) (GetBookResponseObject, error)
+	// UpdateBook Edit book metadata (administrators only)
+	// (PATCH /books/{bookId})
+	UpdateBook(ctx context.Context, request UpdateBookRequestObject) (UpdateBookResponseObject, error)
+	// GetAdjacentBooks The previous and next book in the series, for "next volume" in the reader
+	// (GET /books/{bookId}/adjacent)
+	GetAdjacentBooks(ctx context.Context, request GetAdjacentBooksRequestObject) (GetAdjacentBooksResponseObject, error)
 
 	// (GET /books/{bookId}/pages)
 	ListBookPages(ctx context.Context, request ListBookPagesRequestObject) (ListBookPagesResponseObject, error)
 	// GetBookPage One page image as stored in the archive (ETag, long private cache)
 	// (GET /books/{bookId}/pages/{page})
 	GetBookPage(ctx context.Context, request GetBookPageRequestObject) (GetBookPageResponseObject, error)
+	// ClearBookProgress Mark the book unread for the caller
+	// (DELETE /books/{bookId}/progress)
+	ClearBookProgress(ctx context.Context, request ClearBookProgressRequestObject) (ClearBookProgressResponseObject, error)
+	// SetBookProgress Save the caller's reading position; completed defaults to page == pageCount
+	// (PUT /books/{bookId}/progress)
+	SetBookProgress(ctx context.Context, request SetBookProgressRequestObject) (SetBookProgressResponseObject, error)
 	// GetBookThumbnail Cover thumbnail, JPEG
 	// (GET /books/{bookId}/thumbnail)
 	GetBookThumbnail(ctx context.Context, request GetBookThumbnailRequestObject) (GetBookThumbnailResponseObject, error)
+	// ListCollections Collections with at least one series the caller may see
+	// (GET /collections)
+	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
+
+	// (POST /collections)
+	CreateCollection(ctx context.Context, request CreateCollectionRequestObject) (CreateCollectionResponseObject, error)
+
+	// (DELETE /collections/{collectionId})
+	DeleteCollection(ctx context.Context, request DeleteCollectionRequestObject) (DeleteCollectionResponseObject, error)
+
+	// (GET /collections/{collectionId})
+	GetCollection(ctx context.Context, request GetCollectionRequestObject) (GetCollectionResponseObject, error)
+
+	// (PATCH /collections/{collectionId})
+	UpdateCollection(ctx context.Context, request UpdateCollectionRequestObject) (UpdateCollectionResponseObject, error)
+
+	// (GET /collections/{collectionId}/series)
+	ListCollectionSeries(ctx context.Context, request ListCollectionSeriesRequestObject) (ListCollectionSeriesResponseObject, error)
+	// GetDashboard Home shelves for the caller, newest first, at most 12-16 items each
+	// (GET /dashboard)
+	GetDashboard(ctx context.Context, request GetDashboardRequestObject) (GetDashboardResponseObject, error)
 	// GetHealth Liveness and version
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
@@ -2669,24 +5210,78 @@ type StrictServerInterface interface {
 	// ChangePassword Change the password; other sessions are signed out
 	// (PUT /me/password)
 	ChangePassword(ctx context.Context, request ChangePasswordRequestObject) (ChangePasswordResponseObject, error)
+	// GetReaderPrefs The caller's global reader settings and every series and book override
+	// (GET /me/reader-prefs)
+	GetReaderPrefs(ctx context.Context, request GetReaderPrefsRequestObject) (GetReaderPrefsResponseObject, error)
+	// DeleteBookReaderPrefs Go back to the series (or global) settings for this book
+	// (DELETE /me/reader-prefs/books/{bookId})
+	DeleteBookReaderPrefs(ctx context.Context, request DeleteBookReaderPrefsRequestObject) (DeleteBookReaderPrefsResponseObject, error)
+
+	// (PUT /me/reader-prefs/books/{bookId})
+	SetBookReaderPrefs(ctx context.Context, request SetBookReaderPrefsRequestObject) (SetBookReaderPrefsResponseObject, error)
+
+	// (PUT /me/reader-prefs/global)
+	SetGlobalReaderPrefs(ctx context.Context, request SetGlobalReaderPrefsRequestObject) (SetGlobalReaderPrefsResponseObject, error)
+	// DeleteSeriesReaderPrefs Go back to the global settings for this series
+	// (DELETE /me/reader-prefs/series/{seriesId})
+	DeleteSeriesReaderPrefs(ctx context.Context, request DeleteSeriesReaderPrefsRequestObject) (DeleteSeriesReaderPrefsResponseObject, error)
+
+	// (PUT /me/reader-prefs/series/{seriesId})
+	SetSeriesReaderPrefs(ctx context.Context, request SetSeriesReaderPrefsRequestObject) (SetSeriesReaderPrefsResponseObject, error)
 	// ListMediaIssues Books that failed analysis or whose files are gone
 	// (GET /media/issues)
 	ListMediaIssues(ctx context.Context, request ListMediaIssuesRequestObject) (ListMediaIssuesResponseObject, error)
+	// GetPublicCover A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers)
+	// (GET /public/covers/{seriesId})
+	GetPublicCover(ctx context.Context, request GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error)
 	// GetLoginScreen The only data the sign-in page reads before authentication
 	// (GET /public/login-screen)
 	GetLoginScreen(ctx context.Context, request GetLoginScreenRequestObject) (GetLoginScreenResponseObject, error)
-	// ListSeries Series, optionally in one library (filters and paging arrive in M3)
+	// ListReadLists Reading lists with at least one book the caller may see
+	// (GET /read-lists)
+	ListReadLists(ctx context.Context, request ListReadListsRequestObject) (ListReadListsResponseObject, error)
+
+	// (POST /read-lists)
+	CreateReadList(ctx context.Context, request CreateReadListRequestObject) (CreateReadListResponseObject, error)
+
+	// (DELETE /read-lists/{readListId})
+	DeleteReadList(ctx context.Context, request DeleteReadListRequestObject) (DeleteReadListResponseObject, error)
+
+	// (GET /read-lists/{readListId})
+	GetReadList(ctx context.Context, request GetReadListRequestObject) (GetReadListResponseObject, error)
+
+	// (PATCH /read-lists/{readListId})
+	UpdateReadList(ctx context.Context, request UpdateReadListRequestObject) (UpdateReadListResponseObject, error)
+
+	// (GET /read-lists/{readListId}/books)
+	ListReadListBooks(ctx context.Context, request ListReadListBooksRequestObject) (ListReadListBooksResponseObject, error)
+	// Search Substring search over titles, authors and ISBN (any length, Japanese included)
+	// (GET /search)
+	Search(ctx context.Context, request SearchRequestObject) (SearchResponseObject, error)
+	// ListSeries Series the caller may see, filtered, sorted and paged
 	// (GET /series)
 	ListSeries(ctx context.Context, request ListSeriesRequestObject) (ListSeriesResponseObject, error)
 
 	// (GET /series/{seriesId})
 	GetSeries(ctx context.Context, request GetSeriesRequestObject) (GetSeriesResponseObject, error)
+	// UpdateSeries Edit series metadata (administrators only)
+	// (PATCH /series/{seriesId})
+	UpdateSeries(ctx context.Context, request UpdateSeriesRequestObject) (UpdateSeriesResponseObject, error)
 
 	// (GET /series/{seriesId}/books)
 	ListSeriesBooks(ctx context.Context, request ListSeriesBooksRequestObject) (ListSeriesBooksResponseObject, error)
+	// MarkSeriesRead Mark every book of the series read (completed true) or unread (false) for the caller
+	// (PUT /series/{seriesId}/read-progress)
+	MarkSeriesRead(ctx context.Context, request MarkSeriesReadRequestObject) (MarkSeriesReadResponseObject, error)
 	// GetSeriesThumbnail Cover of the series' first book, JPEG
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(ctx context.Context, request GetSeriesThumbnailRequestObject) (GetSeriesThumbnailResponseObject, error)
+	// GetSettings Server settings (administrators only)
+	// (GET /settings)
+	GetSettings(ctx context.Context, request GetSettingsRequestObject) (GetSettingsResponseObject, error)
+	// UpdateSettings Change only the given fields, merged into the stored settings
+	// (PATCH /settings)
+	UpdateSettings(ctx context.Context, request UpdateSettingsRequestObject) (UpdateSettingsResponseObject, error)
 	// Setup Create the first administrator (only while no user exists)
 	// (POST /setup)
 	Setup(ctx context.Context, request SetupRequestObject) (SetupResponseObject, error)
@@ -2696,6 +5291,9 @@ type StrictServerInterface interface {
 
 	// (POST /tasks/{taskId}/cancel)
 	CancelTask(ctx context.Context, request CancelTaskRequestObject) (CancelTaskResponseObject, error)
+	// EmptyTrash Delete series and books whose files are gone (administrators only)
+	// (POST /trash/empty)
+	EmptyTrash(ctx context.Context, request EmptyTrashRequestObject) (EmptyTrashResponseObject, error)
 	// ListUsers All users (administrators only)
 	// (GET /users)
 	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
@@ -2830,6 +5428,65 @@ func (sh *strictHandler) GetBook(w http.ResponseWriter, r *http.Request, bookId 
 	}
 }
 
+// UpdateBook operation middleware
+func (sh *strictHandler) UpdateBook(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request UpdateBookRequestObject
+
+	request.BookId = bookId
+
+	var body UpdateBookJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateBook(ctx, request.(UpdateBookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateBook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateBookResponseObject); ok {
+		if err := validResponse.VisitUpdateBookResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAdjacentBooks operation middleware
+func (sh *strictHandler) GetAdjacentBooks(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request GetAdjacentBooksRequestObject
+
+	request.BookId = bookId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAdjacentBooks(ctx, request.(GetAdjacentBooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAdjacentBooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAdjacentBooksResponseObject); ok {
+		if err := validResponse.VisitGetAdjacentBooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListBookPages operation middleware
 func (sh *strictHandler) ListBookPages(w http.ResponseWriter, r *http.Request, bookId string) {
 	var request ListBookPagesRequestObject
@@ -2883,6 +5540,65 @@ func (sh *strictHandler) GetBookPage(w http.ResponseWriter, r *http.Request, boo
 	}
 }
 
+// ClearBookProgress operation middleware
+func (sh *strictHandler) ClearBookProgress(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request ClearBookProgressRequestObject
+
+	request.BookId = bookId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ClearBookProgress(ctx, request.(ClearBookProgressRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ClearBookProgress")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ClearBookProgressResponseObject); ok {
+		if err := validResponse.VisitClearBookProgressResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetBookProgress operation middleware
+func (sh *strictHandler) SetBookProgress(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request SetBookProgressRequestObject
+
+	request.BookId = bookId
+
+	var body SetBookProgressJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetBookProgress(ctx, request.(SetBookProgressRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetBookProgress")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetBookProgressResponseObject); ok {
+		if err := validResponse.VisitSetBookProgressResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetBookThumbnail operation middleware
 func (sh *strictHandler) GetBookThumbnail(w http.ResponseWriter, r *http.Request, bookId string) {
 	var request GetBookThumbnailRequestObject
@@ -2902,6 +5618,198 @@ func (sh *strictHandler) GetBookThumbnail(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetBookThumbnailResponseObject); ok {
 		if err := validResponse.VisitGetBookThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCollections operation middleware
+func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
+	var request ListCollectionsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollections(ctx, request.(ListCollectionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollections")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionsResponseObject); ok {
+		if err := validResponse.VisitListCollectionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateCollection operation middleware
+func (sh *strictHandler) CreateCollection(w http.ResponseWriter, r *http.Request) {
+	var request CreateCollectionRequestObject
+
+	var body CreateCollectionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateCollection(ctx, request.(CreateCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateCollectionResponseObject); ok {
+		if err := validResponse.VisitCreateCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteCollection operation middleware
+func (sh *strictHandler) DeleteCollection(w http.ResponseWriter, r *http.Request, collectionId string) {
+	var request DeleteCollectionRequestObject
+
+	request.CollectionId = collectionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteCollection(ctx, request.(DeleteCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteCollectionResponseObject); ok {
+		if err := validResponse.VisitDeleteCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCollection operation middleware
+func (sh *strictHandler) GetCollection(w http.ResponseWriter, r *http.Request, collectionId string) {
+	var request GetCollectionRequestObject
+
+	request.CollectionId = collectionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCollection(ctx, request.(GetCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCollectionResponseObject); ok {
+		if err := validResponse.VisitGetCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateCollection operation middleware
+func (sh *strictHandler) UpdateCollection(w http.ResponseWriter, r *http.Request, collectionId string) {
+	var request UpdateCollectionRequestObject
+
+	request.CollectionId = collectionId
+
+	var body UpdateCollectionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateCollection(ctx, request.(UpdateCollectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateCollection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateCollectionResponseObject); ok {
+		if err := validResponse.VisitUpdateCollectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCollectionSeries operation middleware
+func (sh *strictHandler) ListCollectionSeries(w http.ResponseWriter, r *http.Request, collectionId string) {
+	var request ListCollectionSeriesRequestObject
+
+	request.CollectionId = collectionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCollectionSeries(ctx, request.(ListCollectionSeriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCollectionSeries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCollectionSeriesResponseObject); ok {
+		if err := validResponse.VisitListCollectionSeriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetDashboard operation middleware
+func (sh *strictHandler) GetDashboard(w http.ResponseWriter, r *http.Request, params GetDashboardParams) {
+	var request GetDashboardRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetDashboard(ctx, request.(GetDashboardRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetDashboard")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetDashboardResponseObject); ok {
+		if err := validResponse.VisitGetDashboardResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3235,6 +6143,179 @@ func (sh *strictHandler) ChangePassword(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// GetReaderPrefs operation middleware
+func (sh *strictHandler) GetReaderPrefs(w http.ResponseWriter, r *http.Request) {
+	var request GetReaderPrefsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReaderPrefs(ctx, request.(GetReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitGetReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteBookReaderPrefs operation middleware
+func (sh *strictHandler) DeleteBookReaderPrefs(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request DeleteBookReaderPrefsRequestObject
+
+	request.BookId = bookId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteBookReaderPrefs(ctx, request.(DeleteBookReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteBookReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteBookReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitDeleteBookReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetBookReaderPrefs operation middleware
+func (sh *strictHandler) SetBookReaderPrefs(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request SetBookReaderPrefsRequestObject
+
+	request.BookId = bookId
+
+	var body SetBookReaderPrefsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetBookReaderPrefs(ctx, request.(SetBookReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetBookReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetBookReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitSetBookReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetGlobalReaderPrefs operation middleware
+func (sh *strictHandler) SetGlobalReaderPrefs(w http.ResponseWriter, r *http.Request) {
+	var request SetGlobalReaderPrefsRequestObject
+
+	var body SetGlobalReaderPrefsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetGlobalReaderPrefs(ctx, request.(SetGlobalReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetGlobalReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetGlobalReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitSetGlobalReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSeriesReaderPrefs operation middleware
+func (sh *strictHandler) DeleteSeriesReaderPrefs(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request DeleteSeriesReaderPrefsRequestObject
+
+	request.SeriesId = seriesId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSeriesReaderPrefs(ctx, request.(DeleteSeriesReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSeriesReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSeriesReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitDeleteSeriesReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetSeriesReaderPrefs operation middleware
+func (sh *strictHandler) SetSeriesReaderPrefs(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request SetSeriesReaderPrefsRequestObject
+
+	request.SeriesId = seriesId
+
+	var body SetSeriesReaderPrefsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetSeriesReaderPrefs(ctx, request.(SetSeriesReaderPrefsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetSeriesReaderPrefs")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetSeriesReaderPrefsResponseObject); ok {
+		if err := validResponse.VisitSetSeriesReaderPrefsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMediaIssues operation middleware
 func (sh *strictHandler) ListMediaIssues(w http.ResponseWriter, r *http.Request) {
 	var request ListMediaIssuesRequestObject
@@ -3259,6 +6340,32 @@ func (sh *strictHandler) ListMediaIssues(w http.ResponseWriter, r *http.Request)
 	}
 }
 
+// GetPublicCover operation middleware
+func (sh *strictHandler) GetPublicCover(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request GetPublicCoverRequestObject
+
+	request.SeriesId = seriesId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPublicCover(ctx, request.(GetPublicCoverRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPublicCover")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPublicCoverResponseObject); ok {
+		if err := validResponse.VisitGetPublicCoverResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetLoginScreen operation middleware
 func (sh *strictHandler) GetLoginScreen(w http.ResponseWriter, r *http.Request) {
 	var request GetLoginScreenRequestObject
@@ -3276,6 +6383,198 @@ func (sh *strictHandler) GetLoginScreen(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetLoginScreenResponseObject); ok {
 		if err := validResponse.VisitGetLoginScreenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReadLists operation middleware
+func (sh *strictHandler) ListReadLists(w http.ResponseWriter, r *http.Request) {
+	var request ListReadListsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReadLists(ctx, request.(ListReadListsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReadLists")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReadListsResponseObject); ok {
+		if err := validResponse.VisitListReadListsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateReadList operation middleware
+func (sh *strictHandler) CreateReadList(w http.ResponseWriter, r *http.Request) {
+	var request CreateReadListRequestObject
+
+	var body CreateReadListJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateReadList(ctx, request.(CreateReadListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateReadList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateReadListResponseObject); ok {
+		if err := validResponse.VisitCreateReadListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteReadList operation middleware
+func (sh *strictHandler) DeleteReadList(w http.ResponseWriter, r *http.Request, readListId string) {
+	var request DeleteReadListRequestObject
+
+	request.ReadListId = readListId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteReadList(ctx, request.(DeleteReadListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteReadList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteReadListResponseObject); ok {
+		if err := validResponse.VisitDeleteReadListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReadList operation middleware
+func (sh *strictHandler) GetReadList(w http.ResponseWriter, r *http.Request, readListId string) {
+	var request GetReadListRequestObject
+
+	request.ReadListId = readListId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReadList(ctx, request.(GetReadListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReadList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReadListResponseObject); ok {
+		if err := validResponse.VisitGetReadListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateReadList operation middleware
+func (sh *strictHandler) UpdateReadList(w http.ResponseWriter, r *http.Request, readListId string) {
+	var request UpdateReadListRequestObject
+
+	request.ReadListId = readListId
+
+	var body UpdateReadListJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateReadList(ctx, request.(UpdateReadListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateReadList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateReadListResponseObject); ok {
+		if err := validResponse.VisitUpdateReadListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListReadListBooks operation middleware
+func (sh *strictHandler) ListReadListBooks(w http.ResponseWriter, r *http.Request, readListId string) {
+	var request ListReadListBooksRequestObject
+
+	request.ReadListId = readListId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListReadListBooks(ctx, request.(ListReadListBooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListReadListBooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListReadListBooksResponseObject); ok {
+		if err := validResponse.VisitListReadListBooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Search operation middleware
+func (sh *strictHandler) Search(w http.ResponseWriter, r *http.Request, params SearchParams) {
+	var request SearchRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Search(ctx, request.(SearchRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Search")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SearchResponseObject); ok {
+		if err := validResponse.VisitSearchResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3335,6 +6634,39 @@ func (sh *strictHandler) GetSeries(w http.ResponseWriter, r *http.Request, serie
 	}
 }
 
+// UpdateSeries operation middleware
+func (sh *strictHandler) UpdateSeries(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request UpdateSeriesRequestObject
+
+	request.SeriesId = seriesId
+
+	var body UpdateSeriesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSeries(ctx, request.(UpdateSeriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSeries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSeriesResponseObject); ok {
+		if err := validResponse.VisitUpdateSeriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListSeriesBooks operation middleware
 func (sh *strictHandler) ListSeriesBooks(w http.ResponseWriter, r *http.Request, seriesId string) {
 	var request ListSeriesBooksRequestObject
@@ -3361,6 +6693,39 @@ func (sh *strictHandler) ListSeriesBooks(w http.ResponseWriter, r *http.Request,
 	}
 }
 
+// MarkSeriesRead operation middleware
+func (sh *strictHandler) MarkSeriesRead(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request MarkSeriesReadRequestObject
+
+	request.SeriesId = seriesId
+
+	var body MarkSeriesReadJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkSeriesRead(ctx, request.(MarkSeriesReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkSeriesRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkSeriesReadResponseObject); ok {
+		if err := validResponse.VisitMarkSeriesReadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetSeriesThumbnail operation middleware
 func (sh *strictHandler) GetSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string) {
 	var request GetSeriesThumbnailRequestObject
@@ -3380,6 +6745,61 @@ func (sh *strictHandler) GetSeriesThumbnail(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSeriesThumbnailResponseObject); ok {
 		if err := validResponse.VisitGetSeriesThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSettings operation middleware
+func (sh *strictHandler) GetSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSettings(ctx, request.(GetSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSettingsResponseObject); ok {
+		if err := validResponse.VisitGetSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSettings operation middleware
+func (sh *strictHandler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	var request UpdateSettingsRequestObject
+
+	var body UpdateSettingsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSettings(ctx, request.(UpdateSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSettingsResponseObject); ok {
+		if err := validResponse.VisitUpdateSettingsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3461,6 +6881,30 @@ func (sh *strictHandler) CancelTask(w http.ResponseWriter, r *http.Request, task
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CancelTaskResponseObject); ok {
 		if err := validResponse.VisitCancelTaskResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// EmptyTrash operation middleware
+func (sh *strictHandler) EmptyTrash(w http.ResponseWriter, r *http.Request) {
+	var request EmptyTrashRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.EmptyTrash(ctx, request.(EmptyTrashRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "EmptyTrash")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(EmptyTrashResponseObject); ok {
+		if err := validResponse.VisitEmptyTrashResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -3587,69 +7031,109 @@ func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, user
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"67v1/w0A",
+	"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",
+	"Ny+i+y/3/zcA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

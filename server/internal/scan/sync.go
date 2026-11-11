@@ -87,7 +87,11 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listi
 		deleted, seen                     bool
 	}
 	books := map[string]*bookRow{}
-	rows, err = tx.QueryContext(ctx, `SELECT id, series_id, path, size_bytes, mtime, number, number_source, deleted_at IS NOT NULL FROM books WHERE library_id = ?`, libraryID)
+	rows, err = tx.QueryContext(ctx, `SELECT id, series_id, path, size_bytes, mtime, number,
+		  -- a number locked by an edit is never renumbered by position
+		  CASE WHEN EXISTS (SELECT 1 FROM json_each(locked_fields) WHERE value = 'number') THEN 'locked' ELSE number_source END,
+		  deleted_at IS NOT NULL
+		FROM books WHERE library_id = ?`, libraryID)
 	if err != nil {
 		return st, err
 	}
@@ -213,7 +217,7 @@ func RebuildSearch(ctx context.Context, tx *sql.Tx, libraryID string) error {
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO search_index (kind, ref, library_id, text)
 		SELECT 'book', b.id, b.library_id,
-		  b.title || ' ' || COALESCE((SELECT group_concat(json_extract(a.value, '$.name'), ' ') FROM json_each(b.authors) a), '')
+		  b.title || ' ' || b.isbn || ' ' || COALESCE((SELECT group_concat(json_extract(a.value, '$.name'), ' ') FROM json_each(b.authors) a), '')
 		FROM books b WHERE b.library_id = ? AND b.deleted_at IS NULL`, libraryID)
 	return err
 }

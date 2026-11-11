@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -55,6 +56,21 @@ func TestClientIP(t *testing.T) {
 		}
 		if got := s.clientIP(r); got != c.want {
 			t.Errorf("%s %q: %s, want %s", c.remote, c.xff, got, c.want)
+		}
+	}
+}
+
+// Every operation in the generated interface has an access rule.
+func TestEveryOperationClassified(t *testing.T) {
+	it := reflect.TypeOf((*StrictServerInterface)(nil)).Elem()
+	for i := range it.NumMethod() {
+		if name := it.Method(i).Name; opAccess[name] == 0 {
+			t.Errorf("%s has no entry in opAccess", name)
+		}
+	}
+	for name := range opAccess {
+		if _, ok := it.MethodByName(name); !ok {
+			t.Errorf("opAccess lists %s, which is not an operation", name)
 		}
 	}
 }

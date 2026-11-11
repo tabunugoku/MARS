@@ -112,12 +112,23 @@ paths:
   /series:
     get:
       operationId: listSeries
-      summary: Series, optionally in one library (filters and paging arrive in M3)
+      summary: Series the caller may see, filtered, sorted and paged
       parameters:
         - { name: libraryId, in: query, schema: { type: string } }
+        - { name: search, in: query, description: "Substring of the title, an alternate title or an author", schema: { type: string } }
+        - { name: status, in: query, explode: false, schema: { type: array, items: { $ref: "#/components/schemas/SeriesStatus" } } }
+        - { name: genres, in: query, explode: false, description: "Any of these genres", schema: { type: array, items: { type: string } } }
+        - { name: readState, in: query, explode: false, description: "For the caller", schema: { type: array, items: { $ref: "#/components/schemas/ReadState" } } }
+        - { name: sort, in: query, schema: { $ref: "#/components/schemas/SeriesSort" } }
+        - { name: desc, in: query, schema: { type: boolean } }
+        - { name: limit, in: query, description: "Page size; all when omitted", schema: { type: integer, minimum: 1, maximum: 1000 } }
+        - { name: offset, in: query, schema: { type: integer, minimum: 0 } }
       responses:
         "200":
-          description: Series in title order
+          description: One page of series; X-Total-Count has the count before paging
+          headers:
+            X-Total-Count:
+              schema: { type: integer }
           content:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
@@ -132,6 +143,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Series" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateSeries
+      summary: Edit series metadata (administrators only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Series" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /series/{seriesId}/books:
     parameters:
@@ -165,6 +192,22 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Book" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateBook
+      summary: Edit book metadata (administrators only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /books/{bookId}/thumbnail:
     parameters:
@@ -373,6 +416,322 @@ paths:
         "204": { description: Deleted }
         "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /series/{seriesId}/read-progress:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: markSeriesRead
+      summary: Mark every book of the series read (completed true) or unread (false) for the caller
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesReadUpdate" }
+      responses:
+        "204": { description: Done }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/adjacent:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getAdjacentBooks
+      summary: The previous and next book in the series, for "next volume" in the reader
+      responses:
+        "200":
+          description: Neighbours (null at either end)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AdjacentBooks" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/progress:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setBookProgress
+      summary: Save the caller's reading position; completed defaults to page == pageCount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProgressUpdate" }
+      responses:
+        "200":
+          description: Saved
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadProgress" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: clearBookProgress
+      summary: Mark the book unread for the caller
+      responses:
+        "204": { description: Cleared }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /dashboard:
+    get:
+      operationId: getDashboard
+      summary: Home shelves for the caller, newest first, at most 12-16 items each
+      parameters:
+        - { name: libraryId, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Shelves
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Dashboard" }
+  /search:
+    get:
+      operationId: search
+      summary: Substring search over titles, authors and ISBN (any length, Japanese included)
+      parameters:
+        - { name: q, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Matches the caller may see
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResult" }
+  /collections:
+    get:
+      operationId: listCollections
+      summary: Collections with at least one series the caller may see
+      responses:
+        "200":
+          description: By name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Collection" } }
+    post:
+      operationId: createCollection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollectionCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /collections/{collectionId}:
+    parameters:
+      - { name: collectionId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getCollection
+      responses:
+        "200":
+          description: The collection (seriesIds holds only series the caller may see)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateCollection
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CollectionUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteCollection
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /collections/{collectionId}/series:
+    parameters:
+      - { name: collectionId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listCollectionSeries
+      responses:
+        "200":
+          description: Series in collection order (or title order when not ordered)
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /read-lists:
+    get:
+      operationId: listReadLists
+      summary: Reading lists with at least one book the caller may see
+      responses:
+        "200":
+          description: By name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ReadList" } }
+    post:
+      operationId: createReadList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReadListCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /read-lists/{readListId}:
+    parameters:
+      - { name: readListId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getReadList
+      responses:
+        "200":
+          description: The list (bookIds holds only books the caller may see)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateReadList
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReadListUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteReadList
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /read-lists/{readListId}/books:
+    parameters:
+      - { name: readListId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listReadListBooks
+      responses:
+        "200":
+          description: Books in list order
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /me/reader-prefs:
+    get:
+      operationId: getReaderPrefs
+      summary: The caller's global reader settings and every series and book override
+      responses:
+        "200":
+          description: All reader settings
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReaderPrefsAll" }
+  /me/reader-prefs/global:
+    put:
+      operationId: setGlobalReaderPrefs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/GlobalReaderPrefs" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /me/reader-prefs/series/{seriesId}:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setSeriesReaderPrefs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReaderPrefs" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteSeriesReaderPrefs
+      summary: Go back to the global settings for this series
+      responses:
+        "204": { description: Removed (also when there was none) }
+  /me/reader-prefs/books/{bookId}:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setBookReaderPrefs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ReaderPrefs" }
+      responses:
+        "204": { description: Saved }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteBookReaderPrefs
+      summary: Go back to the series (or global) settings for this book
+      responses:
+        "204": { description: Removed (also when there was none) }
+  /settings:
+    get:
+      operationId: getSettings
+      summary: Server settings (administrators only)
+      responses:
+        "200":
+          description: Current settings, defaults filled in
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerSettings" }
+    patch:
+      operationId: updateSettings
+      summary: Change only the given fields, merged into the stored settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ServerSettingsUpdate" }
+      responses:
+        "200":
+          description: Settings after the change
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ServerSettings" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /trash/empty:
+    post:
+      operationId: emptyTrash
+      summary: Delete series and books whose files are gone (administrators only)
+      responses:
+        "200":
+          description: How many rows were removed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrashResult" }
+  /public/covers/{seriesId}:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getPublicCover
+      summary: A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers)
+      security: []
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
 components:
   securitySchemes:
     session:
@@ -513,7 +872,7 @@ components:
         readAt: { type: string }
     Book:
       type: object
-      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt]
+      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields]
       properties:
         id: { type: string }
         seriesId: { type: string }
@@ -536,6 +895,7 @@ components:
           allOf: [{ $ref: "#/components/schemas/ReadProgress" }]
         thumbnailUrl: { type: string }
         createdAt: { type: string }
+        lockedFields: { type: array, items: { type: string } }
     Page:
       type: object
       required: [number, width, height, mediaType, url]
@@ -675,3 +1035,179 @@ components:
       properties:
         thumbnailUrl: { type: string }
         title: { type: string }
+    SeriesSort:
+      type: string
+      enum: [title, updated, created, releaseDate, bookCount]
+      description: "releaseDate is the earliest release date among the series' books (series without one sort last)"
+    ReadState:
+      type: string
+      enum: [unread, inProgress, read]
+    SeriesUpdate:
+      type: object
+      description: >
+        Fields to change. Every field given here is also locked, so scans and
+        ComicInfo.xml leave it alone; lockedFields, when given, replaces the
+        lock list instead.
+      properties:
+        title: { type: string }
+        titleSort: { type: string }
+        alternateTitles: { type: array, items: { type: string } }
+        status: { $ref: "#/components/schemas/SeriesStatus" }
+        summary: { type: string }
+        publisher: { type: string }
+        readingDirection: { $ref: "#/components/schemas/ReadingDirection" }
+        ageRating: { type: integer, nullable: true }
+        language: { type: string }
+        genres: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
+        totalBookCount: { type: integer, nullable: true }
+        lockedFields: { type: array, items: { type: string } }
+    BookUpdate:
+      type: object
+      description: Fields to change; locking works as in SeriesUpdate
+      properties:
+        title: { type: string }
+        number: { type: number, format: double }
+        numberSort: { type: number, format: double }
+        summary: { type: string }
+        releaseDate: { type: string, nullable: true }
+        isbn: { type: string }
+        authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
+        tags: { type: array, items: { type: string } }
+        lockedFields: { type: array, items: { type: string } }
+    AdjacentBooks:
+      type: object
+      required: [prev, next]
+      properties:
+        prev:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Book" }]
+        next:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/Book" }]
+    ProgressUpdate:
+      type: object
+      required: [page]
+      properties:
+        page: { type: integer, minimum: 1, description: "1-based; at most the book's pageCount" }
+        completed: { type: boolean }
+    SeriesReadUpdate:
+      type: object
+      required: [completed]
+      properties:
+        completed: { type: boolean }
+    Dashboard:
+      type: object
+      required: [keepReading, onDeck, recentlyAddedBooks, recentlyAddedSeries, recentlyUpdatedSeries, recentlyRead]
+      properties:
+        keepReading: { type: array, items: { $ref: "#/components/schemas/Book" }, description: "Started, not finished, last read first" }
+        onDeck: { type: array, items: { $ref: "#/components/schemas/Book" }, description: "First unread book of each series whose previous book is finished" }
+        recentlyAddedBooks: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        recentlyAddedSeries: { type: array, items: { $ref: "#/components/schemas/Series" } }
+        recentlyUpdatedSeries: { type: array, items: { $ref: "#/components/schemas/Series" } }
+        recentlyRead: { type: array, items: { $ref: "#/components/schemas/Book" }, description: "Finished, last read first" }
+    SearchResult:
+      type: object
+      required: [series, books, collections, readLists]
+      properties:
+        series: { type: array, items: { $ref: "#/components/schemas/Series" } }
+        books: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        collections: { type: array, items: { $ref: "#/components/schemas/Collection" } }
+        readLists: { type: array, items: { $ref: "#/components/schemas/ReadList" } }
+    Collection:
+      type: object
+      required: [id, name, ordered, seriesIds]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        ordered: { type: boolean, description: "Keep seriesIds order; otherwise shown by title" }
+        seriesIds: { type: array, items: { type: string } }
+    CollectionCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        ordered: { type: boolean }
+        seriesIds: { type: array, items: { type: string } }
+    CollectionUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        ordered: { type: boolean }
+        seriesIds: { type: array, items: { type: string }, description: "Replaces the members (administrators see every library)" }
+    ReadList:
+      type: object
+      required: [id, name, summary, bookIds]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        summary: { type: string }
+        bookIds: { type: array, items: { type: string } }
+    ReadListCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        summary: { type: string }
+        bookIds: { type: array, items: { type: string } }
+    ReadListUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        summary: { type: string }
+        bookIds: { type: array, items: { type: string } }
+    ReaderPrefs:
+      type: object
+      required: [direction, spread, fit, bg]
+      properties:
+        direction: { $ref: "#/components/schemas/ReadingDirection" }
+        spread: { type: string, enum: ["off", "on", cover] }
+        fit: { type: string, enum: [screen, width, height, original] }
+        bg: { type: string, enum: [black, gray, white] }
+    GlobalReaderPrefs:
+      type: object
+      required: [direction, spread, fit, bg]
+      properties:
+        direction: { type: string, enum: [ltr, rtl, vertical, webtoon, series], description: "series follows each series' own direction" }
+        spread: { type: string, enum: ["off", "on", cover] }
+        fit: { type: string, enum: [screen, width, height, original] }
+        bg: { type: string, enum: [black, gray, white] }
+    ReaderPrefsAll:
+      type: object
+      required: [global, series, books]
+      properties:
+        global: { $ref: "#/components/schemas/GlobalReaderPrefs" }
+        series: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By series id" }
+        books: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By book id" }
+    ServerSettings:
+      type: object
+      required: [port, taskThreads, thumbnailSize, thumbnailFormat, rememberMeDays, deleteEmptyCollections, opdsEnabled, koboSyncEnabled, loginBackdrop]
+      properties:
+        port: { type: integer, description: "Takes effect after a restart" }
+        taskThreads: { type: integer }
+        thumbnailSize: { type: string, enum: [small, medium, large, xlarge] }
+        thumbnailFormat: { type: string, enum: [webp, jpeg, avif], description: "Only jpeg is produced today" }
+        rememberMeDays: { type: integer }
+        deleteEmptyCollections: { type: boolean }
+        opdsEnabled: { type: boolean }
+        koboSyncEnabled: { type: boolean }
+        loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
+    ServerSettingsUpdate:
+      type: object
+      properties:
+        port: { type: integer }
+        taskThreads: { type: integer }
+        thumbnailSize: { type: string, enum: [small, medium, large, xlarge] }
+        thumbnailFormat: { type: string, enum: [webp, jpeg, avif] }
+        rememberMeDays: { type: integer }
+        deleteEmptyCollections: { type: boolean }
+        opdsEnabled: { type: boolean }
+        koboSyncEnabled: { type: boolean }
+        loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
+    TrashResult:
+      type: object
+      required: [series, books]
+      properties:
+        series: { type: integer }
+        books: { type: integer }

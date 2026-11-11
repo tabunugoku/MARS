@@ -122,7 +122,7 @@ func validKind(k LibraryKind) bool {
 
 func validInterval(i ScanInterval) bool {
 	switch i {
-	case Off, Hourly, Daily, Weekly:
+	case ScanIntervalOff, ScanIntervalHourly, ScanIntervalDaily, ScanIntervalWeekly:
 		return true
 	}
 	return false
@@ -149,7 +149,7 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 	if !validKind(b.Kind) {
 		return CreateLibrary400JSONResponse{badRequest("種類が正しくありません")}, nil
 	}
-	interval := Daily
+	interval := ScanIntervalDaily
 	if b.ScanInterval != nil {
 		if !validInterval(*b.ScanInterval) {
 			return CreateLibrary400JSONResponse{badRequest("スキャン間隔が正しくありません")}, nil
@@ -274,81 +274,17 @@ func (s *server) ScanLibrary(ctx context.Context, req ScanLibraryRequestObject) 
 
 // ─── Series and books ────────────────────────────────────────────────────────
 
-const seriesCols = `s.id, s.library_id, s.title, s.title_sort, s.alternate_titles, s.status, s.summary, s.publisher,
-	s.reading_direction, s.age_rating, s.language, s.genres, s.tags, s.authors, s.total_book_count, s.locked_fields,
-	s.created_at, s.updated_at,
-	(SELECT count(*) FROM books b WHERE b.series_id = s.id AND b.deleted_at IS NULL)`
-
-func scanSeries(r scanner) (Series, error) {
-	var x Series
-	var alt, status, dir, genres, tags, au, locked string
-	var age, total sql.NullInt64
-	err := r.Scan(&x.Id, &x.LibraryId, &x.Title, &x.TitleSort, &alt, &status, &x.Summary, &x.Publisher,
-		&dir, &age, &x.Language, &genres, &tags, &au, &total, &locked, &x.CreatedAt, &x.UpdatedAt, &x.BookCount)
-	x.AlternateTitles, x.Genres, x.Tags, x.LockedFields = strs(alt), strs(genres), strs(tags), strs(locked)
-	x.Status, x.ReadingDirection, x.Authors = SeriesStatus(status), ReadingDirection(dir), authors(au)
-	if age.Valid {
-		v := int(age.Int64)
-		x.AgeRating = &v
-	}
-	if total.Valid {
-		v := int(total.Int64)
-		x.TotalBookCount = &v
-	}
-	x.ThumbnailUrl = "/api/v1/series/" + x.Id + "/thumbnail"
-	return x, err
-}
-
-func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (ListSeriesResponseObject, error) {
-	cond, args := libScope(ctx, "s.library_id")
-	q := `SELECT ` + seriesCols + ` FROM series s WHERE s.deleted_at IS NULL AND ` + cond
-	if req.Params.LibraryId != nil {
-		q += ` AND s.library_id = ?`
-		args = append(args, *req.Params.LibraryId)
-	}
-	rows, err := s.DB.QueryContext(ctx, q+` ORDER BY s.title_sort, s.id`, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := ListSeries200JSONResponse{}
-	for rows.Next() {
-		x, err := scanSeries(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, x)
-	}
-	return out, rows.Err()
-}
+// ListSeries is in browse.go; the column lists and scanners in query.go.
 
 func (s *server) GetSeries(ctx context.Context, req GetSeriesRequestObject) (GetSeriesResponseObject, error) {
-	cond, args := libScope(ctx, "s.library_id")
-	x, err := scanSeries(s.DB.QueryRowContext(ctx, `SELECT `+seriesCols+` FROM series s WHERE s.id = ? AND s.deleted_at IS NULL AND `+cond, append([]any{req.SeriesId}, args...)...))
-	if errors.Is(err, sql.ErrNoRows) {
-		return GetSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
-	}
+	x, ok, err := s.oneSeries(ctx, req.SeriesId)
 	if err != nil {
 		return nil, err
 	}
-	return GetSeries200JSONResponse(x), nil
-}
-
-const bookCols = `b.id, b.series_id, b.library_id, b.title, b.number, b.number_sort, b.summary, b.release_date, b.isbn,
-	b.authors, b.tags, b.format, b.path, b.size_bytes, b.page_count, b.media_status, b.created_at`
-
-func scanBook(r scanner) (Book, error) {
-	var x Book
-	var release sql.NullString
-	var au, tags, format, status string
-	err := r.Scan(&x.Id, &x.SeriesId, &x.LibraryId, &x.Title, &x.Number, &x.NumberSort, &x.Summary, &release, &x.Isbn,
-		&au, &tags, &format, &x.Path, &x.SizeBytes, &x.PageCount, &status, &x.CreatedAt)
-	x.Authors, x.Tags, x.Format, x.MediaStatus = authors(au), strs(tags), BookFormat(format), MediaStatus(status)
-	if release.Valid {
-		x.ReleaseDate = &release.String
+	if !ok {
+		return GetSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
-	x.ThumbnailUrl = "/api/v1/books/" + x.Id + "/thumbnail"
-	return x, err
+	return GetSeries200JSONResponse(x), nil
 }
 
 func (s *server) ListSeriesBooks(ctx context.Context, req ListSeriesBooksRequestObject) (ListSeriesBooksResponseObject, error) {
@@ -357,30 +293,20 @@ func (s *server) ListSeriesBooks(ctx context.Context, req ListSeriesBooksRequest
 	} else if !ok {
 		return ListSeriesBooks404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+bookCols+` FROM books b WHERE b.series_id = ? AND b.deleted_at IS NULL ORDER BY b.number_sort, b.path`, req.SeriesId)
+	out, err := s.listBooks(ctx, ` AND b.series_id = ?`, `ORDER BY b.number_sort, b.path`, req.SeriesId)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	out := ListSeriesBooks200JSONResponse{}
-	for rows.Next() {
-		x, err := scanBook(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, x)
-	}
-	return out, rows.Err()
+	return ListSeriesBooks200JSONResponse(out), nil
 }
 
 func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBookResponseObject, error) {
-	cond, args := libScope(ctx, "b.library_id")
-	x, err := scanBook(s.DB.QueryRowContext(ctx, `SELECT `+bookCols+` FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond, append([]any{req.BookId}, args...)...))
-	if errors.Is(err, sql.ErrNoRows) {
-		return GetBook404JSONResponse{notFound("本が見つかりません")}, nil
-	}
+	x, ok, err := s.oneBook(ctx, req.BookId)
 	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return GetBook404JSONResponse{notFound("本が見つかりません")}, nil
 	}
 	return GetBook200JSONResponse(x), nil
 }
