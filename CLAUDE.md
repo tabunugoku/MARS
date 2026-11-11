@@ -6,15 +6,16 @@ Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
 Current phase: **UI mockup approved** (tag `design/approved-v2`, 2026-11-11;
 v2 adds the floating save island). Backend: M0 (foundation), M1 (scan and
-page serving), M2 (sign-in and users) and M3 (browsing API) done; M4
-(connecting the frontend) is next. Every API operation is classified in
+page serving), M2 (sign-in and users), M3 (browsing API) and M4 (frontend
+on the real API) done; M5 (distribution) is next. Every API operation is classified in
 `server/internal/httpapi/access.go` (`opAccess`); an unlisted one is refused,
 and series/books are read only through the builders in `query.go`.
 The server listens on all interfaces (`COMINAVI_HOST` narrows it); a first
-start prints a one-time setup token and writes it to `DATA/setup-token`. The plan is in milestones M0–M5. `web/` runs on mock data behind `web/src/api/`;
-the same code becomes the production frontend once the Go API exists.
-Known contract gap for the backend: covers are addressed by mock seeds
-(`coverSeed`), not real thumbnail URLs.
+start prints a one-time setup token and writes it to `DATA/setup-token`;
+the web app's /login page shows the setup form until an admin exists. The
+plan is in milestones M0–M5. `web/` talks to the Go API through
+`web/src/api/real.ts`; the invented sample data in `web/src/mock/` loads only
+when `VITE_API=mock` (`npm run dev:mock`) and never ships in a normal build.
 
 ## Working agreement
 
@@ -28,7 +29,11 @@ Known contract gap for the backend: covers are addressed by mock seeds
 
 ## Commands (run in `web/`)
 
-- `npm run dev` — dev server on http://localhost:5173
+- `npm run dev` — dev server on http://localhost:5173; `/api` is proxied to
+  the Go server on :25600 (`COMINAVI_DEV=1 go run ./cmd/cominavi` in `server/`)
+- `npm run dev:mock` — the same UI on invented data, no Go server needed
+- `npm run build:embed` — production build copied into the Go binary's
+  `server/internal/webui/dist`
 - `npm run build` — typecheck + production build (must pass before handing back)
 - `npm run localize:fluid` — rerun after any `shadcn add --overwrite`: swaps
   the few hard-coded English strings in `components/ui/` for Japanese
@@ -37,7 +42,8 @@ Known contract gap for the backend: covers are addressed by mock seeds
 
 ## Layout
 
-- `web/src/api/` — types (the API contract) and the mock-backed client
+- `web/src/api/` — types generated from the contract (`npm run api:types`),
+  the fetch client (`real.ts`), the mock client (`mock.ts`, dev only)
 - `web/src/mock/` — invented sample data (no real works)
 - `web/src/components/ui/` — Fluid/shadcn components (don't edit; wrap)
 - `web/src/components/shell/` — sidebar, topbar, bottom tabs, theme
