@@ -2,3 +2,12 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Go server
+/server/data/
+/server/cominavi
+/server/cominavi.exe
+# The embedded UI is copied in by `npm run build:embed`; only the keep file is tracked.
+!/server/internal/webui/dist/
+/server/internal/webui/dist/*
+!/server/internal/webui/dist/.gitkeep

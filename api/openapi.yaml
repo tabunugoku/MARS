@@ -1,0 +1,60 @@
+openapi: 3.0.3
+# The contract between web/ and server/. Edit here first, then regenerate:
+#   server: go generate ./...            (oapi-codegen, strict std-http server)
+#   web:    npm run api:types            (openapi-typescript -> src/api/schema.d.ts)
+# OpenAPI 3.0.3 because oapi-codegen does not fully support 3.1 yet.
+info:
+  title: ComiNavi API
+  version: 0.1.0
+  description: Self-hosted comic and manga server.
+servers:
+  - url: /api/v1
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: Liveness and version
+      security: []
+      responses:
+        "200":
+          description: Server is up
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+  /public/login-screen:
+    get:
+      operationId: getLoginScreen
+      summary: The only data the sign-in page reads before authentication
+      security: []
+      responses:
+        "200":
+          description: What the sign-in page shows beside the form
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LoginScreen" }
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status, version]
+      properties:
+        status: { type: string, enum: [ok] }
+        version: { type: string }
+    LoginBackdrop:
+      type: string
+      enum: [compass, covers]
+    LoginScreen:
+      type: object
+      required: [backdrop, covers]
+      properties:
+        backdrop: { $ref: "#/components/schemas/LoginBackdrop" }
+        covers:
+          description: Filled only when backdrop is "covers".
+          type: array
+          items: { $ref: "#/components/schemas/LoginCover" }
+    LoginCover:
+      type: object
+      required: [thumbnailUrl, title]
+      properties:
+        thumbnailUrl: { type: string }
+        title: { type: string }

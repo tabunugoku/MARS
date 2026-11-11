@@ -12,5 +12,10 @@ export default defineConfig({
       'lucide-react': path.resolve(import.meta.dirname, './src/lib/lucide-stub.ts'),
     },
   },
-  server: { port: 5173, strictPort: true },
+  server: {
+    port: 5173,
+    strictPort: true,
+    // Dev against the Go server: COMINAVI_DEV=1 go run ./cmd/cominavi
+    proxy: { '/api': 'http://localhost:25600' },
+  },
 })
