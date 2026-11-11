@@ -34,6 +34,15 @@ const cache = {
 };
 let loading: Promise<void> | null = null;
 
+const listeners = new Set<() => void>();
+/** Calls fn after every change to the cached settings: a load, a change, or
+ *  a rollback after the server refused one. Returns the unsubscribe. */
+export function subscribeReaderPrefs(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+const notify = () => listeners.forEach((fn) => fn());
+
 /** Fetches the caller's settings once; later calls reuse the first answer. */
 export function loadReaderPrefs(): Promise<void> {
   loading ??= api.readerPrefs().then(
@@ -41,6 +50,7 @@ export function loadReaderPrefs(): Promise<void> {
       cache.global = { ...DEFAULT_GLOBAL, ...all.global };
       cache.series = new Map(Object.entries(all.series));
       cache.books = new Map(Object.entries(all.books));
+      notify();
     },
     (err: unknown) => {
       loading = null; // try again next time
@@ -73,10 +83,14 @@ function writeThrough<V>(key: string, slot: Slot<V>, next: V, send: () => Promis
   const queue = q;
   const n = ++queue.seq;
   slot.set(next);
+  notify();
   const run = queue.chain.then(send).then(
     () => void (queue.acked = next),
     (err: unknown) => {
-      if (n === queue.seq) slot.set(queue.acked as V);
+      if (n === queue.seq) {
+        slot.set(queue.acked as V);
+        notify();
+      }
       throw err;
     },
   );
@@ -84,8 +98,12 @@ function writeThrough<V>(key: string, slot: Slot<V>, next: V, send: () => Promis
   return run;
 }
 
-function setScoped(kind: string, map: Map<string, ReaderPrefs>, id: string, p: SeriesReaderPrefs, put: () => Promise<void>, del: () => Promise<void>) {
-  const slot: Slot<ReaderPrefs | undefined> = { get: () => map.get(id), set: (v) => (v ? map.set(id, v) : map.delete(id)) };
+function setScoped(kind: "series" | "books", id: string, p: SeriesReaderPrefs, put: () => Promise<void>, del: () => Promise<void>) {
+  // cache[kind], not a Map captured now: loadReaderPrefs() replaces the Maps.
+  const slot: Slot<ReaderPrefs | undefined> = {
+    get: () => cache[kind].get(id),
+    set: (v) => (v ? cache[kind].set(id, v) : cache[kind].delete(id)),
+  };
   return p.mode === "global" ? writeThrough(`${kind}:${id}`, slot, undefined, del) : writeThrough(`${kind}:${id}`, slot, p.prefs, put);
 }
 
@@ -100,7 +118,7 @@ export function getSeriesPrefs(seriesId: string): SeriesReaderPrefs {
   return asScoped(cache.series.get(seriesId));
 }
 export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs): Promise<void> {
-  return setScoped("series", cache.series, seriesId, p,
+  return setScoped("series", seriesId, p,
     () => api.putSeriesPrefs(seriesId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteSeriesPrefs(seriesId));
 }
 
@@ -108,7 +126,7 @@ export function getBookPrefs(bookId: string): SeriesReaderPrefs {
   return asScoped(cache.books.get(bookId));
 }
 export function setBookPrefs(bookId: string, p: SeriesReaderPrefs): Promise<void> {
-  return setScoped("book", cache.books, bookId, p,
+  return setScoped("books", bookId, p,
     () => api.putBookPrefs(bookId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteBookPrefs(bookId));
 }
 

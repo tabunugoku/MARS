@@ -3,6 +3,7 @@ package httpapi
 import (
 	"image/color"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -82,6 +83,42 @@ func TestProgress(t *testing.T) {
 	e.admin.json("DELETE", "/api/v1/books/"+id+"/progress", nil, 204, nil)
 	e.admin.json("PUT", "/api/v1/books/nope/progress", map[string]any{"page": 1}, 404, nil)
 	e.admin.json("DELETE", "/api/v1/books/nope/progress", nil, 404, nil)
+}
+
+func TestProgressWriterOrder(t *testing.T) {
+	e, a, _ := progressEnv(t)
+	id := seriesBooks(t, e.admin, libSeries(t, e.admin, a.Id).Id)[0].Id
+	path := "/api/v1/books/" + id + "/progress"
+	put := func(body map[string]any) ReadProgress {
+		var p ReadProgress
+		e.admin.json("PUT", path, body, 200, &p)
+		return p
+	}
+
+	// The unload write (seq 2, last page) lands first; the older page-2 write
+	// from the same reader arrives later and must not undo it.
+	put(map[string]any{"page": 3, "writer": "tab-a", "seq": 2})
+	if p := put(map[string]any{"page": 2, "writer": "tab-a", "seq": 1}); p.Page != 3 || !p.Completed {
+		t.Fatalf("stale write should answer the stored progress: %+v", p)
+	}
+	// The same seq again is stale too.
+	if p := put(map[string]any{"page": 1, "writer": "tab-a", "seq": 2}); p.Page != 3 {
+		t.Fatalf("equal seq applied: %+v", p)
+	}
+	// Another reader (another device) is never blocked by tab-a's numbers.
+	if p := put(map[string]any{"page": 1, "writer": "tab-b", "seq": 1}); p.Page != 1 {
+		t.Fatalf("other writer blocked: %+v", p)
+	}
+	// A write without a writer (mark read on the book page) applies and keeps
+	// tab-b's seq, so a late stale tab-b write cannot undo it.
+	put(map[string]any{"page": 3})
+	if p := put(map[string]any{"page": 1, "writer": "tab-b", "seq": 1}); p.Page != 3 {
+		t.Fatalf("late write undid mark read: %+v", p)
+	}
+	if p := put(map[string]any{"page": 2, "writer": "tab-b", "seq": 2}); p.Page != 2 {
+		t.Fatalf("newer write from tab-b refused: %+v", p)
+	}
+	e.admin.json("PUT", path, map[string]any{"page": 1, "writer": strings.Repeat("x", 65), "seq": 3}, 400, nil)
 }
 
 func TestProgressIsolation(t *testing.T) {

@@ -54,8 +54,10 @@ export const realApi = {
   updateBook: (id: string, changes: BookUpdate) => request<Book>("PATCH", `/books/${enc(id)}`, changes),
   adjacentBooks: (id: string) => get<AdjacentBooks>(`/books/${enc(id)}/adjacent`),
   pages: (bookId: string) => get<Page[]>(`/books/${enc(bookId)}/pages`),
-  setProgress: (bookId: string, page: number, completed?: boolean, opts: { keepalive?: boolean } = {}) =>
-    request<ReadProgress>("PUT", `/books/${enc(bookId)}/progress`, { page, completed }, opts),
+  /** writer + seq order writes from one reader: the server ignores a write
+   *  older than the last one it stored from the same writer. */
+  setProgress: (bookId: string, page: number, completed?: boolean, opts: { keepalive?: boolean; writer?: string; seq?: number } = {}) =>
+    request<ReadProgress>("PUT", `/books/${enc(bookId)}/progress`, { page, completed, writer: opts.writer, seq: opts.seq }, { keepalive: opts.keepalive }),
   clearProgress: (bookId: string) => request<void>("DELETE", `/books/${enc(bookId)}/progress`),
   analyzeBook: (bookId: string) => request<Task>("POST", `/books/${enc(bookId)}/analyze`),
 

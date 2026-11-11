@@ -30,11 +30,13 @@ export function useApi<T>(
   });
   const [tick, setTick] = useState(0);
   // A reload keeps the current data on screen; new deps (another id) never do.
-  const lastTick = useRef(tick);
+  const last = useRef<{ tick: number; deps: DependencyList }>({ tick, deps });
   useEffect(() => {
     let live = true;
-    const isReload = tick !== lastTick.current;
-    lastTick.current = tick;
+    const prev = last.current;
+    const sameDeps = prev.deps.length === deps.length && prev.deps.every((d, i) => Object.is(d, deps[i]));
+    const isReload = tick !== prev.tick && sameDeps;
+    last.current = { tick, deps };
     setState((s) => (isReload ? { ...s, loading: true } : { data: undefined, loading: true, error: null }));
     fn().then(
       (data) => live && setState({ data, loading: false, error: null }),

@@ -8,8 +8,16 @@ import (
 	"time"
 )
 
-const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at) VALUES (?, ?, ?, ?, ?)
-	ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = excluded.completed, read_at = excluded.read_at`
+// upsertProgress stores a position. A write from a named writer whose seq is
+// not newer than the stored one from that same writer changes nothing (it
+// arrived after a later write, e.g. one sent at unload). A write without a
+// writer keeps the stored writer and seq, so a late stale write from the
+// reader cannot undo it either.
+const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at, writer, seq) VALUES (?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = excluded.completed, read_at = excluded.read_at,
+		writer = CASE WHEN excluded.writer = '' THEN read_progress.writer ELSE excluded.writer END,
+		seq = CASE WHEN excluded.writer = '' THEN read_progress.seq ELSE excluded.seq END
+	WHERE excluded.writer = '' OR read_progress.writer <> excluded.writer OR excluded.seq > read_progress.seq`
 
 func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequestObject) (SetBookProgressResponseObject, error) {
 	book, ok, err := s.oneBook(ctx, req.BookId)
@@ -30,8 +38,29 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 	if b.Completed != nil {
 		p.Completed = *b.Completed
 	}
-	if _, err := s.DB.ExecContext(ctx, upsertProgress, currentUser(ctx).ID, book.Id, p.Page, p.Completed, p.ReadAt); err != nil {
+	var writer string
+	var seq int
+	if b.Writer != nil {
+		writer = *b.Writer
+	}
+	if b.Seq != nil {
+		seq = *b.Seq
+	}
+	if len(writer) > 64 || seq < 0 {
+		return SetBookProgress400JSONResponse{badRequest("writer か seq が正しくありません")}, nil
+	}
+	res, err := s.DB.ExecContext(ctx, upsertProgress, currentUser(ctx).ID, book.Id, p.Page, p.Completed, p.ReadAt, writer, seq)
+	if err != nil {
 		return nil, err
+	}
+	if n, err := res.RowsAffected(); err != nil {
+		return nil, err
+	} else if n == 0 {
+		// Stale write: answer with what is stored.
+		if err := s.DB.QueryRowContext(ctx, `SELECT page, completed, read_at FROM read_progress WHERE user_id = ? AND book_id = ?`,
+			currentUser(ctx).ID, book.Id).Scan(&p.Page, &p.Completed, &p.ReadAt); err != nil {
+			return nil, err
+		}
 	}
 	return SetBookProgress200JSONResponse(p), nil
 }
