@@ -5,8 +5,9 @@ Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: Reac
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
 Current phase: **UI mockup approved** (tag `design/approved-v2`, 2026-11-11;
-v2 adds the floating save island). Backend: M0 (foundation) done, M1 (scan
-and page serving) in progress; the plan is in milestones M0–M5. `web/` runs on mock data behind `web/src/api/`;
+v2 adds the floating save island). Backend: M0 (foundation) and M1 (scan
+and page serving) done; M2 (sign-in and users) is next. The server listens
+on 127.0.0.1 until M2 lands. The plan is in milestones M0–M5. `web/` runs on mock data behind `web/src/api/`;
 the same code becomes the production frontend once the Go API exists.
 Known contract gap for the backend: covers are addressed by mock seeds
 (`coverSeed`), not real thumbnail URLs.
