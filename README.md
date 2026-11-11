@@ -49,6 +49,12 @@ mkdir -p data && sudo chown 65532:65532 data
 
 Comic folders only need to be readable (`:ro` is recommended).
 
+The image has a built-in health check (`cominavi healthcheck`), so `docker ps`
+shows the container as healthy once the server answers.
+
+On **TrueNAS SCALE**, see [docs/install/truenas.md](docs/install/truenas.md)
+(datasets, permissions for the `apps` user, and both install methods).
+
 ### First-run setup
 
 Until an administrator exists, the sign-in page shows a setup form that asks

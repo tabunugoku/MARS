@@ -3,7 +3,7 @@
 import { query, request } from "./http";
 import type {
   AdjacentBooks, ApiKey, ApiKeyCreated, Book, BookUpdate, Collection, CollectionCreate, CollectionUpdate,
-  Dashboard, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
+  Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
   ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
   SeriesUpdate, ServerSettings, SetupRequest, Task, TrashResult, User, UserCreate, UserUpdate,
 } from "./types";
@@ -18,6 +18,8 @@ const notNull = <T,>(xs: (T | null)[]) => xs.filter((x): x is T => x !== null);
 export const realApi = {
   // Sign-in (public: a 401 here is a wrong password, not an expired session)
   loginScreen: () => request<LoginScreen>("GET", "/public/login-screen", undefined, { public: true }),
+  /** Liveness and the build version (the release tag, or "dev"). */
+  health: () => request<Health>("GET", "/healthz", undefined, { public: true }),
   login: (body: LoginRequest) => request<User>("POST", "/auth/login", body, { public: true }),
   setup: (body: SetupRequest) => request<User>("POST", "/setup", body, { public: true }),
   logout: () => request<void>("POST", "/auth/logout", undefined, { public: true }),

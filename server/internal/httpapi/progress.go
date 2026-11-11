@@ -8,16 +8,19 @@ import (
 	"time"
 )
 
-// upsertProgress stores a position. A write from a named writer whose seq is
-// not newer than the stored one from that same writer changes nothing (it
-// arrived after a later write, e.g. one sent at unload). A write without a
-// writer keeps the stored writer and seq, so a late stale write from the
-// reader cannot undo it either.
-const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at, writer, seq) VALUES (?, ?, ?, ?, ?, ?, ?)
-	ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = excluded.completed, read_at = excluded.read_at,
-		writer = CASE WHEN excluded.writer = '' THEN read_progress.writer ELSE excluded.writer END,
-		seq = CASE WHEN excluded.writer = '' THEN read_progress.seq ELSE excluded.seq END
-	WHERE excluded.writer = '' OR read_progress.writer <> excluded.writer OR excluded.seq > read_progress.seq`
+const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at) VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = excluded.completed, read_at = excluded.read_at`
+
+// claimSeq raises a writer's high-water mark. It changes no row when seq is
+// not newer than the writer's last one: that write arrived after a later one
+// (e.g. the one sent at unload) and must not be applied.
+const claimSeq = `INSERT INTO progress_writers (user_id, book_id, writer, seq, updated_at) VALUES (?, ?, ?, ?, ?)
+	ON CONFLICT(user_id, book_id, writer) DO UPDATE SET seq = excluded.seq, updated_at = excluded.updated_at
+	WHERE excluded.seq > progress_writers.seq`
+
+// writerTTL is how long a writer's mark is kept after its last write. Writes
+// in flight take seconds; a day keeps the table small without risk.
+const writerTTL = 24 * time.Hour
 
 func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequestObject) (SetBookProgressResponseObject, error) {
 	book, ok, err := s.oneBook(ctx, req.BookId)
@@ -34,7 +37,8 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 	if b.Page < 1 || b.Page > book.PageCount {
 		return SetBookProgress400JSONResponse{badRequest("ページ番号が正しくありません")}, nil
 	}
-	p := ReadProgress{Page: b.Page, Completed: b.Page == book.PageCount, ReadAt: time.Now().UTC().Format(time.RFC3339)}
+	now := time.Now().UTC()
+	p := ReadProgress{Page: b.Page, Completed: b.Page == book.PageCount, ReadAt: now.Format(time.RFC3339)}
 	if b.Completed != nil {
 		p.Completed = *b.Completed
 	}
@@ -49,18 +53,50 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 	if len(writer) > 64 || seq < 0 {
 		return SetBookProgress400JSONResponse{badRequest("writer か seq が正しくありません")}, nil
 	}
-	res, err := s.DB.ExecContext(ctx, upsertProgress, currentUser(ctx).ID, book.Id, p.Page, p.Completed, p.ReadAt, writer, seq)
+	uid := currentUser(ctx).ID
+	// A write without a writer (mark read) is not ordered: it always applies.
+	if writer == "" {
+		if _, err := s.DB.ExecContext(ctx, upsertProgress, uid, book.Id, p.Page, p.Completed, p.ReadAt); err != nil {
+			return nil, err
+		}
+		return SetBookProgress200JSONResponse(p), nil
+	}
+
+	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
-	if n, err := res.RowsAffected(); err != nil {
+	defer tx.Rollback()
+	res, err := tx.ExecContext(ctx, claimSeq, uid, book.Id, writer, seq, p.ReadAt)
+	if err != nil {
 		return nil, err
-	} else if n == 0 {
-		// Stale write: answer with what is stored.
-		if err := s.DB.QueryRowContext(ctx, `SELECT page, completed, read_at FROM read_progress WHERE user_id = ? AND book_id = ?`,
-			currentUser(ctx).ID, book.Id).Scan(&p.Page, &p.Completed, &p.ReadAt); err != nil {
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		// Stale write: answer with what is stored. With nothing stored (the
+		// progress was cleared since) there is no order left to keep, so it
+		// applies like any other write.
+		err := tx.QueryRowContext(ctx, `SELECT page, completed, read_at FROM read_progress WHERE user_id = ? AND book_id = ?`,
+			uid, book.Id).Scan(&p.Page, &p.Completed, &p.ReadAt)
+		if err == nil {
+			return SetBookProgress200JSONResponse(p), nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
+	}
+	if _, err := tx.ExecContext(ctx, upsertProgress, uid, book.Id, p.Page, p.Completed, p.ReadAt); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM progress_writers WHERE user_id = ? AND book_id = ? AND writer <> ? AND updated_at < ?`,
+		uid, book.Id, writer, now.Add(-writerTTL).Format(time.RFC3339)); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
 	}
 	return SetBookProgress200JSONResponse(p), nil
 }

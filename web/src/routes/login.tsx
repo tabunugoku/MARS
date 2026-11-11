@@ -16,6 +16,8 @@ import { SetupForm } from "./login-setup";
 
 export default function Screen() {
   const { data: screen, error, reload } = useApi(() => api.loginScreen(), []);
+  // The build version (release tag, or "dev"); the footer stays empty until it answers.
+  const { data: health } = useApi(() => api.health(), []);
 
   return (
     <div className="relative flex min-h-dvh overflow-hidden bg-background">
@@ -38,7 +40,9 @@ export default function Screen() {
           </div>
         )}
 
-        <p className={cn(typeClass("caption"), "absolute bottom-6 text-muted-foreground")}>ComiNavi v0.1.0</p>
+        <p className={cn(typeClass("caption"), "absolute bottom-6 text-muted-foreground")}>
+          {health && `ComiNavi ${health.version}`}
+        </p>
       </main>
     </div>
   );

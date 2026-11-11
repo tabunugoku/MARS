@@ -118,6 +118,25 @@ func TestProgressWriterOrder(t *testing.T) {
 	if p := put(map[string]any{"page": 2, "writer": "tab-b", "seq": 2}); p.Page != 2 {
 		t.Fatalf("newer write from tab-b refused: %+v", p)
 	}
+	// A write from another tab in between does not reset tab-a's mark: tab-a's
+	// seq 1, arriving after its seq 2 and tab-b's write, is still stale.
+	put(map[string]any{"page": 2, "writer": "tab-c", "seq": 2})
+	put(map[string]any{"page": 3, "writer": "tab-b", "seq": 3})
+	if p := put(map[string]any{"page": 1, "writer": "tab-c", "seq": 1}); p.Page != 3 {
+		t.Fatalf("stale write slipped past another writer's write: %+v", p)
+	}
+	// After a clear, a writer's next write applies.
+	e.admin.json("DELETE", path, nil, 204, nil)
+	if p := put(map[string]any{"page": 2, "writer": "tab-c", "seq": 3}); p.Page != 2 {
+		t.Fatalf("write after clear refused: %+v", p)
+	}
+	// With nothing stored there is no order left to keep: even a stale write
+	// applies (the alternative would be answering with a position that is
+	// not stored).
+	e.admin.json("DELETE", path, nil, 204, nil)
+	if p := put(map[string]any{"page": 1, "writer": "tab-c", "seq": 1}); p.Page != 1 {
+		t.Fatalf("stale write after clear: %+v", p)
+	}
 	e.admin.json("PUT", path, map[string]any{"page": 1, "writer": strings.Repeat("x", 65), "seq": 3}, 400, nil)
 }
 

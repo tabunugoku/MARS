@@ -31,6 +31,9 @@ for _ in $(seq 60); do
   sleep 1
 done
 curl -fsS "$api/healthz"; echo
+# The image's own health probe: the binary checks itself (no shell, no curl).
+docker exec "$name" /usr/local/bin/cominavi healthcheck
+echo "healthcheck subcommand: ok"
 
 token=$(docker logs "$name" 2>&1 | grep -o 'token=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2 || true)
 if [ -z "$token" ]; then
@@ -68,6 +71,20 @@ for f in "/sys/fs/cgroup/system.slice/docker-$id.scope/memory.peak" "/sys/fs/cgr
   [ -r "$f" ] && peak=$(( $(cat "$f") / 1024 / 1024 ))MiB && break
 done
 size=$(docker image inspect -f '{{.Size}}' "$image")
+
+# The image's HEALTHCHECK instruction itself (what TrueNAS shows): the first
+# probe runs one interval (30 s) after start.
+health=""
+for _ in $(seq 30); do
+  health=$(docker inspect -f '{{.State.Health.Status}}' "$name")
+  [ "$health" = healthy ] && break
+  sleep 3
+done
+if [ "$health" != healthy ]; then
+  echo "container health is '$health', want healthy" >&2
+  docker inspect -f '{{json .State.Health}}' "$name" >&2
+  exit 1
+fi
 
 report=$(cat <<EOF
 | measure | value |

@@ -29,6 +29,17 @@ var version = "dev"
 func main() {
 	log := slog.New(slog.NewTextHandler(os.Stderr, nil))
 	slog.SetDefault(log)
+	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
+		cfg, err := config.Load()
+		if err == nil {
+			err = healthcheck(context.Background(), cfg.Addr)
+		}
+		if err != nil {
+			log.Error("unhealthy", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
 	if err := run(); err != nil {
 		log.Error("fatal", "err", err)
 		os.Exit(1)
