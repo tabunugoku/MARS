@@ -61,7 +61,7 @@ func (f *listFixture) sid(title string) string { return f.series[title].Id }
 
 func (f *listFixture) bid(title string, i int) string { return f.books[title][i].Id }
 
-func seriesIDs(ss ...Series) []string {
+func idsOfSeries(ss ...Series) []string {
 	out := []string{}
 	for _, s := range ss {
 		out = append(out, s.Id)
@@ -69,7 +69,7 @@ func seriesIDs(ss ...Series) []string {
 	return out
 }
 
-func bookIDs(bs ...Book) []string {
+func idsOfBooks(bs ...Book) []string {
 	out := []string{}
 	for _, b := range bs {
 		out = append(out, b.Id)
@@ -108,7 +108,7 @@ func TestCollectionCRUD(t *testing.T) {
 	}
 	var members []Series
 	c.json("GET", "/api/v1/collections/"+made.Id+"/series", nil, 200, &members)
-	if !slices.Equal(seriesIDs(members...), []string{bravo, alpha}) {
+	if !slices.Equal(idsOfSeries(members...), []string{bravo, alpha}) {
 		t.Fatalf("members %v, want Bravo then Alpha", titles(members...))
 	}
 
@@ -119,7 +119,7 @@ func TestCollectionCRUD(t *testing.T) {
 		t.Fatalf("updated %+v", upd)
 	}
 	c.json("GET", "/api/v1/collections/"+made.Id+"/series", nil, 200, &members)
-	if !slices.Equal(seriesIDs(members...), []string{alpha, charlie, bravo}) {
+	if !slices.Equal(idsOfSeries(members...), []string{alpha, charlie, bravo}) {
 		t.Fatalf("members after update %v", titles(members...))
 	}
 
@@ -152,8 +152,8 @@ func TestCollectionCRUD(t *testing.T) {
 	}
 	var books []Book
 	c.json("GET", "/api/v1/read-lists/"+rl.Id+"/books", nil, 200, &books)
-	if !slices.Equal(bookIDs(books...), []string{a1, c0, a0}) {
-		t.Fatalf("books %v, want position order", bookIDs(books...))
+	if !slices.Equal(idsOfBooks(books...), []string{a1, c0, a0}) {
+		t.Fatalf("books %v, want position order", idsOfBooks(books...))
 	}
 
 	// A PATCH without summary keeps it; the new order replaces the old one.
@@ -163,8 +163,8 @@ func TestCollectionCRUD(t *testing.T) {
 		t.Fatalf("updated %+v", rlUpd)
 	}
 	c.json("GET", "/api/v1/read-lists/"+rl.Id+"/books", nil, 200, &books)
-	if !slices.Equal(bookIDs(books...), []string{a0, a1}) {
-		t.Fatalf("books after update %v", bookIDs(books...))
+	if !slices.Equal(idsOfBooks(books...), []string{a0, a1}) {
+		t.Fatalf("books after update %v", idsOfBooks(books...))
 	}
 
 	c.json("DELETE", "/api/v1/read-lists/"+rl.Id, nil, 204, nil)
@@ -190,16 +190,16 @@ func TestListOrder(t *testing.T) {
 
 	var got []Series
 	c.json("GET", "/api/v1/collections/"+ordered.Id+"/series", nil, 200, &got)
-	if !slices.Equal(seriesIDs(got...), []string{charlie, bravo, alpha}) {
+	if !slices.Equal(idsOfSeries(got...), []string{charlie, bravo, alpha}) {
 		t.Fatalf("ordered %v, want position order", titles(got...))
 	}
 	c.json("GET", "/api/v1/collections/"+plain.Id+"/series", nil, 200, &got)
-	if !slices.Equal(seriesIDs(got...), []string{alpha, bravo, charlie}) {
+	if !slices.Equal(idsOfSeries(got...), []string{alpha, bravo, charlie}) {
 		t.Fatalf("unordered %v, want title order", titles(got...))
 	}
 	c.json("PATCH", "/api/v1/collections/"+ordered.Id, map[string]any{"ordered": false}, 200, nil)
 	c.json("GET", "/api/v1/collections/"+ordered.Id+"/series", nil, 200, &got)
-	if !slices.Equal(seriesIDs(got...), []string{alpha, bravo, charlie}) {
+	if !slices.Equal(idsOfSeries(got...), []string{alpha, bravo, charlie}) {
 		t.Fatalf("switched to unordered %v, want title order", titles(got...))
 	}
 
@@ -209,8 +209,8 @@ func TestListOrder(t *testing.T) {
 	c.json("POST", "/api/v1/read-lists", map[string]any{"name": "order", "bookIds": []string{c0, a1, b0}}, 201, &rl)
 	var books []Book
 	c.json("GET", "/api/v1/read-lists/"+rl.Id+"/books", nil, 200, &books)
-	if !slices.Equal(bookIDs(books...), []string{c0, a1, b0}) {
-		t.Fatalf("read list %v, want position order", bookIDs(books...))
+	if !slices.Equal(idsOfBooks(books...), []string{c0, a1, b0}) {
+		t.Fatalf("read list %v, want position order", idsOfBooks(books...))
 	}
 }
 
@@ -283,7 +283,7 @@ func TestListsSkipTrash(t *testing.T) {
 	}
 	var members []Series
 	c.json("GET", "/api/v1/collections/"+col.Id+"/series", nil, 200, &members)
-	if !slices.Equal(seriesIDs(members...), []string{alpha}) {
+	if !slices.Equal(idsOfSeries(members...), []string{alpha}) {
 		t.Fatalf("members %v, want Alpha only", titles(members...))
 	}
 	var gotRL ReadList
@@ -293,8 +293,8 @@ func TestListsSkipTrash(t *testing.T) {
 	}
 	var books []Book
 	c.json("GET", "/api/v1/read-lists/"+rl.Id+"/books", nil, 200, &books)
-	if !slices.Equal(bookIDs(books...), []string{a1, c0}) {
-		t.Fatalf("books %v, want the two live books", bookIDs(books...))
+	if !slices.Equal(idsOfBooks(books...), []string{a1, c0}) {
+		t.Fatalf("books %v, want the two live books", idsOfBooks(books...))
 	}
 }
 
@@ -351,7 +351,7 @@ func TestListsHideOtherLibraries(t *testing.T) {
 	}
 	var members []Series
 	r.json("GET", "/api/v1/collections/"+mixed.Id+"/series", nil, 200, &members)
-	if !slices.Equal(seriesIDs(members...), []string{alpha}) {
+	if !slices.Equal(idsOfSeries(members...), []string{alpha}) {
 		t.Fatalf("restricted members %v, want Alpha only", titles(members...))
 	}
 
@@ -361,7 +361,7 @@ func TestListsHideOtherLibraries(t *testing.T) {
 		t.Fatalf("admin sees %d collections, want 3 including the empty one", len(all))
 	}
 	admin.json("GET", "/api/v1/collections/"+onlyB.Id+"/series", nil, 200, &members)
-	if !slices.Equal(seriesIDs(members...), []string{charlie}) {
+	if !slices.Equal(idsOfSeries(members...), []string{charlie}) {
 		t.Fatalf("admin members of only B: %v", titles(members...))
 	}
 
@@ -387,8 +387,8 @@ func TestListsHideOtherLibraries(t *testing.T) {
 	}
 	var rBooks []Book
 	r.json("GET", "/api/v1/read-lists/"+rMixed.Id+"/books", nil, 200, &rBooks)
-	if !slices.Equal(bookIDs(rBooks...), []string{a1}) {
-		t.Fatalf("restricted books %v, want Alpha v02 only", bookIDs(rBooks...))
+	if !slices.Equal(idsOfBooks(rBooks...), []string{a1}) {
+		t.Fatalf("restricted books %v, want Alpha v02 only", idsOfBooks(rBooks...))
 	}
 
 	var allRL []ReadList
@@ -397,7 +397,7 @@ func TestListsHideOtherLibraries(t *testing.T) {
 		t.Fatalf("admin sees %d read lists, want 3 including the empty one", len(allRL))
 	}
 	admin.json("GET", "/api/v1/read-lists/"+rOnlyB.Id+"/books", nil, 200, &rBooks)
-	if !slices.Equal(bookIDs(rBooks...), []string{c0}) {
-		t.Fatalf("admin books of only B: %v", bookIDs(rBooks...))
+	if !slices.Equal(idsOfBooks(rBooks...), []string{c0}) {
+		t.Fatalf("admin books of only B: %v", idsOfBooks(rBooks...))
 	}
 }
