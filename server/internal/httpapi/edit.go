@@ -142,9 +142,9 @@ func checkSeriesUpdate(b *SeriesUpdate) string {
 		return "状態が正しくありません"
 	case b.ReadingDirection != nil && !b.ReadingDirection.Valid():
 		return "読む方向が正しくありません"
-	case b.AgeRating != nil && (*b.AgeRating < 0 || *b.AgeRating > 99):
+	case b.AgeRating.Value != nil && (*b.AgeRating.Value < 0 || *b.AgeRating.Value > 99):
 		return "年齢制限は0〜99にしてください"
-	case b.TotalBookCount != nil && *b.TotalBookCount < 0:
+	case b.TotalBookCount.Value != nil && *b.TotalBookCount.Value < 0:
 		return "巻数は0以上にしてください"
 	case b.Authors != nil && badAuthors(*b.Authors) != "":
 		return badAuthors(*b.Authors)
@@ -156,7 +156,7 @@ func checkBookUpdate(b *BookUpdate) string {
 	switch {
 	case b.Title != nil && strings.TrimSpace(*b.Title) == "":
 		return "タイトルを入力してください"
-	case b.ReleaseDate != nil && strings.TrimSpace(*b.ReleaseDate) != "" && !validReleaseDate(strings.TrimSpace(*b.ReleaseDate)):
+	case b.ReleaseDate.Value != nil && !validReleaseDate(strings.TrimSpace(*b.ReleaseDate.Value)):
 		return "発売日は YYYY-MM-DD、YYYY-MM、YYYY のいずれかで入力してください"
 	case b.Authors != nil && badAuthors(*b.Authors) != "":
 		return badAuthors(*b.Authors)
@@ -226,8 +226,8 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	if b.ReadingDirection != nil {
 		field("readingDirection", "reading_direction", string(*b.ReadingDirection))
 	}
-	if b.AgeRating != nil {
-		field("ageRating", "age_rating", *b.AgeRating)
+	if b.AgeRating.Set {
+		field("ageRating", "age_rating", b.AgeRating.Value)
 	}
 	if b.Language != nil {
 		field("language", "language", *b.Language)
@@ -241,8 +241,8 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	if b.Authors != nil {
 		field("authors", "authors", jsonText(orEmpty(*b.Authors)))
 	}
-	if b.TotalBookCount != nil {
-		field("totalBookCount", "total_book_count", *b.TotalBookCount)
+	if b.TotalBookCount.Set {
+		field("totalBookCount", "total_book_count", b.TotalBookCount.Value)
 	}
 	set = append(set, "locked_fields = ?", "updated_at = ?")
 	args = append(args, lockJSON(locks, edited, b.LockedFields), time.Now().UTC().Format(time.RFC3339Nano), req.SeriesId)
@@ -317,11 +317,10 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 	if b.Summary != nil {
 		field("summary", "summary", *b.Summary)
 	}
-	if b.ReleaseDate != nil {
-		// An empty string clears the date (null cannot be told apart from an absent field).
-		var rd any
-		if v := strings.TrimSpace(*b.ReleaseDate); v != "" {
-			rd = v
+	if b.ReleaseDate.Set {
+		var rd any // null clears the date
+		if b.ReleaseDate.Value != nil {
+			rd = strings.TrimSpace(*b.ReleaseDate.Value)
 		}
 		field("releaseDate", "release_date", rd)
 	}
@@ -486,6 +485,7 @@ func execCount(ctx context.Context, tx *sql.Tx, q string) (int, error) {
 	return int(n), err
 }
 
-func (s *server) GetPublicCover(ctx context.Context, req GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error) {
-	return nil, errTODO
+// GetPublicCover is served by servePublicCover (public.go) on the outer mux.
+func (s *server) GetPublicCover(context.Context, GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error) {
+	return GetPublicCover404JSONResponse{notFound("not routed")}, nil
 }

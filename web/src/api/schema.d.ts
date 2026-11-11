@@ -1015,11 +1015,13 @@ export interface components {
             summary?: string;
             publisher?: string;
             readingDirection?: components["schemas"]["ReadingDirection"];
+            /** @description null clears it */
             ageRating?: number | null;
             language?: string;
             genres?: string[];
             tags?: string[];
             authors?: components["schemas"]["Author"][];
+            /** @description null clears it */
             totalBookCount?: number | null;
             lockedFields?: string[];
         };
@@ -1031,6 +1033,7 @@ export interface components {
             /** Format: double */
             numberSort?: number;
             summary?: string;
+            /** @description YYYY-MM-DD, YYYY-MM or YYYY; null clears it */
             releaseDate?: string | null;
             isbn?: string;
             authors?: components["schemas"]["Author"][];
@@ -2491,6 +2494,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: components["responses"]["NotFound"];
         };
     };
     setBookReaderPrefs: {
@@ -2537,6 +2541,7 @@ export interface operations {
                 };
                 content?: never;
             };
+            404: components["responses"]["NotFound"];
         };
     };
     getSettings: {

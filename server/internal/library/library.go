@@ -370,7 +370,7 @@ func applySeriesInfo(ctx context.Context, tx *sql.Tx, seriesID string, byBook ma
 	}
 	if ci.Series != "" {
 		add("title", "title", ci.Series)
-		add("title", "title_sort", scan.SortTitle(ci.Series))
+		add("titleSort", "title_sort", scan.SortTitle(ci.Series))
 	}
 	if ci.Publisher != "" {
 		add("publisher", "publisher", ci.Publisher)

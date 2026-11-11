@@ -276,3 +276,41 @@ func TestEmptyTrash(t *testing.T) {
 		t.Fatalf("second empty %+v", res)
 	}
 }
+
+// null clears a nullable field; leaving it out keeps it.
+func TestUpdateNullClears(t *testing.T) {
+	e := newEnv(t)
+	red := pngBytes(t, 40, 60, color.RGBA{200, 0, 0, 255})
+	root := t.TempDir()
+	writeCBZ(t, filepath.Join(root, "Yofuke", "Yofuke v01.cbz"), map[string][]byte{"1.png": red})
+	var a Library
+	e.admin.json("POST", "/api/v1/libraries", map[string]any{"name": "A", "root": root, "kind": "manga"}, 201, &a)
+	e.waitTasks()
+	s := seriesOf(e, a.Id)[0]
+	var got Series
+	e.admin.json("PATCH", "/api/v1/series/"+s.Id, map[string]any{"ageRating": 12, "totalBookCount": 5}, 200, &got)
+	if got.AgeRating == nil || *got.AgeRating != 12 || got.TotalBookCount == nil || *got.TotalBookCount != 5 {
+		t.Fatalf("set %+v", got)
+	}
+	e.admin.json("PATCH", "/api/v1/series/"+s.Id, map[string]any{"summary": "あらすじ"}, 200, &got)
+	if got.AgeRating == nil || got.TotalBookCount == nil {
+		t.Fatalf("absent fields changed %+v", got)
+	}
+	e.admin.json("PATCH", "/api/v1/series/"+s.Id, map[string]any{"ageRating": nil}, 200, &got)
+	if got.AgeRating != nil || got.TotalBookCount == nil {
+		t.Fatalf("null ageRating %+v", got)
+	}
+
+	var books []Book
+	e.admin.json("GET", "/api/v1/series/"+s.Id+"/books", nil, 200, &books)
+	var b Book
+	e.admin.json("PATCH", "/api/v1/books/"+books[0].Id, map[string]any{"releaseDate": "2024-05"}, 200, &b)
+	if b.ReleaseDate == nil || *b.ReleaseDate != "2024-05" {
+		t.Fatalf("release date %+v", b.ReleaseDate)
+	}
+	e.admin.json("PATCH", "/api/v1/books/"+books[0].Id, map[string]any{"releaseDate": nil}, 200, &b)
+	if b.ReleaseDate != nil {
+		t.Fatalf("null release date %+v", *b.ReleaseDate)
+	}
+	e.admin.json("PATCH", "/api/v1/books/"+books[0].Id, map[string]any{"releaseDate": "May 2024"}, 400, nil)
+}

@@ -668,6 +668,7 @@ paths:
       summary: Go back to the global settings for this series
       responses:
         "204": { description: Removed (also when there was none) }
+        "404": { $ref: "#/components/responses/NotFound" }
   /me/reader-prefs/books/{bookId}:
     parameters:
       - { name: bookId, in: path, required: true, schema: { type: string } }
@@ -687,6 +688,7 @@ paths:
       summary: Go back to the series (or global) settings for this book
       responses:
         "204": { description: Removed (also when there was none) }
+        "404": { $ref: "#/components/responses/NotFound" }
   /settings:
     get:
       operationId: getSettings
@@ -1056,12 +1058,12 @@ components:
         summary: { type: string }
         publisher: { type: string }
         readingDirection: { $ref: "#/components/schemas/ReadingDirection" }
-        ageRating: { type: integer, nullable: true }
+        ageRating: { type: integer, nullable: true, description: "null clears it", x-go-type: "Opt[int]", x-go-type-skip-optional-pointer: true }
         language: { type: string }
         genres: { type: array, items: { type: string } }
         tags: { type: array, items: { type: string } }
         authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
-        totalBookCount: { type: integer, nullable: true }
+        totalBookCount: { type: integer, nullable: true, description: "null clears it", x-go-type: "Opt[int]", x-go-type-skip-optional-pointer: true }
         lockedFields: { type: array, items: { type: string } }
     BookUpdate:
       type: object
@@ -1071,7 +1073,7 @@ components:
         number: { type: number, format: double }
         numberSort: { type: number, format: double }
         summary: { type: string }
-        releaseDate: { type: string, nullable: true }
+        releaseDate: { type: string, nullable: true, description: "YYYY-MM-DD, YYYY-MM or YYYY; null clears it", x-go-type: "Opt[string]", x-go-type-skip-optional-pointer: true }
         isbn: { type: string }
         authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
         tags: { type: array, items: { type: string } }

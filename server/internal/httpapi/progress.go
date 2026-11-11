@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"net/http"
 	"time"
 )
 
@@ -183,34 +182,13 @@ func (s *server) SetSeriesReaderPrefs(ctx context.Context, req SetSeriesReaderPr
 	return SetSeriesReaderPrefs204Response{}, nil
 }
 
-// The generated contract declares no 404 for the two DELETE prefs routes, but
-// a hidden target must answer 404. These types live here so api.gen.go is
-// untouched; the contract should list the 404 too.
-type deleteSeriesPrefs404 NotFoundJSONResponse
-
-func (r deleteSeriesPrefs404) VisitDeleteSeriesReaderPrefsResponse(w http.ResponseWriter) error {
-	return writeNotFound(w, NotFoundJSONResponse(r))
-}
-
-type deleteBookPrefs404 NotFoundJSONResponse
-
-func (r deleteBookPrefs404) VisitDeleteBookReaderPrefsResponse(w http.ResponseWriter) error {
-	return writeNotFound(w, NotFoundJSONResponse(r))
-}
-
-func writeNotFound(w http.ResponseWriter, body NotFoundJSONResponse) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotFound)
-	return json.NewEncoder(w).Encode(body)
-}
-
 func (s *server) DeleteSeriesReaderPrefs(ctx context.Context, req DeleteSeriesReaderPrefsRequestObject) (DeleteSeriesReaderPrefsResponseObject, error) {
 	ok, err := s.visible(ctx, "series", req.SeriesId)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return deleteSeriesPrefs404{Message: "シリーズが見つかりません"}, nil
+		return DeleteSeriesReaderPrefs404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM reader_prefs WHERE user_id = ? AND scope = 'series' AND target = ?`,
 		currentUser(ctx).ID, req.SeriesId); err != nil {
@@ -242,7 +220,7 @@ func (s *server) DeleteBookReaderPrefs(ctx context.Context, req DeleteBookReader
 		return nil, err
 	}
 	if !ok {
-		return deleteBookPrefs404{Message: "本が見つかりません"}, nil
+		return DeleteBookReaderPrefs404JSONResponse{notFound("本が見つかりません")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM reader_prefs WHERE user_id = ? AND scope = 'book' AND target = ?`,
 		currentUser(ctx).ID, req.BookId); err != nil {
