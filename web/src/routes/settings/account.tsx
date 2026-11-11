@@ -1,20 +1,37 @@
 import { useState } from "react";
-import { api, useApi } from "@/api";
+import { api, errorMessage, useApi, type User } from "@/api";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
+import { LoadError } from "@/components/shell/load-error";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { toast } from "@yusufceng1z/ding-react";
 
 // The signed-in user's own account: display name, email (set by an admin)
-// and password. The mock layer has no save endpoint, so saving only confirms.
+// and password.
 export default function Screen() {
-  const { data: me } = useApi(() => api.me(), []);
+  const { data: me, error, reload } = useApi(() => api.me(), []);
+  // The user the server last returned from a save; it wins over the first load.
+  const [saved, setSaved] = useState<User | null>(null);
+  // The name being typed; null means "show the saved name".
   const [name, setName] = useState<string | null>(null);
+  const [savingName, setSavingName] = useState(false);
   const [pw, setPw] = useState({ current: "", next: "", confirm: "" });
+  const [savingPw, setSavingPw] = useState(false);
 
-  if (!me) {
+  const current = saved ?? me;
+
+  if (error) {
+    return (
+      <Page>
+        <PageHeader title="アカウント" />
+        <LoadError message={error} onRetry={reload} />
+      </Page>
+    );
+  }
+
+  if (!current) {
     return (
       <Page>
         <PageHeader title="アカウント" />
@@ -27,14 +44,42 @@ export default function Screen() {
     );
   }
 
-  const shownName = name ?? me.name;
-  const nameDirty = name !== null && name.trim() !== "" && name !== me.name;
+  const shownName = name ?? current.name;
+  const trimmedName = shownName.trim();
+  const nameDirty = name !== null && trimmedName !== "" && trimmedName !== current.name;
   const mismatch = pw.confirm !== "" && pw.next !== pw.confirm;
   const pwReady = pw.current !== "" && pw.next.length >= 8 && pw.next === pw.confirm;
 
+  const saveName = async () => {
+    setSavingName(true);
+    try {
+      const updated = await api.updateMe(trimmedName);
+      setSaved(updated);
+      setName(null);
+      toast.success("表示名を保存しました");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSavingName(false);
+    }
+  };
+
+  const changePassword = async () => {
+    setSavingPw(true);
+    try {
+      await api.changePassword(pw.current, pw.next);
+      setPw({ current: "", next: "", confirm: "" });
+      toast.success("パスワードを変更しました");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSavingPw(false);
+    }
+  };
+
   return (
     <Page>
-      <PageHeader title="アカウント" meta={me.role === "admin" ? "管理者" : "一般ユーザー"} />
+      <PageHeader title="アカウント" meta={current.role === "admin" ? "管理者" : "一般ユーザー"} />
 
       <div className="max-w-[640px] space-y-10">
         <section>
@@ -46,18 +91,11 @@ export default function Screen() {
             </Field>
             <Field>
               <FieldLabel htmlFor="acc-email">メールアドレス</FieldLabel>
-              <Input id="acc-email" value={me.email} readOnly disabled />
+              <Input id="acc-email" value={current.email} readOnly disabled />
               <FieldDescription>ログインに使います。変更は管理者に頼んでください。</FieldDescription>
             </Field>
             <div>
-              <Button
-                variant="secondary"
-                disabled={!nameDirty}
-                onClick={() => {
-                  setName(null);
-                  toast.success("表示名を保存しました");
-                }}
-              >
+              <Button variant="secondary" disabled={!nameDirty || savingName} loading={savingName} onClick={saveName}>
                 保存
               </Button>
             </div>
@@ -89,14 +127,7 @@ export default function Screen() {
               {mismatch && <FieldError>新しいパスワードと一致しません</FieldError>}
             </Field>
             <div>
-              <Button
-                variant="secondary"
-                disabled={!pwReady}
-                onClick={() => {
-                  setPw({ current: "", next: "", confirm: "" });
-                  toast.success("パスワードを変更しました");
-                }}
-              >
+              <Button variant="secondary" disabled={!pwReady || savingPw} loading={savingPw} onClick={changePassword}>
                 パスワードを変更
               </Button>
             </div>
