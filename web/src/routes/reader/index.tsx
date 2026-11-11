@@ -51,9 +51,10 @@ const progressKey = (p: { page: number; completed: boolean }) => `${p.page}|${p.
 /** Saves the reading position: a second after the last turn, and right away
  *  when the page is hidden or the reader closes.
  *
- *  Nothing is recorded until the reader moves on purpose: the position when
- *  the user first touches, clicks, scrolls or presses a key is the baseline,
- *  so layout settling (webtoon restore, spread re-anchoring) never counts.
+ *  Nothing is recorded until the reader turns a page: the caller calls the
+ *  returned navigated() from its page turns, jumps and user scrolling, so
+ *  layout settling (webtoon restore, a spread regroup after a settings
+ *  change) never counts as reading.
  *
  *  Every write goes out at once, keepalive (it survives unload), named with
  *  this reader's writer id and an increasing seq; the server ignores a write
@@ -68,24 +69,13 @@ function useProgressSaver(
   disabled: boolean,
 ) {
   const latest = useRef({ page, completed, position });
-  const start = useRef<string | null>(null);
   const moved = useRef(false);
   const sent = useRef(stored ? progressKey(stored) : "");
   const writer = useRef<string | null>(null);
   const seq = useRef(0);
-  useEffect(() => {
-    const onInput = () => {
-      start.current ??= latest.current.position;
-    };
-    const opts = { capture: true, passive: true } as const;
-    const kinds = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
-    kinds.forEach((k) => window.addEventListener(k, onInput, opts));
-    return () => kinds.forEach((k) => window.removeEventListener(k, onInput, opts));
-  }, []);
   const flush = useCallback(
     (leaving: boolean) => {
       const v = latest.current;
-      if (start.current !== null && v.position !== start.current) moved.current = true;
       const key = progressKey(v);
       if (disabled || !moved.current || key === sent.current) return;
       sent.current = key;
@@ -111,6 +101,9 @@ function useProgressSaver(
       flush(true);
     };
   }, [flush]);
+  return useCallback(() => {
+    moved.current = true;
+  }, []);
 }
 
 /** Which touch gestures the browser keeps. A page larger than the screen
@@ -252,6 +245,13 @@ function ReaderBody({
   }, [atEnd, currentPage, webtoon]);
   const [jump, setJump] = useState<{ page: number; n: number } | null>(null);
 
+  // The end card counts as the last page, finished (in webtoon too, where it
+  // may come into view without the page changing). Incognito reads leave no trace.
+  const shownPage = webtoon ? (webtoonEnd ? pageCount : webtoonPage) : currentPage;
+  const lastShown = webtoon ? shownPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
+  const finished = webtoon ? webtoonEnd : atEnd;
+  const navigated = useProgressSaver(book.id, shownPage, lastShown >= pageCount, finished ? "end" : String(shownPage), book.progress, incognito);
+
   const axis = prefs.direction === "vertical" ? "y" : "x";
   const forward = prefs.direction === "rtl" ? -1 : 1;
 
@@ -260,8 +260,9 @@ function ReaderBody({
     (d: 1 | -1) => {
       setVi((i) => Math.max(0, Math.min(views.length, i + d)));
       setChrome(false);
+      navigated();
     },
-    [views.length],
+    [views.length, navigated],
   );
 
   const onTap = useCallback(
@@ -308,8 +309,8 @@ function ReaderBody({
       else if (k === "ArrowLeft") d = axis === "x" ? (forward === 1 ? -1 : 1) : 0;
       else if (k === "ArrowDown") d = axis === "y" ? 1 : 0;
       else if (k === "ArrowUp") d = axis === "y" ? -1 : 0;
-      else if (k === "Home") return setVi(0);
-      else if (k === "End") return setVi(views.length - 1);
+      else if (k === "Home") return navigated(), setVi(0);
+      else if (k === "End") return navigated(), setVi(views.length - 1);
       if (d) {
         e.preventDefault();
         swipe.turn(d);
@@ -317,7 +318,7 @@ function ReaderBody({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [axis, forward, views.length, panel, onExit, swipe, webtoon]);
+  }, [axis, forward, views.length, panel, onExit, swipe, webtoon, navigated]);
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) document.exitFullscreen();
@@ -336,12 +337,8 @@ function ReaderBody({
       setJump((j) => ({ page: p, n: (j?.n ?? 0) + 1 }));
     } else setVi(Math.max(0, views.findIndex((v) => v.pages.includes(p))));
     setPanel("none");
+    navigated();
   };
-  const shownPage = webtoon ? webtoonPage : currentPage;
-  // The last page (or the end card) counts as finished. Incognito reads leave no trace.
-  const lastShown = webtoon ? webtoonPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
-  const finished = webtoon ? webtoonEnd : atEnd;
-  useProgressSaver(book.id, shownPage, lastShown >= pageCount, finished ? "end" : String(shownPage), book.progress, incognito);
 
   // Neighbour views are mounted beside the current one (prev/next) so a turn
   // shows decoded pixels; two further views are preloaded invisibly.
@@ -362,11 +359,16 @@ function ReaderBody({
           incognito={incognito}
           startPage={webtoonPage}
           jump={jump}
-          onPage={(p) => {
+          active={panel === "none"}
+          onPage={(p, byUser) => {
             anchor.current = p;
             setWebtoonPage(p);
+            if (byUser) navigated();
           }}
-          onEnd={setWebtoonEnd}
+          onEnd={(visible, byUser) => {
+            setWebtoonEnd(visible);
+            if (byUser) navigated();
+          }}
           onToggleChrome={() => setChrome((c) => !c)}
         />
       ) : (
@@ -599,6 +601,7 @@ function WebtoonView({
   incognito,
   startPage,
   jump,
+  active,
   onPage,
   onEnd,
   onToggleChrome,
@@ -609,11 +612,39 @@ function WebtoonView({
   incognito: boolean;
   startPage: number;
   jump: { page: number; n: number } | null;
-  onPage: (p: number) => void;
-  onEnd: (visible: boolean) => void;
+  /** No panel is open: keys go to the strip. */
+  active: boolean;
+  /** byUser: the user has scrolled the strip, so the change is reading, not
+   *  the restore scroll or images settling. */
+  onPage: (p: number, byUser: boolean) => void;
+  onEnd: (visible: boolean, byUser: boolean) => void;
   onToggleChrome: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const byUser = useRef(false);
+  const activeRef = useRef(active);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+  // Scrolling input on the strip itself; keys only while no panel is open
+  // (the strip is not focusable, so they arrive on the page).
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const mark = () => {
+      byUser.current = true;
+    };
+    const onKey = () => {
+      if (activeRef.current) mark();
+    };
+    const kinds = ["wheel", "touchstart", "pointerdown"] as const;
+    kinds.forEach((k) => el.addEventListener(k, mark, { passive: true }));
+    window.addEventListener("keydown", onKey);
+    return () => {
+      kinds.forEach((k) => el.removeEventListener(k, mark));
+      window.removeEventListener("keydown", onKey);
+    };
+  }, []);
   // Explicit jumps (page list) scroll; ordinary scrolling only reports.
   useEffect(() => {
     if (jump) ref.current?.querySelector(`[data-page="${jump.page}"]`)?.scrollIntoView({ block: "start" });
@@ -621,12 +652,12 @@ function WebtoonView({
   useEffect(() => {
     ref.current?.querySelector(`[data-page="${startPage}"]`)?.scrollIntoView({ block: "start" });
     const io = new IntersectionObserver(
-      (es) => es.forEach((e) => e.isIntersecting && onPage(Number((e.target as HTMLElement).dataset.page))),
+      (es) => es.forEach((e) => e.isIntersecting && onPage(Number((e.target as HTMLElement).dataset.page), byUser.current)),
       { root: ref.current, rootMargin: "-50% 0px -50% 0px" },
     );
     ref.current?.querySelectorAll("[data-page]").forEach((el) => io.observe(el));
     // The end card in view counts as finishing the volume (it may not change the page).
-    const endIo = new IntersectionObserver(([e]) => onEnd(e.isIntersecting), { root: ref.current, threshold: 0.5 });
+    const endIo = new IntersectionObserver(([e]) => onEnd(e.isIntersecting, byUser.current), { root: ref.current, threshold: 0.5 });
     const endEl = ref.current?.querySelector("[data-end]");
     if (endEl) endIo.observe(endEl);
     return () => {
