@@ -4,16 +4,18 @@ A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
 Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
-Current phase: **UI mockup approved** (tag `design/approved-v2`, 2026-11-11;
-v2 adds the floating save island). Backend: M0 (foundation), M1 (scan and
-page serving), M2 (sign-in and users), M3 (browsing API) and M4 (frontend
-on the real API) done; M5 (distribution) is next. Every API operation is classified in
+Current phase: **MVP complete** (milestones M0–M5 merged into `main`,
+2026-11-12). UI design approved as tag `design/approved-v2`. Distribution:
+`Dockerfile` (distroless/static), CI builds and smoke-tests the image,
+`release.yml` publishes amd64/arm64 images to GHCR on a `v*` tag (see
+README). Next: the 【推奨】 features in `docs/features.md`. Every API operation is classified in
 `server/internal/httpapi/access.go` (`opAccess`); an unlisted one is refused,
 and series/books are read only through the builders in `query.go`.
 The server listens on all interfaces (`COMINAVI_HOST` narrows it); a first
 start prints a one-time setup token and writes it to `DATA/setup-token`;
-the web app's /login page shows the setup form until an admin exists. The
-plan is in milestones M0–M5. `web/` talks to the Go API through
+the web app's /login page shows the setup form until an admin exists.
+Reader progress writes carry a per-reader `writer` and `seq`; the server
+ignores a stale one. `web/` talks to the Go API through
 `web/src/api/real.ts`; the invented sample data in `web/src/mock/` loads only
 when `VITE_API=mock` (`npm run dev:mock`) and never ships in a normal build.
 
