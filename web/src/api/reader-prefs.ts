@@ -53,9 +53,26 @@ export function loadReaderPrefs(): Promise<void> {
 export function getGlobalPrefs(): GlobalReaderPrefs {
   return cache.global;
 }
+/** Applies a change to the cache at once and undoes it if the server refuses. */
+function writeThrough(apply: () => void, undo: () => void, send: () => Promise<void>): Promise<void> {
+  apply();
+  return send().catch((err: unknown) => {
+    undo();
+    throw err;
+  });
+}
+
+function setScoped(map: Map<string, ReaderPrefs>, id: string, p: SeriesReaderPrefs, put: () => Promise<void>, del: () => Promise<void>) {
+  const before = map.get(id);
+  const restore = () => (before ? map.set(id, before) : map.delete(id));
+  return p.mode === "global"
+    ? writeThrough(() => map.delete(id), restore, del)
+    : writeThrough(() => map.set(id, p.prefs), restore, put);
+}
+
 export function setGlobalPrefs(p: GlobalReaderPrefs): Promise<void> {
-  cache.global = p;
-  return api.putGlobalPrefs(p);
+  const before = cache.global;
+  return writeThrough(() => (cache.global = p), () => (cache.global = before), () => api.putGlobalPrefs(p));
 }
 
 const asScoped = (p: ReaderPrefs | undefined): SeriesReaderPrefs => (p ? { mode: "custom", prefs: p } : { mode: "global" });
@@ -64,24 +81,16 @@ export function getSeriesPrefs(seriesId: string): SeriesReaderPrefs {
   return asScoped(cache.series.get(seriesId));
 }
 export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs): Promise<void> {
-  if (p.mode === "global") {
-    cache.series.delete(seriesId);
-    return api.deleteSeriesPrefs(seriesId);
-  }
-  cache.series.set(seriesId, p.prefs);
-  return api.putSeriesPrefs(seriesId, p.prefs);
+  return setScoped(cache.series, seriesId, p,
+    () => api.putSeriesPrefs(seriesId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteSeriesPrefs(seriesId));
 }
 
 export function getBookPrefs(bookId: string): SeriesReaderPrefs {
   return asScoped(cache.books.get(bookId));
 }
 export function setBookPrefs(bookId: string, p: SeriesReaderPrefs): Promise<void> {
-  if (p.mode === "global") {
-    cache.books.delete(bookId);
-    return api.deleteBookPrefs(bookId);
-  }
-  cache.books.set(bookId, p.prefs);
-  return api.putBookPrefs(bookId, p.prefs);
+  return setScoped(cache.books, bookId, p,
+    () => api.putBookPrefs(bookId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteBookPrefs(bookId));
 }
 
 /** Series ids that keep their own settings. */
