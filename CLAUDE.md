@@ -1,11 +1,12 @@
 # ComiNavi
 
 A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
-Backend: Go + SQLite (not started yet, `server/`). Frontend: React 19 + Vite +
+Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
-Current phase: **UI mockup approved** (tag `design/approved-v1`, 2026-11-11);
-backend planning is next. `web/` runs on mock data behind `web/src/api/`;
+Current phase: **UI mockup approved** (tag `design/approved-v2`, 2026-11-11;
+v2 adds the floating save island). Backend: M0 (foundation) done, M1 (scan
+and page serving) in progress; the plan is in milestones M0–M5. `web/` runs on mock data behind `web/src/api/`;
 the same code becomes the production frontend once the Go API exists.
 Known contract gap for the backend: covers are addressed by mock seeds
 (`coverSeed`), not real thumbnail URLs.
