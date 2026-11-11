@@ -99,6 +99,7 @@ const me = (): User => db.currentUser;
 const shelf = (bs: db.MockBook[], n = 20) => bs.slice(0, n).map(book);
 
 export const mockApi: Api = {
+  health: () => Promise.resolve({ status: "ok", version: "mock" }),
   loginScreen: (): Promise<LoginScreen> => {
     const backdrop = loadSettings().loginBackdrop;
     const covers =

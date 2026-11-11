@@ -41,6 +41,7 @@ export type MediaIssue = S["MediaIssue"];
 export type ServerSettings = S["ServerSettings"];
 export type LoginBackdrop = S["LoginBackdrop"];
 export type LoginScreen = S["LoginScreen"];
+export type Health = S["Health"];
 export type LoginCover = S["LoginCover"];
 export type SetupRequest = S["SetupRequest"];
 export type LoginRequest = S["LoginRequest"];
