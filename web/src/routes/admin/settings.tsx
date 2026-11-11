@@ -3,6 +3,7 @@ import { Copy, Eye, EyeOff } from "@keyline-icons/react";
 import { api, useApi, type ServerSettings } from "@/api";
 import { Block } from "@/components/media/skeletons";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
+import { SaveBar } from "@/components/shell/save-bar";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -220,16 +221,7 @@ export default function Screen() {
         </section>
       </div>
 
-      {dirty && (
-        <div className="sticky bottom-20 z-10 -mx-4 mt-8 flex items-center justify-end gap-2 border-t border-border bg-background px-4 py-3 md:bottom-0 md:-mx-8 md:px-8">
-          <Button variant="ghost" onClick={() => setDraft(null)}>
-            変更を破棄
-          </Button>
-          <Button variant="primary" onClick={save}>
-            保存
-          </Button>
-        </div>
-      )}
+      <SaveBar open={dirty} onDiscard={() => setDraft(null)} onSave={save} />
 
       <ConfirmDialog
         open={rotating}
