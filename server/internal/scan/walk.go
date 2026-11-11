@@ -35,14 +35,23 @@ var skipDirs = map[string]bool{
 	"System Volume Information": true, "lost+found": true, "__MACOSX": true,
 }
 
+// Listing is what Walk saw. Unreadable holds paths (relative, '/'
+// separated) that could not be read completely: books under them must not
+// be treated as deleted, since they may only be out of reach for a moment.
+type Listing struct {
+	Series     []FoundSeries
+	Unreadable []string
+}
+
 // Walk lists the series under root. Hidden files and folders (leading '.')
 // and the system folders above are skipped, as is anything matching an
 // exclude glob (path.Match against the relative path or the base name).
 // Symlinks are not followed. Series come back in natural folder order and
 // books in natural name order.
-func Walk(ctx context.Context, root string, exclude []string) ([]FoundSeries, error) {
+func Walk(ctx context.Context, root string, exclude []string) (Listing, error) {
 	byDir := map[string]*FoundSeries{}
 	var oneshots []FoundSeries
+	var unreadable []string
 
 	excluded := func(rel string) bool {
 		base := path.Base(rel)
@@ -65,7 +74,11 @@ func Walk(ctx context.Context, root string, exclude []string) ([]FoundSeries, er
 			if p == root {
 				return err // the library root itself is unreadable
 			}
-			return nil // skip unreadable subtrees, keep scanning
+			// Keep scanning, but remember what could not be read.
+			if r, rerr := filepath.Rel(root, p); rerr == nil {
+				unreadable = append(unreadable, filepath.ToSlash(r))
+			}
+			return nil
 		}
 		if p == root {
 			return nil
@@ -97,6 +110,7 @@ func Walk(ctx context.Context, root string, exclude []string) ([]FoundSeries, er
 		}
 		info, ierr := d.Info()
 		if ierr != nil {
+			unreadable = append(unreadable, rel)
 			return nil
 		}
 		b := FoundBook{Rel: rel, Format: f, Size: info.Size(), MTime: info.ModTime().UTC()}
@@ -114,7 +128,7 @@ func Walk(ctx context.Context, root string, exclude []string) ([]FoundSeries, er
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return Listing{}, err
 	}
 
 	out := make([]FoundSeries, 0, len(byDir)+len(oneshots))
@@ -124,7 +138,12 @@ func Walk(ctx context.Context, root string, exclude []string) ([]FoundSeries, er
 	}
 	out = append(out, oneshots...)
 	slices.SortFunc(out, func(a, b FoundSeries) int { return cmpNat(a.Dir+a.Oneshot, b.Dir+b.Oneshot) }) // one of the two is always ""
-	return out, nil
+	return Listing{Series: out, Unreadable: unreadable}, nil
+}
+
+// under reports whether rel is folder p or inside it ("" or "." is the root).
+func under(rel, p string) bool {
+	return p == "" || p == "." || rel == p || strings.HasPrefix(rel, p+"/")
 }
 
 func cmpNat(a, b string) int {

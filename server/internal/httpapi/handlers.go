@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path"
@@ -372,12 +374,14 @@ func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBook
 }
 
 func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObject) (ListBookPagesResponseObject, error) {
-	var one int
-	if err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM books WHERE id = ? AND deleted_at IS NULL`, req.BookId).Scan(&one); errors.Is(err, sql.ErrNoRows) {
+	var size int64
+	var mtime string
+	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime FROM books WHERE id = ? AND deleted_at IS NULL`, req.BookId).Scan(&size, &mtime); errors.Is(err, sql.ErrNoRows) {
 		return ListBookPages404JSONResponse{notFound("本が見つかりません")}, nil
 	} else if err != nil {
 		return nil, err
 	}
+	v := library.Version(size, mtime)
 	rows, err := s.DB.QueryContext(ctx, `SELECT number, width, height, media_type FROM pages WHERE book_id = ? ORDER BY number`, req.BookId)
 	if err != nil {
 		return nil, err
@@ -389,7 +393,7 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 		if err := rows.Scan(&p.Number, &p.Width, &p.Height, &p.MediaType); err != nil {
 			return nil, err
 		}
-		p.Url = fmt.Sprintf("/api/v1/books/%s/pages/%d", req.BookId, p.Number)
+		p.Url = fmt.Sprintf("/api/v1/books/%s/pages/%d?v=%s", req.BookId, p.Number, v)
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -424,11 +428,27 @@ func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
 	}
 	defer p.Close()
 	h := w.Header()
-	h.Set("Content-Type", p.MediaType)
 	h.Set("ETag", p.ETag)
-	h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	// Cache forever only under a versioned URL (?v= from the page list):
+	// a replaced file gets new URLs. Anything else must revalidate.
+	if r.URL.Query().Get("v") == p.Version {
+		h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		h.Set("Cache-Control", "private, no-cache")
+	}
+	if inm := r.Header.Get("If-None-Match"); inm != "" && (inm == p.ETag || inm == "*") {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+	h.Set("Content-Type", p.MediaType)
+	h.Set("Content-Length", strconv.FormatInt(p.Size, 10))
 	h.Set("X-Content-Type-Options", "nosniff")
-	http.ServeContent(w, r, "", time.Time{}, p.Body)
+	if r.Method == http.MethodHead {
+		return
+	}
+	if _, err := io.Copy(w, p.Body); err != nil {
+		slog.Debug("page write", "err", err) // usually the client went away
+	}
 }
 
 func (s *server) serveThumbnail(kind string) http.HandlerFunc {

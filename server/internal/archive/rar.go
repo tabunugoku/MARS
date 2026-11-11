@@ -21,22 +21,22 @@ type rarArchive struct {
 	byName map[string]int // index into files of the first entry with a name
 }
 
+// maxRarDictionary caps the decoder window rardecode allocates up front
+// (its default is 4 GiB, which a small hostile file can claim). WinRAR's
+// default dictionary is 32 MiB; books made with larger ones fail to open.
+const maxRarDictionary = 128 << 20
+
+var rarOpts = []rardecode.Option{rardecode.MaxDictionarySize(maxRarDictionary)}
+
 func openRar(path string) (Archive, error) {
-	rr, err := rardecode.OpenReader(path)
+	// List reads headers only, so listing does not decompress anything.
+	files, err := rardecode.List(path, rarOpts...)
 	if err != nil {
 		return nil, rarErr(err)
 	}
-	defer rr.Close()
-
 	a := &rarArchive{path: path, byName: make(map[string]int)}
-	for {
-		h, err := rr.Next()
-		if errors.Is(err, io.EOF) {
-			break
-		}
-		if err != nil {
-			return nil, rarErr(err)
-		}
+	for _, f := range files {
+		h := &f.FileHeader
 		if h.IsDir {
 			continue
 		}
@@ -95,7 +95,7 @@ func (a *rarArchive) Open(name string) (io.ReadCloser, error) {
 	if a.files[i].encrypted {
 		return nil, errEncrypted(name)
 	}
-	rr, err := rardecode.OpenReader(a.path)
+	rr, err := rardecode.OpenReader(a.path, rarOpts...)
 	if err != nil {
 		return nil, rarErr(err)
 	}
@@ -117,7 +117,7 @@ func (a *rarArchive) Open(name string) (io.ReadCloser, error) {
 }
 
 func (a *rarArchive) Walk(fn func(e Entry, r io.Reader) error) error {
-	rr, err := rardecode.OpenReader(a.path)
+	rr, err := rardecode.OpenReader(a.path, rarOpts...)
 	if err != nil {
 		return rarErr(err)
 	}

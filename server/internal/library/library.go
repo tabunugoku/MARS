@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
@@ -35,6 +36,13 @@ type Service struct {
 	Queue    *task.Queue
 	ThumbDir string
 	Pages    *media.PageCache
+
+	scanLocks sync.Map // library id -> *sync.Mutex; one walk+sync at a time per library
+}
+
+func (s *Service) scanLock(id string) *sync.Mutex {
+	m, _ := s.scanLocks.LoadOrStore(id, &sync.Mutex{})
+	return m.(*sync.Mutex)
 }
 
 type lib struct {
@@ -71,14 +79,23 @@ func (s *Service) QueueScan(ctx context.Context, libraryID string) (task.Task, e
 		if err != nil {
 			return err
 		}
+		// A running scan is not deduplicated by the queue, so two can overlap;
+		// the lock keeps an older walk from being committed after a newer one.
+		mu := s.scanLock(l.id)
+		mu.Lock()
 		found, err := scan.Walk(ctx, l.root, l.exclude)
 		if err != nil {
+			mu.Unlock()
 			return fmt.Errorf("フォルダを読めません: %w", err)
 		}
 		progress(0.5)
 		st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
+		mu.Unlock()
 		if err != nil {
 			return err
+		}
+		if len(found.Unreadable) > 0 {
+			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
 		_, err = s.QueueAnalyze(context.WithoutCancel(ctx), l.id)
@@ -112,62 +129,89 @@ func (s *Service) QueueAnalyze(ctx context.Context, libraryID string) (task.Task
 			todo = append(todo, id)
 		}
 		rows.Close()
+		infos := map[string]map[string]scan.ComicInfo{} // series id -> book id -> ComicInfo
 		for i, id := range todo {
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			if err := s.analyzeBook(ctx, l, id); err != nil {
+			seriesID, ci, err := s.analyzeBook(ctx, l, id)
+			if err != nil {
 				return err // only database errors stop the task; bad files are recorded per book
+			}
+			if ci != nil {
+				if infos[seriesID] == nil {
+					infos[seriesID] = map[string]scan.ComicInfo{}
+				}
+				infos[seriesID][id] = *ci
 			}
 			progress(float64(i+1) / float64(len(todo)))
 		}
-		if len(todo) > 0 {
-			tx, err := s.DB.BeginTx(ctx, nil)
-			if err != nil {
-				return err
-			}
-			defer tx.Rollback()
-			if err := scan.RebuildSearch(ctx, tx, l.id); err != nil {
-				return err
-			}
-			return tx.Commit()
+		if len(todo) == 0 {
+			return nil
 		}
-		return nil
+		tx, err := s.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		// Series fields come from the first book, chosen only now that every
+		// book's number (possibly from its own ComicInfo) is final.
+		ts := time.Now().UTC().Format(time.RFC3339Nano)
+		for seriesID, byBook := range infos {
+			if err := applySeriesInfo(ctx, tx, seriesID, byBook, ts); err != nil {
+				return err
+			}
+		}
+		if err := scan.RebuildSearch(ctx, tx, l.id); err != nil {
+			return err
+		}
+		return tx.Commit()
 	})
 }
 
-// analyzeBook reads one book and stores pages, thumbnail and metadata. A
-// broken or unsupported file is recorded on the book, not returned.
-func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) error {
+// version is what the last scan recorded for a book file. Analysis results
+// are stored only if the row still has the version they were read under, so
+// a slow analysis cannot overwrite a newer scan of a replaced file.
+type version struct {
+	size  int64
+	mtime string
+}
+
+// analyzeBook reads one book and stores pages, thumbnail and book metadata.
+// It returns the book's series and its ComicInfo (nil when absent or the
+// result was discarded). A broken or unsupported file is recorded on the
+// book, not returned as an error.
+func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string, *scan.ComicInfo, error) {
 	var rel, seriesID, lockedJSON string
-	if err := s.DB.QueryRowContext(ctx, `SELECT path, series_id, locked_fields FROM books WHERE id = ?`, bookID).
-		Scan(&rel, &seriesID, &lockedJSON); err != nil {
-		return err
+	var v version
+	if err := s.DB.QueryRowContext(ctx, `SELECT path, series_id, locked_fields, size_bytes, mtime FROM books WHERE id = ?`, bookID).
+		Scan(&rel, &seriesID, &lockedJSON, &v.size, &v.mtime); err != nil {
+		return "", nil, err
 	}
 	full, err := resolve(l.root, rel)
 	if err != nil {
-		return s.markBook(ctx, bookID, "error", err.Error())
+		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
 	}
 	a, err := media.Analyze(full)
 	switch {
 	case errors.Is(err, archive.ErrUnsupported):
-		return s.markBook(ctx, bookID, "unsupported", err.Error())
+		return seriesID, nil, s.markBook(ctx, bookID, v, "unsupported", err.Error())
 	case err != nil:
-		return s.markBook(ctx, bookID, "error", err.Error())
+		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
 	}
 
 	thumb := ""
 	if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
 		if err := os.MkdirAll(s.ThumbDir, 0o755); err != nil {
-			return err
+			return "", nil, err
 		}
 		name := bookID + ".jpg"
 		tmp := filepath.Join(s.ThumbDir, name+".tmp")
 		if err := os.WriteFile(tmp, jpg, 0o644); err != nil {
-			return err
+			return "", nil, err
 		}
 		if err := os.Rename(tmp, filepath.Join(s.ThumbDir, name)); err != nil {
-			return err
+			return "", nil, err
 		}
 		thumb = name
 	} else {
@@ -185,50 +229,66 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) error {
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 	defer tx.Rollback()
+	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	res, err := tx.ExecContext(ctx, `
+		UPDATE books SET page_count = ?, media_status = 'ready', media_error = '', thumbnail = ?, updated_at = ?
+		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
+		len(a.Pages), thumb, ts, bookID, v.size, v.mtime)
+	if err != nil {
+		return "", nil, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return seriesID, nil, nil // rescanned meanwhile; the next analysis takes it
+	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
-		return err
+		return "", nil, err
 	}
 	for _, p := range a.Pages {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`,
 			bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
-			return err
+			return "", nil, err
 		}
-	}
-	ts := time.Now().UTC().Format(time.RFC3339Nano)
-	if _, err := tx.ExecContext(ctx,
-		`UPDATE books SET page_count = ?, media_status = 'ready', media_error = '', thumbnail = ?, updated_at = ? WHERE id = ?`,
-		len(a.Pages), thumb, ts, bookID); err != nil {
-		return err
 	}
 	if ci != nil {
 		if err := applyBookInfo(ctx, tx, bookID, lockedJSON, *ci, ts); err != nil {
-			return err
-		}
-		if err := applySeriesInfo(ctx, tx, seriesID, bookID, *ci, ts); err != nil {
-			return err
+			return "", nil, err
 		}
 	}
-	return tx.Commit()
+	return seriesID, ci, tx.Commit()
 }
 
-func (s *Service) markBook(ctx context.Context, bookID, status, msg string) error {
-	_, err := s.DB.ExecContext(ctx,
-		`UPDATE books SET media_status = ?, media_error = ?, page_count = 0, updated_at = ? WHERE id = ?`,
-		status, msg, time.Now().UTC().Format(time.RFC3339Nano), bookID)
+func (s *Service) markBook(ctx context.Context, bookID string, v version, status, msg string) error {
+	_, err := s.DB.ExecContext(ctx, `
+		UPDATE books SET media_status = ?, media_error = ?, page_count = 0, updated_at = ?
+		WHERE id = ? AND size_bytes = ? AND mtime = ?`,
+		status, msg, time.Now().UTC().Format(time.RFC3339Nano), bookID, v.size, v.mtime)
 	return err
 }
 
 // resolve joins a stored relative path onto the library root and refuses
-// anything that would land outside it.
+// anything outside it: '..' in the stored path, and symlinks (in the book
+// path or swapped in after the scan) that lead out of the root.
 func resolve(root, rel string) (string, error) {
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
 		return "", fmt.Errorf("不正なパス: %q", rel)
 	}
-	return filepath.Join(root, filepath.FromSlash(rel)), nil
+	full := filepath.Join(root, filepath.FromSlash(rel))
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	real, err := filepath.EvalSymlinks(full)
+	if err != nil {
+		return "", err
+	}
+	if r, err := filepath.Rel(realRoot, real); err != nil || !filepath.IsLocal(r) {
+		return "", fmt.Errorf("ライブラリの外を指しています: %q", rel)
+	}
+	return real, nil
 }
 
 func locked(lockedJSON string) map[string]bool {
@@ -262,6 +322,7 @@ func applyBookInfo(ctx context.Context, tx *sql.Tx, bookID, lockedJSON string, c
 	if n, ok := ci.NumberValue(); ok {
 		add("number", "number", n)
 		add("number", "number_sort", n)
+		add("number", "number_source", "comicinfo")
 	}
 	if ci.Summary != "" {
 		add("summary", "summary", ci.Summary)
@@ -288,13 +349,20 @@ func applyBookInfo(ctx context.Context, tx *sql.Tx, bookID, lockedJSON string, c
 
 // applySeriesInfo copies series-level fields from the series' first book
 // only, so books that disagree cannot make the series flip on every scan.
-func applySeriesInfo(ctx context.Context, tx *sql.Tx, seriesID, bookID string, ci scan.ComicInfo, ts string) error {
+// byBook holds the ComicInfo of the books analysed in this run; when the
+// first book is not among them, the series is left as it is.
+func applySeriesInfo(ctx context.Context, tx *sql.Tx, seriesID string, byBook map[string]scan.ComicInfo, ts string) error {
 	var first, lockedJSON string
-	if err := tx.QueryRowContext(ctx,
-		`SELECT id FROM books WHERE series_id = ? AND deleted_at IS NULL ORDER BY number_sort, path LIMIT 1`, seriesID).Scan(&first); err != nil {
+	err := tx.QueryRowContext(ctx,
+		`SELECT id FROM books WHERE series_id = ? AND deleted_at IS NULL ORDER BY number_sort, path LIMIT 1`, seriesID).Scan(&first)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
 		return err
 	}
-	if first != bookID {
+	ci, ok := byBook[first]
+	if !ok {
 		return nil
 	}
 	if err := tx.QueryRowContext(ctx, `SELECT locked_fields FROM series WHERE id = ?`, seriesID).Scan(&lockedJSON); err != nil {
@@ -335,28 +403,37 @@ func applySeriesInfo(ctx context.Context, tx *sql.Tx, seriesID, bookID string, c
 		return nil
 	}
 	args = append(args, ts, seriesID)
-	_, err := tx.ExecContext(ctx, `UPDATE series SET `+strings.Join(set, ", ")+`, updated_at = ? WHERE id = ?`, args...)
+	_, err = tx.ExecContext(ctx, `UPDATE series SET `+strings.Join(set, ", ")+`, updated_at = ? WHERE id = ?`, args...)
 	return err
 }
 
-// Page is a page ready to serve.
+// Page is a page ready to stream. Body yields at most Size bytes.
 type Page struct {
-	Body      io.ReadSeeker
+	Body      io.Reader
+	Size      int64
 	MediaType string
 	ETag      string // strong; changes when the file changes
+	Version   string // see Version
 	Close     func() error
 }
 
-// OpenPage resolves page n (1-based) of a ready book. Zip pages are read
-// straight from the archive; other formats go through the page cache.
+// Version is the token page URLs carry (?v=) so a replaced file gets new
+// URLs and old cached responses are never reused for it.
+func Version(size int64, mtime string) string {
+	return fmt.Sprintf("%x", hash(fmt.Sprintf("%d-%s", size, mtime)))
+}
+
+// OpenPage resolves page n (1-based) of a ready book. Zip pages stream
+// straight from the archive (nothing is buffered in memory); RAR and 7z pages
+// come from the page cache, which is checked before the archive is touched.
 func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, error) {
-	var root, rel, entry, mediaType, mtime string
+	var root, rel, format, entry, mediaType, mtime string
 	var size int64
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT l.root, b.path, b.size_bytes, b.mtime, p.entry, p.media_type
+		SELECT l.root, b.path, b.format, b.size_bytes, b.mtime, p.entry, p.media_type
 		FROM books b JOIN libraries l ON l.id = b.library_id JOIN pages p ON p.book_id = b.id
 		WHERE b.id = ? AND p.number = ? AND b.deleted_at IS NULL AND b.media_status = 'ready'`, bookID, n).
-		Scan(&root, &rel, &size, &mtime, &entry, &mediaType)
+		Scan(&root, &rel, &format, &size, &mtime, &entry, &mediaType)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Page{}, ErrNotFound
 	}
@@ -367,44 +444,50 @@ func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, err
 	if err != nil {
 		return Page{}, err
 	}
-	key := fmt.Sprintf("%d-%s", size, mtime)
-	etag := fmt.Sprintf(`"%s-%d-%x"`, bookID, n, hash(key))
+	v := Version(size, mtime)
+	etag := fmt.Sprintf(`"%s-%d-%s"`, bookID, n, v)
 
-	a, _, err := archive.Open(full)
-	if err != nil {
-		return Page{}, err
-	}
-	if a.RandomAccess() {
-		defer a.Close()
-		rc, err := a.Open(entry)
+	if archive.Format(format) == archive.CBZ {
+		a, _, err := archive.Open(full)
 		if err != nil {
 			return Page{}, err
 		}
-		defer rc.Close()
-		b, err := io.ReadAll(io.LimitReader(rc, media.MaxEntryBytes+1))
-		if err != nil {
-			return Page{}, err
+		var entrySize int64 = -1
+		for _, e := range a.Entries() {
+			if e.Name == entry {
+				entrySize = e.Size
+				break
+			}
 		}
-		if len(b) > media.MaxEntryBytes {
+		if entrySize < 0 || entrySize > media.MaxEntryBytes {
+			a.Close()
 			return Page{}, media.ErrTooLarge
 		}
-		return Page{Body: bytes.NewReader(b), MediaType: mediaType, ETag: etag, Close: func() error { return nil }}, nil
+		rc, err := a.Open(entry)
+		if err != nil {
+			a.Close()
+			return Page{}, err
+		}
+		return Page{
+			Body: io.LimitReader(rc, entrySize), Size: entrySize, MediaType: mediaType, ETag: etag, Version: v,
+			Close: func() error { rc.Close(); return a.Close() },
+		}, nil
 	}
-	a.Close()
 
 	pages, err := s.pages(ctx, bookID)
 	if err != nil {
 		return Page{}, err
 	}
-	p, err := s.Pages.Page(bookID, key, full, pages, n)
+	f, err := s.Pages.Open(ctx, bookID, v, full, pages, n)
 	if err != nil {
 		return Page{}, err
 	}
-	f, err := os.Open(p)
+	st, err := f.Stat()
 	if err != nil {
+		f.Close()
 		return Page{}, err
 	}
-	return Page{Body: f, MediaType: mediaType, ETag: etag, Close: f.Close}, nil
+	return Page{Body: f, Size: st.Size(), MediaType: mediaType, ETag: etag, Version: v, Close: f.Close}, nil
 }
 
 func (s *Service) pages(ctx context.Context, bookID string) ([]media.Page, error) {

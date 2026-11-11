@@ -1,6 +1,7 @@
 package media
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -23,6 +24,8 @@ const (
 	keyFileName = "key"
 	tmpInfix    = ".tmp-"
 	staleTmp    = time.Hour
+
+	defaultExtractions = 2
 )
 
 // PageCache keeps extracted pages on disk for archives without cheap random
@@ -32,8 +35,13 @@ type PageCache struct {
 	Dir      string // e.g. DATA/cache/pages
 	MaxBytes int64  // total budget; least recently used books are evicted beyond it
 
+	// MaxExtractions limits how many archives are extracted at once, which
+	// bounds the temporary disk space in use. Zero means 2.
+	MaxExtractions int
+
 	mu    sync.Mutex
 	books map[string]*bookLock
+	sem   chan struct{} // extraction slots, created on first use under mu
 }
 
 // bookLock serialises extraction for one book. refs counts the holders and
@@ -43,15 +51,17 @@ type bookLock struct {
 	refs int
 }
 
-// Page returns the filesystem path of page n (1-based) of the book,
-// extracting the whole book on first use. key identifies the file version
-// (e.g. size+mtime); a different key re-extracts.
-func (c *PageCache) Page(bookID, key, archivePath string, pages []Page, n int) (string, error) {
+// Open returns page n (1-based) of the book as an open file, extracting the
+// whole book on first use. key identifies the file version (e.g. size+mtime);
+// a different key re-extracts. The file is opened while the book's lock is
+// held, so eviction cannot delete it between validation and open. The caller
+// must close it.
+func (c *PageCache) Open(ctx context.Context, bookID, key, archivePath string, pages []Page, n int) (*os.File, error) {
 	if !bookIDPattern.MatchString(bookID) {
-		return "", fmt.Errorf("media: invalid book id %q", bookID)
+		return nil, fmt.Errorf("media: invalid book id %q", bookID)
 	}
 	if n < 1 || n > len(pages) {
-		return "", fmt.Errorf("media: page %d out of range 1..%d", n, len(pages))
+		return nil, fmt.Errorf("media: page %d out of range 1..%d", n, len(pages))
 	}
 	unlock := c.lockBook(bookID)
 	defer unlock()
@@ -60,24 +70,41 @@ func (c *PageCache) Page(bookID, key, archivePath string, pages []Page, n int) (
 	if c.valid(bookDir, key) {
 		now := time.Now()
 		if err := os.Chtimes(filepath.Join(bookDir, keyFileName), now, now); err != nil {
-			return "", err
+			return nil, err
 		}
-	} else {
-		if err := c.extract(bookID, key, archivePath, pages); err != nil {
-			return "", err
-		}
-		_ = c.evict(bookID) // best effort: a failed sweep must not fail the read
+	} else if err := c.extract(ctx, bookID, key, archivePath, pages); err != nil {
+		return nil, err
 	}
 
-	page := filepath.Join(bookDir, strconv.Itoa(n))
-	if _, err := os.Stat(page); err != nil {
-		return "", fmt.Errorf("media: page %d not cached: %w", n, err)
+	f, err := os.Open(filepath.Join(bookDir, strconv.Itoa(n)))
+	if err != nil {
+		return nil, fmt.Errorf("media: page %d not cached: %w", n, err)
 	}
-	return page, nil
+	return f, nil
 }
 
+// lockBook takes the per-book lock and returns the function that releases it.
 func (c *PageCache) lockBook(id string) func() {
+	bl := c.ref(id)
+	bl.mu.Lock()
+	return c.unlocker(id, bl)
+}
+
+// tryLockBook takes the per-book lock without waiting. ok is false when another
+// request holds it; in that case there is nothing to release.
+func (c *PageCache) tryLockBook(id string) (unlock func(), ok bool) {
+	bl := c.ref(id)
+	if !bl.mu.TryLock() {
+		c.unref(id, bl)
+		return nil, false
+	}
+	return c.unlocker(id, bl), true
+}
+
+// ref registers a holder or waiter for the book's lock entry.
+func (c *PageCache) ref(id string) *bookLock {
 	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.books == nil {
 		c.books = make(map[string]*bookLock)
 	}
@@ -87,18 +114,38 @@ func (c *PageCache) lockBook(id string) func() {
 		c.books[id] = bl
 	}
 	bl.refs++
-	c.mu.Unlock()
+	return bl
+}
 
-	bl.mu.Lock()
+// unref drops a holder or waiter and removes the entry when none are left.
+func (c *PageCache) unref(id string, bl *bookLock) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	bl.refs--
+	if bl.refs == 0 {
+		delete(c.books, id)
+	}
+}
+
+func (c *PageCache) unlocker(id string, bl *bookLock) func() {
 	return func() {
 		bl.mu.Unlock()
-		c.mu.Lock()
-		bl.refs--
-		if bl.refs == 0 {
-			delete(c.books, id)
-		}
-		c.mu.Unlock()
+		c.unref(id, bl)
 	}
+}
+
+// semaphore returns the channel that limits concurrent extractions.
+func (c *PageCache) semaphore() chan struct{} {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.sem == nil {
+		n := c.MaxExtractions
+		if n <= 0 {
+			n = defaultExtractions
+		}
+		c.sem = make(chan struct{}, n)
+	}
+	return c.sem
 }
 
 // valid reports whether bookDir was extracted from the file version key.
@@ -107,11 +154,40 @@ func (c *PageCache) valid(bookDir, key string) bool {
 	return err == nil && string(b) == key
 }
 
-// extract writes every page into a temp dir, then swaps it in for Dir/<bookID>.
-func (c *PageCache) extract(bookID, key, archivePath string, pages []Page) error {
+// extract makes room for the book, then writes it. It waits for an extraction
+// slot first, and gives up with ctx.Err() if ctx ends while waiting. The
+// caller must hold the book's lock.
+func (c *PageCache) extract(ctx context.Context, bookID, key, archivePath string, pages []Page) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	sem := c.semaphore()
+	select {
+	case sem <- struct{}{}:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	defer func() { <-sem }()
+
+	info, err := os.Stat(archivePath)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(c.Dir, 0o755); err != nil {
 		return err
 	}
+	// Reserve the archive size up front, so concurrent extractions do not
+	// together overrun the budget. The archive size is only an estimate.
+	c.evict(bookID, info.Size())
+	if err := c.writeBook(ctx, bookID, key, archivePath, pages); err != nil {
+		return err
+	}
+	c.evict(bookID, 0) // the real size is known now; trim to the budget
+	return nil
+}
+
+// writeBook writes every page into a temp dir, then swaps it in for Dir/<bookID>.
+func (c *PageCache) writeBook(ctx context.Context, bookID, key, archivePath string, pages []Page) error {
 	tmp, err := os.MkdirTemp(c.Dir, bookID+tmpInfix)
 	if err != nil {
 		return err
@@ -123,7 +199,7 @@ func (c *PageCache) extract(bookID, key, archivePath string, pages []Page) error
 		}
 	}()
 
-	written, err := writePages(tmp, archivePath, pages)
+	written, err := writePages(ctx, tmp, archivePath, pages)
 	if err != nil {
 		return err
 	}
@@ -149,8 +225,8 @@ func (c *PageCache) extract(bookID, key, archivePath string, pages []Page) error
 // writePages walks the archive once and writes each page entry to dir/<n>.
 // Duplicate entry names keep the first page number, and duplicate entries in
 // the archive keep the first occurrence. It returns the entry names that were
-// written, mapped to their page number.
-func writePages(dir, archivePath string, pages []Page) (map[string]int, error) {
+// written, mapped to their page number. It stops with ctx.Err() once ctx ends.
+func writePages(ctx context.Context, dir, archivePath string, pages []Page) (map[string]int, error) {
 	want := make(map[string]int, len(pages))
 	for _, p := range pages {
 		if _, dup := want[p.Entry]; !dup {
@@ -167,6 +243,9 @@ func writePages(dir, archivePath string, pages []Page) (map[string]int, error) {
 
 	var total int64
 	err = a.Walk(func(e archive.Entry, r io.Reader) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		num, ok := want[e.Name]
 		if !ok {
 			return nil
@@ -204,13 +283,16 @@ func writePages(dir, archivePath string, pages []Page) (map[string]int, error) {
 	return written, nil
 }
 
-// evict removes the least recently used book dirs while the cache is over
-// MaxBytes, never removing keep. Temp dirs older than an hour are removed;
+// evict removes the least recently used book dirs while the cache, counting
+// reserve bytes for an extraction about to start, is over MaxBytes. It never
+// removes keep, and it skips any book whose lock is held by another request.
+// Temp dirs count toward the total; those older than an hour are removed, and
 // younger ones may belong to an extraction in progress and are left alone.
-func (c *PageCache) evict(keep string) error {
+// Failures are ignored: eviction is best effort.
+func (c *PageCache) evict(keep string, reserve int64) {
 	entries, err := os.ReadDir(c.Dir)
 	if err != nil {
-		return err
+		return
 	}
 	type book struct {
 		name string
@@ -218,16 +300,22 @@ func (c *PageCache) evict(keep string) error {
 		used time.Time
 	}
 	var books []book
-	var total int64
+	total := reserve
 	now := time.Now()
 	for _, de := range entries {
 		if !de.IsDir() {
 			continue
 		}
-		dir := filepath.Join(c.Dir, de.Name())
-		if strings.Contains(de.Name(), tmpInfix) {
+		name := de.Name()
+		dir := filepath.Join(c.Dir, name)
+		if strings.Contains(name, tmpInfix) {
 			if info, err := os.Stat(dir); err == nil && now.Sub(info.ModTime()) >= staleTmp {
-				_ = os.RemoveAll(dir)
+				if os.RemoveAll(dir) == nil {
+					continue
+				}
+			}
+			if size, err := dirSize(dir); err == nil {
+				total += size
 			}
 			continue
 		}
@@ -239,26 +327,32 @@ func (c *PageCache) evict(keep string) error {
 		if info, err := os.Stat(filepath.Join(dir, keyFileName)); err == nil {
 			used = info.ModTime()
 		}
-		books = append(books, book{de.Name(), size, used})
+		books = append(books, book{name, size, used})
 		total += size
 	}
 
 	sort.Slice(books, func(i, j int) bool { return books[i].used.Before(books[j].used) })
-	count := len(books)
 	for _, b := range books {
-		if total <= c.MaxBytes || count <= 1 {
+		if total <= c.MaxBytes {
 			break
 		}
 		if b.name == keep {
 			continue
 		}
-		if err := os.RemoveAll(filepath.Join(c.Dir, b.name)); err != nil {
-			return err
+		unlock, ok := c.tryLockBook(b.name)
+		if !ok {
+			continue // in use by another request; try the next oldest
+		}
+		// Drop the key first, so a removal that fails part-way cannot leave
+		// a dir that still looks valid.
+		_ = os.Remove(filepath.Join(c.Dir, b.name, keyFileName))
+		err := os.RemoveAll(filepath.Join(c.Dir, b.name))
+		unlock()
+		if err != nil {
+			continue // e.g. Windows: a file is still open; move on
 		}
 		total -= b.size
-		count--
 	}
-	return nil
 }
 
 func dirSize(dir string) (int64, error) {

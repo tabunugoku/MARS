@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -48,11 +49,11 @@ func TestWalkAndSync(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(found) != 3 {
-		t.Fatalf("found %d series: %+v", len(found), found)
+	if len(found.Series) != 3 {
+		t.Fatalf("found %d series: %+v", len(found.Series), found)
 	}
-	if got := found[0].Books; found[0].Dir != "Harbor Lights (2019)" || got[0].Rel != "Harbor Lights (2019)/Harbor Lights v2.cb7" {
-		t.Fatalf("order: %+v", found[0])
+	if got := found.Series[0].Books; found.Series[0].Dir != "Harbor Lights (2019)" || got[0].Rel != "Harbor Lights (2019)/Harbor Lights v2.cb7" {
+		t.Fatalf("order: %+v", found.Series[0])
 	}
 
 	d, err := db.Open(ctx, filepath.Join(t.TempDir(), "t.db"))
@@ -117,5 +118,65 @@ func TestWalkAndSync(t *testing.T) {
 	}
 	if n := count(t, d, `SELECT count(*) FROM series WHERE deleted_at IS NULL`); n != 3 {
 		t.Fatalf("live series after restore %d", n)
+	}
+}
+
+func TestSyncUnreadableAndRenumber(t *testing.T) {
+	ctx := context.Background()
+	root := t.TempDir()
+	write(t, root, "S/Bravo.cbz", "b")
+	write(t, root, "S/Delta.cbz", "d")
+	write(t, root, "T/T 01.cbz", "t")
+	d, err := db.Open(ctx, filepath.Join(t.TempDir(), "t.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if _, err := d.Exec(`INSERT INTO libraries (id, name, root, kind, created_at) VALUES ('L', 'L', ?, 'comics', '')`, root); err != nil {
+		t.Fatal(err)
+	}
+	sync := func() Listing {
+		l, err := Walk(ctx, root, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Sync(ctx, d, "L", "comics", l, time.Now()); err != nil {
+			t.Fatal(err)
+		}
+		return l
+	}
+	sync()
+	write(t, root, "S/Alpha.cbz", "a")
+	write(t, root, "S/Charlie.cbz", "c")
+	sync()
+	rows, err := d.Query(`SELECT path FROM books WHERE path LIKE 'S/%' ORDER BY number_sort, path`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var order []string
+	for rows.Next() {
+		var p string
+		rows.Scan(&p)
+		order = append(order, p)
+	}
+	rows.Close()
+	if strings.Join(order, ",") != "S/Alpha.cbz,S/Bravo.cbz,S/Charlie.cbz,S/Delta.cbz" {
+		t.Fatalf("order %v", order)
+	}
+
+	// A folder the walk could not read keeps its books.
+	l, _ := Walk(ctx, root, nil)
+	var kept []FoundSeries
+	for _, s := range l.Series {
+		if s.Dir != "T" {
+			kept = append(kept, s)
+		}
+	}
+	st, err := Sync(ctx, d, "L", "comics", Listing{Series: kept, Unreadable: []string{"T"}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st.BooksRemoved != 0 || st.SeriesRemoved != 0 {
+		t.Fatalf("unreadable folder was trashed: %+v", st)
 	}
 }

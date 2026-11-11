@@ -36,12 +36,24 @@ func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 //     (media_status 'outdated', so analysis picks them up);
 //   - a book whose size or mtime changed goes back to 'outdated';
 //   - rows whose files are gone get deleted_at (Komga's trash), and come
-//     back if the file reappears at the same path;
+//     back if the file reappears at the same path; rows under a path the
+//     walk could not read are left alone;
+//   - books with no number in their name are numbered by position, and
+//     renumbered when books around them come and go;
 //   - the search index for the library is rebuilt from the live rows.
 //
 // Metadata from ComicInfo.xml is applied later, by analysis.
-func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []FoundSeries, now time.Time) (Stats, error) {
+func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listing, now time.Time) (Stats, error) {
 	var st Stats
+	found := listing.Series
+	unreachable := func(rel string) bool {
+		for _, p := range listing.Unreadable {
+			if under(rel, p) {
+				return true
+			}
+		}
+		return false
+	}
 	ts := stamp(now)
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
@@ -50,9 +62,8 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 	defer tx.Rollback()
 
 	type seriesRow struct {
-		id      string
-		deleted bool
-		seen    bool
+		id, dir, oneshot string
+		deleted, seen    bool
 	}
 	series := map[string]*seriesRow{}
 	rows, err := tx.QueryContext(ctx, `SELECT id, dir, oneshot_file, deleted_at IS NOT NULL FROM series WHERE library_id = ?`, libraryID)
@@ -61,33 +72,32 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 	}
 	for rows.Next() {
 		var r seriesRow
-		var dir, one string
-		if err := rows.Scan(&r.id, &dir, &one, &r.deleted); err != nil {
+		if err := rows.Scan(&r.id, &r.dir, &r.oneshot, &r.deleted); err != nil {
 			rows.Close()
 			return st, err
 		}
-		series[dir+"\x00"+one] = &r
+		series[r.dir+"\x00"+r.oneshot] = &r
 	}
 	rows.Close()
 
 	type bookRow struct {
-		id, seriesID, mtime string
-		size                int64
-		deleted, seen       bool
+		id, seriesID, mtime, path, source string
+		size                              int64
+		number                            float64
+		deleted, seen                     bool
 	}
 	books := map[string]*bookRow{}
-	rows, err = tx.QueryContext(ctx, `SELECT id, series_id, path, size_bytes, mtime, deleted_at IS NOT NULL FROM books WHERE library_id = ?`, libraryID)
+	rows, err = tx.QueryContext(ctx, `SELECT id, series_id, path, size_bytes, mtime, number, number_source, deleted_at IS NOT NULL FROM books WHERE library_id = ?`, libraryID)
 	if err != nil {
 		return st, err
 	}
 	for rows.Next() {
 		var r bookRow
-		var p string
-		if err := rows.Scan(&r.id, &r.seriesID, &p, &r.size, &r.mtime, &r.deleted); err != nil {
+		if err := rows.Scan(&r.id, &r.seriesID, &r.path, &r.size, &r.mtime, &r.number, &r.source, &r.deleted); err != nil {
 			rows.Close()
 			return st, err
 		}
-		books[p] = &r
+		books[r.path] = &r
 	}
 	rows.Close()
 
@@ -122,14 +132,15 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 			if b == nil {
 				name := path.Base(fb.Rel)
 				num, ok := ParseNumber(name)
+				source := "file"
 				if !ok {
-					num = float64(i + 1)
+					num, source = float64(i+1), "position"
 				}
 				id := ids.New()
 				if _, err := tx.ExecContext(ctx, `
-					INSERT INTO books (id, series_id, library_id, path, format, size_bytes, mtime, title, number, number_sort, created_at, updated_at)
-					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-					id, s.id, libraryID, fb.Rel, string(fb.Format), fb.Size, mtime, BookTitle(name), num, num, ts, ts); err != nil {
+					INSERT INTO books (id, series_id, library_id, path, format, size_bytes, mtime, title, number, number_sort, number_source, created_at, updated_at)
+					VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+					id, s.id, libraryID, fb.Rel, string(fb.Format), fb.Size, mtime, BookTitle(name), num, num, source, ts, ts); err != nil {
 					return st, fmt.Errorf("insert book %q: %w", fb.Rel, err)
 				}
 				books[fb.Rel] = &bookRow{id: id, seen: true}
@@ -137,6 +148,11 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 				continue
 			}
 			b.seen = true
+			if b.source == "position" && b.number != float64(i+1) {
+				if _, err := tx.ExecContext(ctx, `UPDATE books SET number = ?, number_sort = ? WHERE id = ?`, i+1, i+1, b.id); err != nil {
+					return st, err
+				}
+			}
 			changed := b.size != fb.Size || b.mtime != mtime
 			if !changed && !b.deleted && b.seriesID == s.id {
 				continue
@@ -156,7 +172,7 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 	}
 
 	for _, b := range books {
-		if !b.seen && !b.deleted {
+		if !b.seen && !b.deleted && !unreachable(b.path) {
 			if _, err := tx.ExecContext(ctx, `UPDATE books SET deleted_at = ? WHERE id = ?`, ts, b.id); err != nil {
 				return st, err
 			}
@@ -164,7 +180,7 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, found []Found
 		}
 	}
 	for _, s := range series {
-		if !s.seen && !s.deleted {
+		if !s.seen && !s.deleted && !unreachable(s.dir+s.oneshot) {
 			if _, err := tx.ExecContext(ctx, `UPDATE series SET deleted_at = ? WHERE id = ?`, ts, s.id); err != nil {
 				return st, err
 			}

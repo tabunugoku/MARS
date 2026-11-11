@@ -49,6 +49,9 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 
 // Migrate applies every migrations/NNNN_*.sql newer than the stored
 // user_version, each in its own transaction.
+//
+// 0001_init.sql was edited during development, before any release; it is
+// frozen from milestone M1 on. Schema changes from now on go in new files.
 func Migrate(ctx context.Context, d *sql.DB) error {
 	var current int
 	if err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {

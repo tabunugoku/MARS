@@ -171,13 +171,19 @@ func TestScanAndServe(t *testing.T) {
 	}
 	var pages []Page
 	c.json("GET", "/api/v1/books/"+books[0].Id+"/pages", nil, 200, &pages)
-	if len(pages) != 3 || pages[2].Width != 120 || pages[2].Url != "/api/v1/books/"+books[0].Id+"/pages/3" {
+	if len(pages) != 3 || pages[2].Width != 120 || !strings.HasPrefix(pages[2].Url, "/api/v1/books/"+books[0].Id+"/pages/3?v=") {
 		t.Fatalf("pages %+v", pages)
 	}
 
 	rec := c.do("GET", pages[2].Url, nil)
 	if rec.Code != 200 || !bytes.Equal(rec.Body.Bytes(), blue) || rec.Header().Get("Content-Type") != "image/png" {
 		t.Fatalf("page 3: %d %q", rec.Code, rec.Header().Get("Content-Type"))
+	}
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
+		t.Fatalf("versioned URL cache-control %q", cc)
+	}
+	if rec := c.do("GET", strings.Split(pages[2].Url, "?")[0], nil); rec.Header().Get("Cache-Control") != "private, no-cache" {
+		t.Fatalf("unversioned URL cache-control %q", rec.Header().Get("Cache-Control"))
 	}
 	etag := rec.Header().Get("ETag")
 	if rec := c.do("GET", pages[2].Url, nil, "If-None-Match", etag); rec.Code != 304 {

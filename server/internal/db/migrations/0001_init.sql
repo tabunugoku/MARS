@@ -58,6 +58,8 @@ CREATE TABLE books (
   title         TEXT NOT NULL,
   number        REAL NOT NULL,
   number_sort   REAL NOT NULL,
+  number_source TEXT NOT NULL DEFAULT 'file' CHECK (number_source IN ('file','position','comicinfo')),
+                                             -- 'position' numbers are recomputed on every scan
   summary       TEXT NOT NULL DEFAULT '',
   release_date  TEXT,
   isbn          TEXT NOT NULL DEFAULT '',

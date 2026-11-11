@@ -161,10 +161,12 @@ func (q *Queue) run(parent context.Context, j *job) {
 		return // cancelled while queued; Cancel already marked it
 	}
 	db := context.WithoutCancel(parent)
-	res, err := q.db.ExecContext(db,
+	res, err := q.execRetry(db,
 		`UPDATE tasks SET state = 'running', started_at = ? WHERE id = ? AND state = 'queued'`, now(), j.id)
 	if err != nil {
+		// The row stays 'queued' with nothing behind it; record that.
 		slog.Error("task start", "id", j.id, "err", err)
+		q.execRetry(db, `UPDATE tasks SET state = 'failed', error = ?, finished_at = ? WHERE id = ?`, "開始できませんでした", now(), j.id)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
@@ -204,11 +206,26 @@ func (q *Queue) run(parent context.Context, j *job) {
 		state, msg = "failed", err.Error()
 		slog.Error("task failed", "id", j.id, "kind", j.kind, "err", err)
 	}
-	if _, err := q.db.ExecContext(db,
+	if _, err := q.execRetry(db,
 		`UPDATE tasks SET state = ?, error = ?, progress = CASE WHEN ? = 'done' THEN 1 ELSE progress END, finished_at = ? WHERE id = ?`,
 		state, msg, state, now(), j.id); err != nil {
 		slog.Error("task finish", "id", j.id, "err", err)
 	}
+}
+
+// execRetry runs a task-state write, retrying for about 30 seconds: the
+// database may be held by a long scan transaction past busy_timeout, and a
+// lost state write would strand the row as queued or running.
+func (q *Queue) execRetry(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	var err error
+	for attempt := 1; attempt <= 6; attempt++ {
+		var res sql.Result
+		if res, err = q.db.ExecContext(ctx, query, args...); err == nil {
+			return res, nil
+		}
+		time.Sleep(time.Duration(attempt) * 2 * time.Second)
+	}
+	return nil, err
 }
 
 // safeRun turns a panic in fn into an error so one bad book cannot take the
