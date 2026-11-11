@@ -1,0 +1,15 @@
+# Keep the build context to what the Dockerfile copies: web/ and server/.
+.git
+.github
+.claude
+.mcp.json
+docs
+**/node_modules
+web/dist
+server/internal/webui/dist/*
+!server/internal/webui/dist/.gitkeep
+server/data
+server/cominavi
+server/cominavi.exe
+data
+*.log
