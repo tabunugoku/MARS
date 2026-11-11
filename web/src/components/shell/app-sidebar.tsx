@@ -69,6 +69,9 @@ export function AppSidebar() {
   const { theme, toggle } = useTheme();
   const { data: libs } = useApi(() => api.libraries(), []);
   const { data: me } = useApi(() => api.me(), []);
+  // Running and queued tasks, for the badge on タスク (administrators only).
+  const { data: tasks } = useApi(() => (me?.role === "admin" ? api.tasks() : Promise.resolve([])), [me?.role]);
+  const activeTasks = tasks?.filter((t) => t.state === "running" || t.state === "queued").length ?? 0;
 
   return (
     <Sidebar variant="inset">
@@ -125,7 +128,7 @@ export function AppSidebar() {
             <SidebarMenu>
               <NavRow to="/admin/libraries" icon={I(LibraryBig)} label="ライブラリ設定" />
               <NavRow to="/admin/users" icon={I(Users)} label="ユーザー" />
-              <NavRow to="/admin/tasks" icon={I(Activity)} label="タスク" badge={2} />
+              <NavRow to="/admin/tasks" icon={I(Activity)} label="タスク" badge={activeTasks || undefined} />
               <NavRow to="/admin/media" icon={I(FileAlert)} label="メディア管理" />
               <NavRow to="/admin/settings" icon={I(Settings)} label="サーバー設定" />
             </SidebarMenu>
@@ -149,7 +152,7 @@ export function AppSidebar() {
                 label={theme === "dark" ? "テーマ: ダーク" : "テーマ: ライト"}
                 onSelect={() => toggle()}
               />
-              <MenuItem index={1} icon={I(LogOut)} label="ログアウト" onSelect={() => navigate("/login")} />
+              <MenuItem index={1} icon={I(LogOut)} label="ログアウト" onSelect={() => void api.logout().finally(() => location.assign("/login"))} />
             </>
           }
         />
