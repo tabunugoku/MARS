@@ -31,9 +31,6 @@ export default function Screen() {
     <div className="relative flex min-h-dvh overflow-hidden bg-background">
       <div aria-hidden className="relative hidden md:block md:w-[55%] md:overflow-hidden">
         <Backdrop screen={screen} />
-        <div className="absolute inset-0 grid place-items-center">
-          <AppMark size={96} />
-        </div>
       </div>
 
       <main className="flex flex-1 flex-col items-center justify-center p-6">
@@ -120,11 +117,15 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
           ))}
         </div>
         <div className="absolute inset-0 bg-background/70 tone" />
+        <div className="absolute inset-0 grid place-items-center">
+          <AppMark size={96} />
+        </div>
       </>
     );
   }
-  // The night chart: the same rose as behind every screen, centred under the
-  // mark. Its needle swings in once to the mark's own 35° heading.
+  // The night chart: the same rose as behind every screen, on its own (the
+  // form already carries the mark). Its needle swings in once to the mark's
+  // own 35° heading.
   return (
     <>
       <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />
