@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Download, Film } from "@keyline-icons/react";
-import { api, useApi, type Library, type Role, type User } from "@/api";
+import { api, errorMessage, useApi, type Library, type Role, type UserCreate } from "@/api";
+import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,13 +50,12 @@ const BLANK: UserForm = {
 };
 
 export default function Screen() {
-  const { data } = useApi(() => Promise.all([api.users(), api.libraries()]), []);
-  // Mock layer has no mutations: added users live here until the API exists.
-  const [edited, setEdited] = useState<User[] | null>(null);
+  const { data, error, reload } = useApi(() => Promise.all([api.users(), api.libraries()]), []);
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<UserForm>(BLANK);
+  const [saving, setSaving] = useState(false);
 
-  const users = edited ?? data?.[0];
+  const users = data?.[0];
   const libs: Library[] = data?.[1] ?? [];
   const names = new Map(libs.map((l) => [l.id, l.name]));
   const set = (patch: Partial<UserForm>) => setForm((f) => ({ ...f, ...patch }));
@@ -63,21 +63,28 @@ export default function Screen() {
   const togglePick = (id: string) =>
     set({ picked: form.picked.includes(id) ? form.picked.filter((x) => x !== id) : [...form.picked, id] });
 
-  const save = () => {
-    const user: User = {
-      id: `u-${Date.now()}`,
+  const save = async () => {
+    const body: UserCreate = {
       name: form.name.trim(),
       email: form.email.trim(),
+      password: form.password,
       role: form.role,
       canDownload: form.canDownload,
       canStream: form.canStream,
       allLibraries: form.allLibs,
       libraryIds: form.allLibs ? [] : form.picked,
-      lastActive: new Date().toISOString(),
     };
-    setEdited([...(users ?? []), user]);
-    setOpen(false);
-    toast.success("ユーザーを追加しました");
+    setSaving(true);
+    try {
+      await api.createUser(body);
+      setOpen(false);
+      toast.success("ユーザーを追加しました");
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const add = (
@@ -96,7 +103,9 @@ export default function Screen() {
     <Page>
       <PageHeader title="ユーザー" actions={users && users.length > 0 ? add : undefined} />
 
-      {!users && <TableSkeleton heads={HEADS} />}
+      {error && !users && <LoadError message={error} onRetry={reload} />}
+
+      {!error && !users && <TableSkeleton heads={HEADS} />}
 
       {users && users.length === 0 && (
         <EmptyState title="ユーザーがいません" body="家族や友人を追加すると、それぞれの権限で読めるようになります" action={add} />
@@ -135,7 +144,7 @@ export default function Screen() {
                   <TableCell className={cn(typeClass("caption"), "max-w-[260px] truncate")}>
                     {u.allLibraries ? "すべて" : u.libraryIds.map((id) => names.get(id) ?? id).join("、")}
                   </TableCell>
-                  <TableCell className="whitespace-nowrap">{relTime(u.lastActive)}</TableCell>
+                  <TableCell className="whitespace-nowrap">{u.lastActive ? relTime(u.lastActive) : "なし"}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -143,7 +152,7 @@ export default function Screen() {
         </div>
       )}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={(o) => !saving && setOpen(o)}>
         <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>ユーザーを追加</DialogTitle>
@@ -217,7 +226,7 @@ export default function Screen() {
             <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
             <Button
               variant="primary"
-              disabled={!form.name.trim() || !form.email.trim() || !form.password || (!form.allLibs && form.picked.length === 0)}
+              disabled={saving || !form.name.trim() || !form.email.trim() || !form.password || (!form.allLibs && form.picked.length === 0)}
               onClick={save}
             >
               追加
