@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 )
 
 // likePattern turns user text into a LIKE pattern matching it anywhere,
@@ -118,13 +119,214 @@ func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (L
 }
 
 func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksRequestObject) (GetAdjacentBooksResponseObject, error) {
-	return nil, errTODO
+	cur, ok, err := s.oneBook(ctx, req.BookId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return GetAdjacentBooks404JSONResponse{notFound("本が見つかりません")}, nil
+	}
+	prev, err := s.listBooks(ctx, ` AND b.series_id = ? AND (b.number_sort, b.path) < (?, ?)`,
+		`ORDER BY b.number_sort DESC, b.path DESC LIMIT 1`, cur.SeriesId, cur.NumberSort, cur.Path)
+	if err != nil {
+		return nil, err
+	}
+	next, err := s.listBooks(ctx, ` AND b.series_id = ? AND (b.number_sort, b.path) > (?, ?)`,
+		`ORDER BY b.number_sort, b.path LIMIT 1`, cur.SeriesId, cur.NumberSort, cur.Path)
+	if err != nil {
+		return nil, err
+	}
+	var out AdjacentBooks
+	if len(prev) > 0 {
+		out.Prev = &prev[0]
+	}
+	if len(next) > 0 {
+		out.Next = &next[0]
+	}
+	return GetAdjacentBooks200JSONResponse(out), nil
 }
 
+// onDeckWhere selects the first unread book b of a series when the book
+// before it is finished, the series has no book in progress, and no earlier
+// book is still unread. The caller's user id is bound three times, then once
+// more in the ORDER BY (see GetDashboard).
+const onDeckWhere = ` AND rp.book_id IS NULL
+  AND EXISTS (SELECT 1 FROM books p JOIN read_progress pr ON pr.book_id = p.id AND pr.user_id = ?
+    WHERE p.series_id = b.series_id AND p.deleted_at IS NULL AND pr.completed = 1
+    AND (p.number_sort, p.path) < (b.number_sort, b.path)
+    AND NOT EXISTS (SELECT 1 FROM books m WHERE m.series_id = b.series_id AND m.deleted_at IS NULL
+      AND (m.number_sort, m.path) > (p.number_sort, p.path) AND (m.number_sort, m.path) < (b.number_sort, b.path)))
+  AND NOT EXISTS (SELECT 1 FROM books u LEFT JOIN read_progress ur ON ur.book_id = u.id AND ur.user_id = ?
+    WHERE u.series_id = b.series_id AND u.deleted_at IS NULL AND ur.book_id IS NULL
+    AND (u.number_sort, u.path) < (b.number_sort, b.path))
+  AND NOT EXISTS (SELECT 1 FROM books q JOIN read_progress qr ON qr.book_id = q.id AND qr.user_id = ?
+    WHERE q.series_id = b.series_id AND q.deleted_at IS NULL AND qr.completed = 0)`
+
 func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject) (GetDashboardResponseObject, error) {
-	return nil, errTODO
+	uid := currentUser(ctx).ID
+	var libArgs []any
+	bLib, sLib := "", ""
+	if req.Params.LibraryId != nil {
+		libArgs = []any{*req.Params.LibraryId}
+		bLib, sLib = ` AND b.library_id = ?`, ` AND s.library_id = ?`
+	}
+	books := func(where, tail string, args ...any) ([]Book, error) {
+		return s.listBooks(ctx, bLib+where, tail, append(append([]any{}, libArgs...), args...)...)
+	}
+	series := func(where, tail string, args ...any) ([]Series, error) {
+		return s.listSeries(ctx, sLib+where, tail, append(append([]any{}, libArgs...), args...)...)
+	}
+
+	var d Dashboard
+	var err error
+	if d.KeepReading, err = books(` AND rp.completed = 0`, `ORDER BY rp.read_at DESC, b.id LIMIT 20`); err != nil {
+		return nil, err
+	}
+	if d.OnDeck, err = books(onDeckWhere, `ORDER BY (SELECT max(sr.read_at) FROM books sb
+	  JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
+	  WHERE sb.series_id = b.series_id AND sb.deleted_at IS NULL) DESC, b.id LIMIT 20`, uid, uid, uid, uid); err != nil {
+		return nil, err
+	}
+	if d.RecentlyAddedBooks, err = books(``, `ORDER BY b.created_at DESC, b.id DESC LIMIT 20`); err != nil {
+		return nil, err
+	}
+	if d.RecentlyAddedSeries, err = series(``, `ORDER BY s.created_at DESC, s.id DESC LIMIT 20`); err != nil {
+		return nil, err
+	}
+	if d.RecentlyRead, err = books(` AND rp.completed = 1`, `ORDER BY rp.read_at DESC, b.id LIMIT 20`); err != nil {
+		return nil, err
+	}
+	if d.RecentlyUpdatedSeries, err = series(` AND s.updated_at > s.created_at`, `ORDER BY s.updated_at DESC, s.id DESC LIMIT 20`); err != nil {
+		return nil, err
+	}
+	return GetDashboard200JSONResponse(d), nil
+}
+
+// idList runs a query whose rows are single id columns.
+func (s *server) idList(ctx context.Context, q string, args ...any) ([]string, error) {
+	rows, err := s.DB.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 func (s *server) Search(ctx context.Context, req SearchRequestObject) (SearchResponseObject, error) {
-	return nil, errTODO
+	q := strings.TrimSpace(req.Params.Q)
+	res := SearchResult{Series: []Series{}, Books: []Book{}, Collections: []Collection{}, ReadLists: []ReadList{}}
+	if q == "" {
+		return Search200JSONResponse(res), nil
+	}
+	admin := currentUser(ctx).IsAdmin()
+
+	// trigram needs three characters; shorter queries use LIKE on the index.
+	var seriesCond, bookCond string
+	var match any
+	if utf8.RuneCountInString(q) >= 3 {
+		seriesCond = ` AND s.id IN (SELECT ref FROM search_index WHERE kind = 'series' AND text MATCH ?)`
+		bookCond = ` AND b.id IN (SELECT ref FROM search_index WHERE kind = 'book' AND text MATCH ?)`
+		match = `"` + strings.ReplaceAll(q, `"`, `""`) + `"`
+	} else {
+		seriesCond = ` AND s.id IN (SELECT ref FROM search_index WHERE kind = 'series' AND text LIKE ? ESCAPE '\')`
+		bookCond = ` AND b.id IN (SELECT ref FROM search_index WHERE kind = 'book' AND text LIKE ? ESCAPE '\')`
+		match = likePattern(q)
+	}
+	series, err := s.listSeries(ctx, seriesCond, "ORDER BY s.title_sort LIMIT 20", match)
+	if err != nil {
+		return nil, err
+	}
+	books, err := s.listBooks(ctx, bookCond, "ORDER BY b.title, b.number_sort LIMIT 20", match)
+	if err != nil {
+		return nil, err
+	}
+	res.Series, res.Books = series, books
+
+	// Collections and read lists match by name. A normal user gets only those
+	// with at least one member they may see; members are listed the same way.
+	pat := likePattern(q)
+	cScope, cArgs := libScope(ctx, "s.library_id")
+	cols := `SELECT c.id, c.name, c.ordered FROM collections c WHERE c.name LIKE ? ESCAPE '\'`
+	cargs := []any{pat}
+	if !admin {
+		cols += ` AND EXISTS (SELECT 1 FROM collection_series cs JOIN series s ON s.id = cs.series_id
+		  WHERE cs.collection_id = c.id AND s.deleted_at IS NULL AND ` + cScope + `)`
+		cargs = append(cargs, cArgs...)
+	}
+	cols += ` ORDER BY c.name, c.id LIMIT 20`
+	rows, err := s.DB.QueryContext(ctx, cols, cargs...)
+	if err != nil {
+		return nil, err
+	}
+	var cs []Collection
+	for rows.Next() {
+		var c Collection
+		var ordered int
+		if err := rows.Scan(&c.Id, &c.Name, &ordered); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		c.Ordered = ordered != 0
+		cs = append(cs, c)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range cs {
+		members, err := s.idList(ctx, `SELECT cs.series_id FROM collection_series cs JOIN series s ON s.id = cs.series_id
+		  WHERE cs.collection_id = ? AND s.deleted_at IS NULL AND `+cScope+` ORDER BY cs.position, cs.series_id`,
+			append([]any{cs[i].Id}, cArgs...)...)
+		if err != nil {
+			return nil, err
+		}
+		cs[i].SeriesIds = members
+	}
+	res.Collections = append(res.Collections, cs...)
+
+	bScope, bArgs := libScope(ctx, "b.library_id")
+	lists := `SELECT r.id, r.name, r.summary FROM read_lists r WHERE r.name LIKE ? ESCAPE '\'`
+	largs := []any{pat}
+	if !admin {
+		lists += ` AND EXISTS (SELECT 1 FROM read_list_books rb JOIN books b ON b.id = rb.book_id
+		  WHERE rb.read_list_id = r.id AND b.deleted_at IS NULL AND ` + bScope + `)`
+		largs = append(largs, bArgs...)
+	}
+	lists += ` ORDER BY r.name, r.id LIMIT 20`
+	rows, err = s.DB.QueryContext(ctx, lists, largs...)
+	if err != nil {
+		return nil, err
+	}
+	var rl []ReadList
+	for rows.Next() {
+		var x ReadList
+		if err := rows.Scan(&x.Id, &x.Name, &x.Summary); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		rl = append(rl, x)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	for i := range rl {
+		members, err := s.idList(ctx, `SELECT rb.book_id FROM read_list_books rb JOIN books b ON b.id = rb.book_id
+		  WHERE rb.read_list_id = ? AND b.deleted_at IS NULL AND `+bScope+` ORDER BY rb.position, rb.book_id`,
+			append([]any{rl[i].Id}, bArgs...)...)
+		if err != nil {
+			return nil, err
+		}
+		rl[i].BookIds = members
+	}
+	res.ReadLists = append(res.ReadLists, rl...)
+	return Search200JSONResponse(res), nil
 }
