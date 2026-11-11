@@ -1,10 +1,10 @@
 // Reader display preferences. The global set is the master. A series can keep
 // its own set (shared by all its volumes), and a single volume can keep its
-// own on top of that: volume > series > global. Synchronous on purpose: the
-// reader needs them before its first frame. Today they live in localStorage;
-// with the Go server they become per-user settings (GET/PUT
-// /api/me/reader-prefs, /api/me/series/:id/reader-prefs and
-// /api/me/books/:id/reader-prefs) cached here.
+// own on top of that: volume > series > global. They are per-user settings on
+// the server; loadReaderPrefs() fetches them once after sign-in, and the
+// getters below then answer synchronously, because the reader needs them
+// before its first frame. Setters update the cache at once and write through.
+import { api } from "./impl";
 import type { ReadingDirection } from "./types";
 
 export interface ReaderPrefs {
@@ -25,59 +25,69 @@ export type SeriesReaderPrefs = { mode: "global" } | { mode: "custom"; prefs: Re
 /** Where a volume's settings come from. */
 export type ReaderScope = "global" | "series" | "book";
 
-const GLOBAL_KEY = "cn-reader-global";
-const SERIES_KEY = (id: string) => `cn-reader-series-${id}`;
-const SERIES_PREFIX = "cn-reader-series-";
-const BOOK_PREFIX = "cn-reader-book-";
-
 export const DEFAULT_GLOBAL: GlobalReaderPrefs = { direction: "series", spread: "off", fit: "screen", bg: "black" };
 
-function read<T>(key: string): T | null {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? (JSON.parse(raw) as T) : null;
-  } catch {
-    return null;
-  }
+const cache = {
+  global: DEFAULT_GLOBAL,
+  series: new Map<string, ReaderPrefs>(),
+  books: new Map<string, ReaderPrefs>(),
+};
+let loading: Promise<void> | null = null;
+
+/** Fetches the caller's settings once; later calls reuse the first answer. */
+export function loadReaderPrefs(): Promise<void> {
+  loading ??= api.readerPrefs().then(
+    (all) => {
+      cache.global = { ...DEFAULT_GLOBAL, ...all.global };
+      cache.series = new Map(Object.entries(all.series));
+      cache.books = new Map(Object.entries(all.books));
+    },
+    (err: unknown) => {
+      loading = null; // try again next time
+      throw err;
+    },
+  );
+  return loading;
 }
 
 export function getGlobalPrefs(): GlobalReaderPrefs {
-  return { ...DEFAULT_GLOBAL, ...read<Partial<GlobalReaderPrefs>>(GLOBAL_KEY) };
+  return cache.global;
 }
-export function setGlobalPrefs(p: GlobalReaderPrefs) {
-  localStorage.setItem(GLOBAL_KEY, JSON.stringify(p));
+export function setGlobalPrefs(p: GlobalReaderPrefs): Promise<void> {
+  cache.global = p;
+  return api.putGlobalPrefs(p);
 }
 
+const asScoped = (p: ReaderPrefs | undefined): SeriesReaderPrefs => (p ? { mode: "custom", prefs: p } : { mode: "global" });
+
 export function getSeriesPrefs(seriesId: string): SeriesReaderPrefs {
-  const v = read<SeriesReaderPrefs>(SERIES_KEY(seriesId));
-  return v?.mode === "custom" && v.prefs ? v : { mode: "global" };
+  return asScoped(cache.series.get(seriesId));
 }
-export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs) {
-  if (p.mode === "global") localStorage.removeItem(SERIES_KEY(seriesId));
-  else localStorage.setItem(SERIES_KEY(seriesId), JSON.stringify(p));
+export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs): Promise<void> {
+  if (p.mode === "global") {
+    cache.series.delete(seriesId);
+    return api.deleteSeriesPrefs(seriesId);
+  }
+  cache.series.set(seriesId, p.prefs);
+  return api.putSeriesPrefs(seriesId, p.prefs);
 }
 
 export function getBookPrefs(bookId: string): SeriesReaderPrefs {
-  const v = read<SeriesReaderPrefs>(BOOK_PREFIX + bookId);
-  return v?.mode === "custom" && v.prefs ? v : { mode: "global" };
+  return asScoped(cache.books.get(bookId));
 }
-export function setBookPrefs(bookId: string, p: SeriesReaderPrefs) {
-  if (p.mode === "global") localStorage.removeItem(BOOK_PREFIX + bookId);
-  else localStorage.setItem(BOOK_PREFIX + bookId, JSON.stringify(p));
+export function setBookPrefs(bookId: string, p: SeriesReaderPrefs): Promise<void> {
+  if (p.mode === "global") {
+    cache.books.delete(bookId);
+    return api.deleteBookPrefs(bookId);
+  }
+  cache.books.set(bookId, p.prefs);
+  return api.putBookPrefs(bookId, p.prefs);
 }
 
-function idsWith(prefix: string) {
-  const ids: string[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k?.startsWith(prefix) && read<SeriesReaderPrefs>(k)?.mode === "custom") ids.push(k.slice(prefix.length));
-  }
-  return ids;
-}
 /** Series ids that keep their own settings. */
-export const customSeriesIds = () => idsWith(SERIES_PREFIX);
+export const customSeriesIds = () => [...cache.series.keys()];
 /** Volume (book) ids that keep their own settings. */
-export const customBookIds = () => idsWith(BOOK_PREFIX);
+export const customBookIds = () => [...cache.books.keys()];
 
 export function scopeOf(series: SeriesReaderPrefs, book: SeriesReaderPrefs): ReaderScope {
   return book.mode === "custom" ? "book" : series.mode === "custom" ? "series" : "global";

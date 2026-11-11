@@ -32,7 +32,7 @@ export default function Screen() {
               covers={c.seriesIds
                 .map((id) => data.byId.get(id))
                 .filter((s) => s !== undefined)
-                .map((s) => ({ seed: s.coverSeed, title: s.title }))}
+                .map((s) => ({ src: s.thumbnailUrl, title: s.title }))}
             />
           ))}
         </ListGrid>

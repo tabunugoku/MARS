@@ -9,8 +9,8 @@ import {
   Minimize,
   EyeOff,
 } from "@keyline-icons/react";
-import { api, useApi, effectivePrefs, getBookPrefs, getGlobalPrefs, getSeriesPrefs, scopeOf, setBookPrefs, setSeriesPrefs, type Book, type ReaderPrefs, type ReaderScope, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
-import { pageArt, coverArt } from "@/lib/art";
+import { api, useApi, effectivePrefs, errorMessage, getBookPrefs, getGlobalPrefs, getSeriesPrefs, loadReaderPrefs, scopeOf, setBookPrefs, setSeriesPrefs, type Book, type Page, type ReaderPrefs, type ReaderScope, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
+import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -26,19 +26,58 @@ import { ReaderSettings } from "./settings";
 
 type View = { pages: number[] }; // one or two page numbers shown together
 
-/** Group pages into views. Spread mode pairs pages; "cover" keeps page 1 alone. */
-function buildViews(count: number, spread: ReaderPrefs["spread"]): View[] {
+/** A page scanned as a two-page spread (wider than tall) always stands alone. */
+const isWide = (pg: Page | undefined) => !!pg && pg.width > pg.height;
+
+/** Group pages into views. Spread mode pairs pages; "cover" keeps page 1
+ *  alone; a page that is already a spread is never paired. */
+function buildViews(pages: Page[], spread: ReaderPrefs["spread"]): View[] {
+  const count = pages.length;
   const views: View[] = [];
   let p = 1;
-  if (spread !== "off" && spread === "cover") views.push({ pages: [p++] });
+  if (spread === "cover" && count > 0) views.push({ pages: [p++] });
   while (p <= count) {
-    if (spread === "off" || p === count) views.push({ pages: [p++] });
+    if (spread === "off" || p === count || isWide(pages[p - 1]) || isWide(pages[p])) views.push({ pages: [p++] });
     else {
       views.push({ pages: [p, p + 1] });
       p += 2;
     }
   }
   return views;
+}
+
+/** Saves the reading position: a second after the last turn, and right away
+ *  (keepalive) when the page is hidden or the reader closes. Opening a book
+ *  alone records nothing. */
+function useProgressSaver(bookId: string, page: number, completed: boolean, disabled: boolean) {
+  const latest = useRef({ page, completed });
+  const sent = useRef(`${page}|${completed}`);
+  const flush = useCallback(
+    (keepalive: boolean) => {
+      const v = latest.current;
+      const key = `${v.page}|${v.completed}`;
+      if (disabled || key === sent.current) return;
+      sent.current = key;
+      api.setProgress(bookId, v.page, v.completed, { keepalive }).catch((err: unknown) => {
+        sent.current = "";
+        if (!keepalive) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
+      });
+    },
+    [bookId, disabled],
+  );
+  useEffect(() => {
+    latest.current = { page, completed };
+    const t = setTimeout(() => flush(false), 1000);
+    return () => clearTimeout(t);
+  }, [page, completed, flush]);
+  useEffect(() => {
+    const onHide = () => flush(true);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      window.removeEventListener("pagehide", onHide);
+      flush(true);
+    };
+  }, [flush]);
 }
 
 const bgClass: Record<ReaderPrefs["bg"], string> = {
@@ -53,18 +92,25 @@ export default function Reader() {
   const navigate = useNavigate();
   const incognito = params.get("incognito") === "1";
 
-  const { data, loading } = useApi(async () => {
+  const { data, loading, error } = useApi(async () => {
     const book = await api.book(bookId);
     if (!book) return null;
-    const [series, adj] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(book.id)]);
-    return { book, series, adj };
+    const [series, adj, pages] = await Promise.all([
+      api.seriesById(book.seriesId),
+      api.adjacentBooks(book.id),
+      api.pages(book.id),
+      loadReaderPrefs(),
+    ]);
+    return { book, series, adj, pages };
   }, [bookId]);
 
   if (loading && !data) return <div className="fixed inset-0 bg-black" aria-busy />;
-  if (!data) {
+  if (!data || data.pages.length === 0) {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black text-white">
-        <p className={typeClass("title")}>この本は見つかりませんでした</p>
+        <p className={typeClass("title")}>
+          {error ?? (data ? "この本はまだ読めません（解析が済んでいないか、ページがありません）" : "この本は見つかりませんでした")}
+        </p>
         <Link to="/" className={cn(typeClass("body"), "text-white/70 underline-offset-4 hover:underline")}>ホームへ戻る</Link>
       </div>
     );
@@ -73,6 +119,7 @@ export default function Reader() {
     <ReaderBody
       key={data.book.id}
       book={data.book}
+      pages={data.pages}
       seriesTitle={data.series?.title ?? ""}
       defaultDirection={data.series?.readingDirection ?? "rtl"}
       next={data.adj.next}
@@ -85,6 +132,7 @@ export default function Reader() {
 
 function ReaderBody({
   book,
+  pages,
   seriesTitle,
   defaultDirection,
   next,
@@ -93,6 +141,7 @@ function ReaderBody({
   onExit,
 }: {
   book: Book;
+  pages: Page[];
   seriesTitle: string;
   defaultDirection: ReadingDirection;
   next: Book | null;
@@ -109,11 +158,11 @@ function ReaderBody({
   const prefs = useMemo(() => effectivePrefs(seriesPrefs, bookPrefs, globalPrefs, defaultDirection), [seriesPrefs, bookPrefs, globalPrefs, defaultDirection]);
   const saveSeries = (p: SeriesReaderPrefs) => {
     setSeriesState(p);
-    setSeriesPrefs(book.seriesId, p);
+    setSeriesPrefs(book.seriesId, p).catch((err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`));
   };
   const saveBook = (p: SeriesReaderPrefs) => {
     setBookState(p);
-    setBookPrefs(book.id, p);
+    setBookPrefs(book.id, p).catch((err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`));
   };
   const changeScope = (s: ReaderScope) => {
     if (s === scope) return;
@@ -128,12 +177,14 @@ function ReaderBody({
   const [fullscreen, setFullscreen] = useState(false);
 
   const webtoon = prefs.direction === "webtoon";
-  const views = useMemo(() => buildViews(book.pageCount, webtoon ? "off" : prefs.spread), [book.pageCount, prefs.spread, webtoon]);
+  const pageCount = pages.length;
+  const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread), [pages, prefs.spread, webtoon]);
   // index views.length = the end card
   const [vi, setVi] = useState(() => Math.max(0, views.findIndex((v) => v.pages.includes(startPage))));
   const viewIndex = Math.min(vi, views.length);
   const atEnd = viewIndex === views.length;
-  const currentPage = atEnd ? book.pageCount : views[viewIndex].pages[0];
+  const currentPage = atEnd ? pageCount : views[viewIndex].pages[0];
+  const url = (p: number) => pages[p - 1]?.url ?? "";
 
   // The page the reader is "on", independent of grouping (Infinity = end card).
   // When the spread layout changes, re-find it in the new views. This effect
@@ -144,7 +195,7 @@ function ReaderBody({
   useEffect(() => {
     const a = anchor.current;
     setVi(a === Infinity ? views.length : Math.max(0, views.findIndex((v) => v.pages.includes(a))));
-    setWebtoonPage(a === Infinity ? book.pageCount : a);
+    setWebtoonPage(a === Infinity ? pageCount : a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [views]);
   useEffect(() => {
@@ -238,12 +289,15 @@ function ReaderBody({
     setPanel("none");
   };
   const shownPage = webtoon ? webtoonPage : currentPage;
+  // The last page (or the end card) counts as finished. Incognito reads leave no trace.
+  const lastShown = webtoon ? webtoonPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
+  useProgressSaver(book.id, shownPage, lastShown >= pageCount, incognito);
 
   // Neighbour views are mounted beside the current one (prev/next) so a turn
   // shows decoded pixels; two further views are preloaded invisibly.
   const slot = (i: number) =>
     i < 0 ? null : i === views.length ? <EndCard key="end" book={book} next={next} seriesId={book.seriesId} /> : i > views.length ? null : (
-      <PageView key={i} view={views[i]} seed={book.coverSeed} rtl={forward === -1} fit={prefs.fit} webtoon={false} />
+      <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} />
     );
 
   const tone = bgClass[prefs.bg];
@@ -253,6 +307,7 @@ function ReaderBody({
       {webtoon ? (
         <WebtoonView
           book={book}
+          pages={pages}
           next={next}
           startPage={webtoonPage}
           jump={jump}
@@ -288,7 +343,7 @@ function ReaderBody({
               );
             })}
           </motion.div>
-          <Preload seed={book.coverSeed} pages={[viewIndex + 2, viewIndex + 3].flatMap((i) => views[i]?.pages ?? [])} />
+          <Preload urls={[viewIndex + 2, viewIndex + 3].flatMap((i) => views[i]?.pages ?? []).map(url)} />
         </div>
       )}
 
@@ -338,9 +393,9 @@ function ReaderBody({
         >
           <div className="mx-auto flex max-w-3xl items-center gap-3">
             <span className={cn(typeClass("caption"), "w-20 font-mono tabular-nums text-white/80")}>
-              P.{currentPage} / {book.pageCount}
+              P.{currentPage} / {pageCount}
             </span>
-            <DotRail value={currentPage} max={book.pageCount} rtl={forward === -1} onChange={goToPage} />
+            <DotRail value={currentPage} max={pageCount} rtl={forward === -1} onChange={goToPage} />
             <span className={cn(typeClass("caption"), "w-16 text-right text-white/60")}>
               {prefs.direction === "rtl" ? "右から左" : prefs.direction === "ltr" ? "左から右" : "縦"}
             </span>
@@ -350,7 +405,7 @@ function ReaderBody({
 
       {panel === "pages" && (
         <PageStrip
-          book={book}
+          pages={pages}
           current={shownPage}
           rtl={forward === -1}
           onPick={goToPage}
@@ -381,23 +436,23 @@ function IconBtn({ label, onClick, children, pressed }: { label: string; onClick
   );
 }
 
-function PageImg({ seed, page, fit, className }: { seed: number; page: number; fit: ReaderPrefs["fit"]; className?: string }) {
+function PageImg({ src, page, fit, className }: { src: string; page: number; fit: ReaderPrefs["fit"]; className?: string }) {
   const fitCls = {
     screen: "max-h-full max-w-full object-contain",
     height: "h-full w-auto max-w-none",
     width: "w-full h-auto max-h-none",
     original: "max-w-none max-h-none",
   }[fit];
-  return <img src={pageArt(seed, page)} alt={`${page}ページ`} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
+  return <img src={src} alt={`${page}ページ`} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
 }
 
-function PageView({ view, seed, rtl, fit }: { view: View; seed: number; rtl: boolean; fit: ReaderPrefs["fit"]; webtoon: boolean }) {
+function PageView({ view, url, rtl, fit }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"] }) {
   const pages = rtl ? [...view.pages].reverse() : view.pages;
   const scroll = fit === "width" || fit === "original";
   if (pages.length === 1) {
     return (
       <div className={cn("flex size-full justify-center", scroll ? "items-start overflow-auto" : "items-center")}>
-        <PageImg seed={seed} page={pages[0]} fit={fit} />
+        <PageImg src={url(pages[0])} page={pages[0]} fit={fit} />
       </div>
     );
   }
@@ -406,18 +461,18 @@ function PageView({ view, seed, rtl, fit }: { view: View; seed: number; rtl: boo
     <div className={cn("flex size-full justify-center", scroll ? "items-start overflow-auto" : "items-center")}>
       {pages.map((p) => (
         <div key={p} className={cn("flex h-full w-1/2 items-center", p === pages[0] ? "justify-end" : "justify-start")}>
-          <PageImg seed={seed} page={p} fit={fit === "width" ? "width" : "screen"} />
+          <PageImg src={url(p)} page={p} fit={fit === "width" ? "width" : "screen"} />
         </div>
       ))}
     </div>
   );
 }
 
-function Preload({ seed, pages }: { seed: number; pages: number[] }) {
+function Preload({ urls }: { urls: string[] }) {
   return (
     <div className="pointer-events-none absolute size-px overflow-hidden opacity-0" aria-hidden>
-      {pages.map((p) => (
-        <img key={p} src={pageArt(seed, p)} alt="" decoding="async" />
+      {urls.map((u) => (
+        <img key={u} src={u} alt="" decoding="async" />
       ))}
     </div>
   );
@@ -431,7 +486,7 @@ function EndCard({ book, next, seriesId }: { book: Book; next: Book | null; seri
       </p>
       {next ? (
         <>
-          <img src={coverArt(next.coverSeed, next.title, String(next.number))} alt="" className="w-32 rounded-md shadow-lg" />
+          <img src={next.thumbnailUrl} alt="" className="w-32 rounded-md shadow-lg" />
           <BrandAction to={`/read/${next.id}?page=1`}>次の巻を読む（{next.title}）</BrandAction>
         </>
       ) : (
@@ -444,7 +499,7 @@ function EndCard({ book, next, seriesId }: { book: Book; next: Book | null; seri
   );
 }
 
-function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; current: number; rtl: boolean; onPick: (p: number) => void; onClose: () => void }) {
+function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; current: number; rtl: boolean; onPick: (p: number) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>(`[data-page="${current}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
@@ -458,7 +513,7 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
         </button>
       </div>
       <div ref={ref} dir={rtl ? "rtl" : "ltr"} className="shelf-scroll flex gap-2 overflow-x-auto px-4 pb-1">
-        {Array.from({ length: book.pageCount }, (_, i) => i + 1).map((p) => (
+        {pages.map(({ number: p, url }) => (
           <button
             key={p}
             type="button"
@@ -468,7 +523,7 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
             aria-label={`${p}ページへ`}
             aria-current={p === current ? "page" : undefined}
           >
-            <img src={pageArt(book.coverSeed, p)} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
+            <img src={url} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
             <span className={cn(typeClass("micro"), "mt-1 block text-center tabular-nums text-white/70")}>{p}</span>
           </button>
         ))}
@@ -480,6 +535,7 @@ function PageStrip({ book, current, rtl, onPick, onClose }: { book: Book; curren
 /** Continuous vertical scroll for webtoons: native scroll, pages lazy-load as they near the viewport. */
 function WebtoonView({
   book,
+  pages,
   next,
   startPage,
   jump,
@@ -487,6 +543,7 @@ function WebtoonView({
   onToggleChrome,
 }: {
   book: Book;
+  pages: Page[];
   next: Book | null;
   startPage: number;
   jump: { page: number; n: number } | null;
@@ -511,14 +568,15 @@ function WebtoonView({
   return (
     <div ref={ref} className="absolute inset-0 overflow-y-auto" onClick={onToggleChrome}>
       <div className="mx-auto max-w-[800px]">
-        {Array.from({ length: book.pageCount }, (_, i) => i + 1).map((p) => (
+        {pages.map(({ number: p, url, width, height }) => (
           <img
             key={p}
             data-page={p}
-            src={pageArt(book.coverSeed, p, { webtoon: true })}
+            src={url}
             alt={`${p}ページ`}
             loading={Math.abs(p - startPage) < 3 ? "eager" : "lazy"}
-            className="block aspect-[800/1280] w-full"
+            className="block w-full"
+            style={{ aspectRatio: `${width || 800} / ${height || 1280}` }}
           />
         ))}
         <div className="flex justify-center py-16">

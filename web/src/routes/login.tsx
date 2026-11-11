@@ -118,7 +118,7 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
         <div className="absolute inset-0 overflow-hidden">
           <div className="grid grid-cols-6 gap-3 p-6">
             {wall.map((c, i) => (
-              <Cover key={i} seed={c.seed} title={c.title} />
+              <Cover key={i} src={c.thumbnailUrl} title={c.title} />
             ))}
           </div>
         </div>

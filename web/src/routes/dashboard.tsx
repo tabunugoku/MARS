@@ -24,22 +24,14 @@ const ymd = (iso: string) => {
 export default function Screen() {
   const { data } = useApi(
     async () => {
-      const [keep, deck, addedBooks, addedSeries, updatedSeries, read, all] = await Promise.all([
-        api.keepReading(),
-        api.onDeck(),
-        api.recentlyAddedBooks(),
-        api.recentlyAddedSeries(),
-        api.recentlyUpdatedSeries(),
-        api.recentlyRead(),
-        api.series(),
-      ]);
+      const [d, all] = await Promise.all([api.dashboard(), api.series()]);
       return {
-        keep,
-        deck,
-        addedBooks,
-        addedSeries,
-        updatedSeries,
-        read,
+        keep: d.keepReading,
+        deck: d.onDeck,
+        addedBooks: d.recentlyAddedBooks,
+        addedSeries: d.recentlyAddedSeries,
+        updatedSeries: d.recentlyUpdatedSeries,
+        read: d.recentlyRead,
         titles: new Map(all.map((s) => [s.id, s.title])),
       };
     },
@@ -113,7 +105,7 @@ export default function Screen() {
       {hero && (
         <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone">
           <div className="w-[96px] shrink-0 sm:w-[120px]">
-            <Cover seed={hero.coverSeed} title={heroSeriesTitle} label={String(hero.number)} />
+            <Cover src={hero.thumbnailUrl} title={heroSeriesTitle} label={String(hero.number)} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {hero.progress && (

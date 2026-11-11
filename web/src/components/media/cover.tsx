@@ -1,10 +1,11 @@
-import { memo } from "react";
+import { memo, useState } from "react";
 import { cn } from "@/lib/utils";
-import { coverArt } from "@/lib/art";
 
 export interface CoverProps {
-  seed: number;
+  /** The thumbnail URL from the API (thumbnailUrl). */
+  src: string;
   title: string;
+  /** Shown with the title when there is no cover image (volume number). */
   label?: string;
   /** 0..1 reading progress; renders the bottom bar when between 0 and 1. */
   progress?: number;
@@ -17,20 +18,31 @@ export interface CoverProps {
 }
 
 /** The one cover primitive. Fixed 2:3 box so grids never shift while art loads. */
-export const Cover = memo(function Cover({ seed, title, label, progress, unread, read, className, priority }: CoverProps) {
+export const Cover = memo(function Cover({ src, title, label, progress, unread, read, className, priority }: CoverProps) {
+  // A book without a thumbnail yet (not analysed, or no image) answers 404.
+  const [failed, setFailed] = useState<string | null>(null);
+  const missing = !src || failed === src;
   return (
     <div
       className={cn("relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-muted", className)}
       style={{ boxShadow: "var(--cover-shadow)" }}
     >
-      <img
-        src={coverArt(seed, title, label)}
-        alt=""
-        loading={priority ? "eager" : "lazy"}
-        decoding="async"
-        draggable={false}
-        className="size-full object-cover"
-      />
+      {missing ? (
+        <span className="flex size-full flex-col justify-end gap-0.5 p-2 text-[11px] leading-4 text-muted-foreground">
+          <span className="line-clamp-3 break-words">{title}</span>
+          {label && <span className="tabular-nums">{label}</span>}
+        </span>
+      ) : (
+        <img
+          src={src}
+          alt=""
+          loading={priority ? "eager" : "lazy"}
+          decoding="async"
+          draggable={false}
+          onError={() => setFailed(src)}
+          className="size-full object-cover"
+        />
+      )}
       {unread !== undefined && unread > 0 && (
         <span className="absolute bottom-2 right-1.5 min-w-5 rounded-full bg-brand px-1.5 text-center text-[11px] leading-5 text-brand-foreground tabular-nums">
           {unread}

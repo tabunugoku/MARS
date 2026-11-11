@@ -36,7 +36,7 @@ export default function Screen() {
                 .slice(0, 4)
                 .map((id) => data.byId.get(id))
                 .filter((b) => b !== undefined)
-                .map((b) => ({ seed: b.coverSeed, title: b.title, label: String(b.number) }))}
+                .map((b) => ({ src: b.thumbnailUrl, title: b.title, label: String(b.number) }))}
             />
           ))}
         </ListGrid>

@@ -71,7 +71,8 @@ export default function Screen() {
       role: form.role,
       canDownload: form.canDownload,
       canStream: form.canStream,
-      libraryIds: form.allLibs ? "all" : form.picked,
+      allLibraries: form.allLibs,
+      libraryIds: form.allLibs ? [] : form.picked,
       lastActive: new Date().toISOString(),
     };
     setEdited([...(users ?? []), user]);
@@ -132,7 +133,7 @@ export default function Screen() {
                     </div>
                   </TableCell>
                   <TableCell className={cn(typeClass("caption"), "max-w-[260px] truncate")}>
-                    {u.libraryIds === "all" ? "すべて" : u.libraryIds.map((id) => names.get(id) ?? id).join("、")}
+                    {u.allLibraries ? "すべて" : u.libraryIds.map((id) => names.get(id) ?? id).join("、")}
                   </TableCell>
                   <TableCell className="whitespace-nowrap">{relTime(u.lastActive)}</TableCell>
                 </TableRow>

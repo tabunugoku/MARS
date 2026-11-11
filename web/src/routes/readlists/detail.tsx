@@ -103,7 +103,7 @@ function BookRow({
       >
         <span className={cn(typeClass("body"), "w-6 shrink-0 text-right text-muted-foreground tabular-nums")}>{index + 1}</span>
         <div className="w-10 shrink-0">
-          <Cover seed={book.coverSeed} title={seriesTitle ?? book.title} label={String(book.number)} />
+          <Cover src={book.thumbnailUrl} title={seriesTitle ?? book.title} label={String(book.number)} />
         </div>
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className={cn(typeClass("caption"), "truncate text-muted-foreground")}>{seriesTitle}</p>

@@ -13,7 +13,6 @@ import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { Tooltip } from "@/components/ui/tooltip";
-import { pageArt } from "@/lib/art";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -47,8 +46,8 @@ function BookPage({ id }: { id: string }) {
   const { data } = useApi(async () => {
     const book = await api.book(id);
     if (!book) return null;
-    const [series, adjacent] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id)]);
-    return { book, series, adjacent };
+    const [series, adjacent, pages] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id), api.pages(id).catch(() => [])]);
+    return { book, series, adjacent, pages };
   }, [id]);
 
   const [readOverride, setReadOverride] = useState<boolean | null>(null);
@@ -84,7 +83,7 @@ function BookPage({ id }: { id: string }) {
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
   const dots = Math.min(book.pageCount, 60);
-  const shownPages = allPages ? book.pageCount : Math.min(PREVIEW_PAGES, book.pageCount);
+  const shownPages = allPages ? data.pages.length : Math.min(PREVIEW_PAGES, data.pages.length);
   const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
 
   const toggleRead = () => {
@@ -133,7 +132,7 @@ function BookPage({ id }: { id: string }) {
 
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="mx-auto w-[160px] shrink-0 md:mx-0 md:w-[200px]">
-          <Cover seed={book.coverSeed} title={series?.title ?? book.title} label={String(book.number)} priority />
+          <Cover src={book.thumbnailUrl} title={series?.title ?? book.title} label={String(book.number)} priority />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -192,7 +191,7 @@ function BookPage({ id }: { id: string }) {
               className="group block rounded-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <img
-                src={pageArt(book.coverSeed, n)}
+                src={data.pages[n - 1].url}
                 alt=""
                 loading="lazy"
                 decoding="async"

@@ -76,7 +76,7 @@ export default function Screen() {
                         <TableRow key={`${issue.kind}-${book.id}`} index={r}>
                           <TableCell>
                             <div className="w-8">
-                              <Cover seed={book.coverSeed} title={series} label={String(book.number)} />
+                              <Cover src={book.thumbnailUrl} title={series} label={String(book.number)} />
                             </div>
                           </TableCell>
                           <TableCell>

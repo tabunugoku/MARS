@@ -103,7 +103,7 @@ function SeriesPage({ id }: { id: string }) {
       </Link>
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="mx-auto w-[160px] shrink-0 md:mx-0 md:w-[220px]">
-          <Cover seed={series.coverSeed} title={series.title} priority />
+          <Cover src={series.thumbnailUrl} title={series.title} priority />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">

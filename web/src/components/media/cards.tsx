@@ -37,7 +37,7 @@ export function SeriesCard({ series, priority, className }: { series: Series; pr
       <div className="relative">
         <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
         <Cover
-          seed={series.coverSeed}
+          src={series.thumbnailUrl}
           title={series.title}
           priority={priority}
           unread={series.booksRead === 0 ? undefined : unread}
@@ -66,7 +66,7 @@ export function BookCard({ book, seriesTitle, priority, className, to }: { book:
     >
       <div className="relative">
         <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
-        <Cover seed={book.coverSeed} title={seriesTitle ?? book.title} label={String(book.number)} progress={progress} read={p?.completed} priority={priority} />
+        <Cover src={book.thumbnailUrl} title={seriesTitle ?? book.title} label={String(book.number)} progress={progress} read={p?.completed} priority={priority} />
           <Spotlight />
         </div>
       </div>

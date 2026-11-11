@@ -71,7 +71,7 @@ export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
 }
 
 export interface StackCover {
-  seed: number;
+  src: string;
   title: string;
   label?: string;
 }
@@ -103,7 +103,7 @@ export function CoverStack({ covers }: { covers: StackCover[] }) {
             className="absolute w-[60%]"
             style={{ left: `${(slot / 3) * 40}%`, top: `${(slot / 3) * 25}%`, zIndex: slot }}
           >
-            <Cover seed={c.seed} title={c.title} label={c.label} />
+            <Cover src={c.src} title={c.title} label={c.label} />
             {depth > 0 && (
               <span
                 aria-hidden
