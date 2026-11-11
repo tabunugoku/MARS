@@ -174,6 +174,7 @@ export const settings: ServerSettings = {
   deleteEmptyCollections: true,
   opdsEnabled: true,
   koboSyncEnabled: false,
+  loginBackdrop: "compass",
 };
 
 export const currentUser = users[0];

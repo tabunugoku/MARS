@@ -3,7 +3,7 @@
 // signature. Keep screens free of direct "@/mock" imports.
 import { useEffect, useState, type DependencyList } from "react";
 import * as db from "@/mock/data";
-import type { Book, Series, SeriesQuery } from "./types";
+import type { Book, LoginScreen, Series, SeriesQuery, ServerSettings } from "./types";
 
 export * from "./types";
 export * from "./reader-prefs";
@@ -110,8 +110,38 @@ export const api = {
   users: () => delay(db.users),
   tasks: () => delay(db.tasks),
   mediaIssues: () => delay(db.mediaIssues),
-  settings: () => delay(db.settings),
+  settings: () => delay(loadSettings()),
+  /** Mock save: kept in localStorage so the choice survives a reload. */
+  saveSettings: (s: ServerSettings) => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    return delay(s);
+  },
+
+  /** Public: the sign-in page calls this before anyone is signed in, so it
+   *  returns covers only when an admin chose to show them. */
+  loginScreen: (): Promise<LoginScreen> => {
+    const backdrop = loadSettings().loginBackdrop;
+    const covers =
+      backdrop === "covers"
+        ? [...db.series]
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+            .slice(0, 36)
+            .map((s) => ({ seed: s.coverSeed, title: s.title }))
+        : [];
+    return delay({ backdrop, covers });
+  },
 };
+
+const SETTINGS_KEY = "cn-mock-server-settings";
+function loadSettings(): ServerSettings {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (raw) return { ...db.settings, ...(JSON.parse(raw) as Partial<ServerSettings>) };
+  } catch {
+    /* ignore malformed mock storage */
+  }
+  return db.settings;
+}
 
 /** Minimal async hook for the mock era. Swap for TanStack Query with the real API. */
 export function useApi<T>(fn: () => Promise<T>, deps: DependencyList): { data: T | undefined; loading: boolean } {

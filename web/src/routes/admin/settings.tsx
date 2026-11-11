@@ -4,7 +4,7 @@ import { api, useApi, type ServerSettings } from "@/api";
 import { Block } from "@/components/media/skeletons";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -18,6 +18,11 @@ import { ConfirmDialog, IconAction } from "./_parts";
 const SIZE_LABEL: Record<ServerSettings["thumbnailSize"], string> = { small: "小", medium: "中", large: "大", xlarge: "特大" };
 const FORMAT_LABEL: Record<ServerSettings["thumbnailFormat"], string> = { webp: "WebP", jpeg: "JPEG", avif: "AVIF" };
 const KEY_MASK = "••••••••••••••••••••";
+const BACKDROP_LABEL: Record<ServerSettings["loginBackdrop"], string> = { compass: "羅針盤", covers: "表紙の壁" };
+const BACKDROP_NOTE: Record<ServerSettings["loginBackdrop"], string> = {
+  compass: "ログイン前の画面には ComiNavi の羅針盤だけが表示されます",
+  covers: "最近追加したシリーズの表紙を並べます。ログインしていない人にも表紙が見えます",
+};
 
 export default function Screen() {
   const { data } = useApi(() => api.settings(), []);
@@ -48,6 +53,7 @@ export default function Screen() {
   const patch = (p: Partial<ServerSettings>) => setDraft({ ...cur, ...p });
   const save = () => {
     if (!draft) return;
+    void api.saveSettings(draft);
     setSaved(draft);
     setDraft(null);
     toast.success("設定を保存しました");
@@ -134,6 +140,19 @@ export default function Screen() {
                 value={cur.rememberMeDays}
                 onChange={(e) => patch({ rememberMeDays: Number(e.target.value) })}
               />
+            </Field>
+            <Field>
+              <FieldLabel id="set-login-backdrop">ログイン画面</FieldLabel>
+              <RadioGroup
+                aria-labelledby="set-login-backdrop"
+                value={cur.loginBackdrop}
+                onValueChange={(v) => patch({ loginBackdrop: v as ServerSettings["loginBackdrop"] })}
+              >
+                {(Object.keys(BACKDROP_LABEL) as ServerSettings["loginBackdrop"][]).map((k, i) => (
+                  <RadioItem key={k} index={i} value={k} label={BACKDROP_LABEL[k]} />
+                ))}
+              </RadioGroup>
+              <FieldDescription>{BACKDROP_NOTE[cur.loginBackdrop]}</FieldDescription>
             </Field>
           </FieldGroup>
         </section>

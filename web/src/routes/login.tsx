@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
+import { api, useApi, type LoginScreen } from "@/api";
 import { AppMark } from "@/components/brand/app-mark";
+import { CompassRose } from "@/components/brand/compass-rose";
 import { Cover } from "@/components/media/cover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -9,21 +11,13 @@ import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 
-// Decoration only (aria-hidden): invented titles, so the wall reads as a
-// shelf rather than numbered placeholders.
-const WALL_TITLES = [
-  "夜更けの測量士", "潮見坂ブックス", "白線の向こう側", "鉄と紙飛行機", "まどろみ天文台", "千年喫茶ほたる",
-  "灯台守のレシピ", "雨音サーキット", "ひだまり探偵社", "砂時計の騎士", "月面ベーカリー", "青のアトリエ",
-  "とおりゃんせ電車", "ことのは図書館", "星屑ガレージ", "風見鶏の約束", "遠雷マーチ", "硝子の庭師",
-];
-const WALL = Array.from({ length: 36 }, (_, i) => ({ seed: i, title: WALL_TITLES[i % WALL_TITLES.length] }));
-
 export default function Screen() {
   const navigate = useNavigate();
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
   const [keep, setKeep] = useState(false);
   const [errors, setErrors] = useState({ user: false, pass: false });
+  const { data: screen } = useApi(() => api.loginScreen(), []);
 
   const submit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -36,12 +30,7 @@ export default function Screen() {
   return (
     <div className="relative flex min-h-dvh overflow-hidden bg-background">
       <div aria-hidden className="relative hidden md:block md:w-[55%] md:overflow-hidden">
-        <div className="grid grid-cols-6 gap-3 p-6">
-          {WALL.map((c) => (
-            <Cover key={c.seed} seed={c.seed} title={c.title} />
-          ))}
-        </div>
-        <div className="absolute inset-0 bg-background/70 tone" />
+        <Backdrop screen={screen} />
         <div className="absolute inset-0 grid place-items-center">
           <AppMark size={96} />
         </div>
@@ -111,5 +100,39 @@ export default function Screen() {
         <p className={cn(typeClass("caption"), "absolute bottom-6 text-muted-foreground")}>ComiNavi v0.1.0</p>
       </main>
     </div>
+  );
+}
+
+const WALL_SIZE = 42; // 7 rows of 6: enough to fill a tall panel
+
+// Beside the form, chosen by an admin in サーバー設定 → ログイン画面.
+// Until the choice arrives the panel stays plain, so neither flashes.
+function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
+  if (!screen) return null;
+  if (screen.backdrop === "covers") {
+    // A small library repeats its covers so the wall still fills the panel.
+    const wall = screen.covers.length ? Array.from({ length: WALL_SIZE }, (_, i) => screen.covers[i % screen.covers.length]) : [];
+    return (
+      <>
+        <div className="grid grid-cols-6 gap-3 p-6">
+          {wall.map((c, i) => (
+            <Cover key={i} seed={c.seed} title={c.title} />
+          ))}
+        </div>
+        <div className="absolute inset-0 bg-background/70 tone" />
+      </>
+    );
+  }
+  // The night chart: the same rose as behind every screen, centred under the
+  // mark. Its needle swings in once to the mark's own 35° heading.
+  return (
+    <>
+      <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />
+      <CompassRose
+        deg={35}
+        from={-90}
+        className="absolute left-1/2 top-1/2 size-[min(88%,680px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.16] dark:opacity-[0.2]"
+      />
+    </>
   );
 }

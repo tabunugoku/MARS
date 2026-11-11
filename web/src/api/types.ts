@@ -132,6 +132,18 @@ export interface ServerSettings {
   deleteEmptyCollections: boolean;
   opdsEnabled: boolean;
   koboSyncEnabled: boolean;
+  /** What the sign-in page shows beside the form. "covers" shows library
+   *  covers to anyone who opens the page, before they sign in. */
+  loginBackdrop: LoginBackdrop;
+}
+
+export type LoginBackdrop = "compass" | "covers";
+
+/** The only data the sign-in page may read before authentication. */
+export interface LoginScreen {
+  backdrop: LoginBackdrop;
+  /** Filled only when backdrop is "covers". */
+  covers: { seed: number; title: string }[];
 }
 
 export type SeriesSort = "title" | "updated" | "created" | "releaseDate" | "bookCount";
