@@ -1087,6 +1087,10 @@ export interface components {
             /** @description 1-based; at most the book's pageCount */
             page: number;
             completed?: boolean;
+            /** @description Names one reader session. With seq, a write older than the last one stored from the same writer is ignored (the answer is the stored progress). */
+            writer?: string;
+            /** @description Increases with every write from the same writer */
+            seq?: number;
         };
         SeriesReadUpdate: {
             completed: boolean;

@@ -1136,6 +1136,11 @@ components:
       properties:
         page: { type: integer, minimum: 1, description: "1-based; at most the book's pageCount" }
         completed: { type: boolean }
+        writer:
+          type: string
+          maxLength: 64
+          description: "Names one reader session. With seq, a write older than the last one stored from the same writer is ignored (the answer is the stored progress)."
+        seq: { type: integer, minimum: 0, description: "Increases with every write from the same writer" }
     SeriesReadUpdate:
       type: object
       required: [completed]
