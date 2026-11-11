@@ -31,6 +31,9 @@ for _ in $(seq 60); do
   sleep 1
 done
 curl -fsS "$api/healthz"; echo
+# The image's own health probe: the binary checks itself (no shell, no curl).
+docker exec "$name" /usr/local/bin/cominavi healthcheck
+echo "healthcheck subcommand: ok"
 
 token=$(docker logs "$name" 2>&1 | grep -o 'token=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2 || true)
 if [ -z "$token" ]; then

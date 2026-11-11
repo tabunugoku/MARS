@@ -37,4 +37,7 @@ ENV COMINAVI_DATA=/data \
 EXPOSE 25600
 VOLUME /data
 USER nonroot:nonroot
+# The image has no shell or curl, so the binary probes itself.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD ["/usr/local/bin/cominavi", "healthcheck"]
 ENTRYPOINT ["/usr/local/bin/cominavi"]
