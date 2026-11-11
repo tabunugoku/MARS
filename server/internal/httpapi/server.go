@@ -11,8 +11,10 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"log/slog"
 	"net/http"
+	"net/netip"
 
 	"github.com/tabunugoku/cominavi/server/internal/library"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -23,6 +25,11 @@ type Deps struct {
 	Version string
 	Library *library.Service
 	Tasks   *task.Queue
+	Auth    auth.Store
+	Limiter *auth.Limiter
+	Gate    *SetupGate
+	// TrustedProxies are reverse proxies whose X-Forwarded-For is believed.
+	TrustedProxies []netip.Prefix
 }
 
 type server struct{ Deps }
@@ -32,7 +39,7 @@ var _ StrictServerInterface = (*server)(nil)
 // New returns the API handler, rooted at "/" (mount it under /api/v1).
 func New(d Deps) http.Handler {
 	s := &server{d}
-	strict := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+	strict := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{requireAdmin}, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			writeError(w, http.StatusBadRequest, err.Error())
 		},
@@ -42,11 +49,14 @@ func New(d Deps) http.Handler {
 		},
 	})
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /auth/login", s.handleLogin)
+	mux.HandleFunc("POST /auth/logout", s.handleLogout)
+	mux.HandleFunc("POST /setup", s.handleSetup)
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
 	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
 	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
 	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
-	return mux
+	return s.authenticate(mux)
 }
 
 func writeError(w http.ResponseWriter, code int, msg string) {
@@ -65,5 +75,5 @@ func (s *server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHe
 // GetLoginScreen is public: it returns covers only when an admin chose the
 // cover wall. The setting arrives with the settings API (M3).
 func (s *server) GetLoginScreen(ctx context.Context, _ GetLoginScreenRequestObject) (GetLoginScreenResponseObject, error) {
-	return GetLoginScreen200JSONResponse{Backdrop: Compass, Covers: []LoginCover{}}, nil
+	return GetLoginScreen200JSONResponse{Backdrop: Compass, Covers: []LoginCover{}, NeedsSetup: s.Gate.open()}, nil
 }

@@ -70,11 +70,22 @@ func scanLibrary(r scanner) (Library, error) {
 }
 
 func (s *server) getLibrary(ctx context.Context, id string) (Library, error) {
-	return scanLibrary(s.DB.QueryRowContext(ctx, `SELECT `+libraryCols+` FROM libraries l WHERE l.id = ?`, id))
+	cond, args := libScope(ctx, "l.id")
+	l, err := scanLibrary(s.DB.QueryRowContext(ctx, `SELECT `+libraryCols+` FROM libraries l WHERE l.id = ? AND `+cond, append([]any{id}, args...)...))
+	return redactLibrary(ctx, l), err
+}
+
+// redactLibrary hides where the files live from users who cannot manage them.
+func redactLibrary(ctx context.Context, l Library) Library {
+	if !currentUser(ctx).IsAdmin() {
+		l.Root, l.Exclude = "", []string{}
+	}
+	return l
 }
 
 func (s *server) ListLibraries(ctx context.Context, _ ListLibrariesRequestObject) (ListLibrariesResponseObject, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT `+libraryCols+` FROM libraries l ORDER BY l.name`)
+	cond, args := libScope(ctx, "l.id")
+	rows, err := s.DB.QueryContext(ctx, `SELECT `+libraryCols+` FROM libraries l WHERE `+cond+` ORDER BY l.name`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +96,7 @@ func (s *server) ListLibraries(ctx context.Context, _ ListLibrariesRequestObject
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, l)
+		out = append(out, redactLibrary(ctx, l))
 	}
 	return out, rows.Err()
 }
@@ -289,8 +300,8 @@ func scanSeries(r scanner) (Series, error) {
 }
 
 func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (ListSeriesResponseObject, error) {
-	q := `SELECT ` + seriesCols + ` FROM series s WHERE s.deleted_at IS NULL`
-	args := []any{}
+	cond, args := libScope(ctx, "s.library_id")
+	q := `SELECT ` + seriesCols + ` FROM series s WHERE s.deleted_at IS NULL AND ` + cond
 	if req.Params.LibraryId != nil {
 		q += ` AND s.library_id = ?`
 		args = append(args, *req.Params.LibraryId)
@@ -312,7 +323,8 @@ func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (L
 }
 
 func (s *server) GetSeries(ctx context.Context, req GetSeriesRequestObject) (GetSeriesResponseObject, error) {
-	x, err := scanSeries(s.DB.QueryRowContext(ctx, `SELECT `+seriesCols+` FROM series s WHERE s.id = ? AND s.deleted_at IS NULL`, req.SeriesId))
+	cond, args := libScope(ctx, "s.library_id")
+	x, err := scanSeries(s.DB.QueryRowContext(ctx, `SELECT `+seriesCols+` FROM series s WHERE s.id = ? AND s.deleted_at IS NULL AND `+cond, append([]any{req.SeriesId}, args...)...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return GetSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
@@ -340,11 +352,10 @@ func scanBook(r scanner) (Book, error) {
 }
 
 func (s *server) ListSeriesBooks(ctx context.Context, req ListSeriesBooksRequestObject) (ListSeriesBooksResponseObject, error) {
-	var one int
-	if err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM series WHERE id = ? AND deleted_at IS NULL`, req.SeriesId).Scan(&one); errors.Is(err, sql.ErrNoRows) {
-		return ListSeriesBooks404JSONResponse{notFound("シリーズが見つかりません")}, nil
-	} else if err != nil {
+	if ok, err := s.visible(ctx, "series", req.SeriesId); err != nil {
 		return nil, err
+	} else if !ok {
+		return ListSeriesBooks404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+bookCols+` FROM books b WHERE b.series_id = ? AND b.deleted_at IS NULL ORDER BY b.number_sort, b.path`, req.SeriesId)
 	if err != nil {
@@ -363,7 +374,8 @@ func (s *server) ListSeriesBooks(ctx context.Context, req ListSeriesBooksRequest
 }
 
 func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBookResponseObject, error) {
-	x, err := scanBook(s.DB.QueryRowContext(ctx, `SELECT `+bookCols+` FROM books b WHERE b.id = ? AND b.deleted_at IS NULL`, req.BookId))
+	cond, args := libScope(ctx, "b.library_id")
+	x, err := scanBook(s.DB.QueryRowContext(ctx, `SELECT `+bookCols+` FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond, append([]any{req.BookId}, args...)...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return GetBook404JSONResponse{notFound("本が見つかりません")}, nil
 	}
@@ -376,7 +388,9 @@ func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBook
 func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObject) (ListBookPagesResponseObject, error) {
 	var size int64
 	var mtime string
-	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime FROM books WHERE id = ? AND deleted_at IS NULL`, req.BookId).Scan(&size, &mtime); errors.Is(err, sql.ErrNoRows) {
+	cond, args := libScope(ctx, "b.library_id")
+	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
+		append([]any{req.BookId}, args...)...).Scan(&size, &mtime); errors.Is(err, sql.ErrNoRows) {
 		return ListBookPages404JSONResponse{notFound("本が見つかりません")}, nil
 	} else if err != nil {
 		return nil, err
@@ -415,6 +429,17 @@ func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
 	n, err := strconv.Atoi(r.PathValue("page"))
 	if err != nil || n < 1 {
 		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		return
+	}
+	if ok, err := s.visible(r.Context(), "books", r.PathValue("bookId")); err != nil {
+		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
+		return
+	} else if !ok {
+		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		return
+	}
+	if !canStream(r.Context()) {
+		writeError(w, http.StatusForbidden, "このアカウントでは本を読めません")
 		return
 	}
 	p, err := s.Library.OpenPage(r.Context(), r.PathValue("bookId"), n)
@@ -456,6 +481,17 @@ func (s *server) serveThumbnail(kind string) http.HandlerFunc {
 		id := r.PathValue("bookId")
 		if kind == "series" {
 			id = r.PathValue("seriesId")
+		}
+		table := "books"
+		if kind == "series" {
+			table = "series"
+		}
+		if ok, err := s.visible(r.Context(), table, id); err != nil {
+			writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+			return
+		} else if !ok {
+			writeError(w, http.StatusNotFound, "表紙がありません")
+			return
 		}
 		p, err := s.Library.ThumbnailPath(r.Context(), kind, id)
 		if errors.Is(err, library.ErrNotFound) {

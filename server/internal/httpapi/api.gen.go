@@ -209,6 +209,24 @@ func (e ReadingDirection) Valid() bool {
 	}
 }
 
+// Defines values for Role.
+const (
+	RoleAdmin Role = "admin"
+	RoleUser  Role = "user"
+)
+
+// Valid indicates whether the value is a known member of the Role enum.
+func (e Role) Valid() bool {
+	switch e {
+	case RoleAdmin:
+		return true
+	case RoleUser:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ScanInterval.
 const (
 	Daily  ScanInterval = "daily"
@@ -309,6 +327,28 @@ func (e TaskState) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// ApiKey defines model for ApiKey.
+type ApiKey struct {
+	CreatedAt string  `json:"createdAt"`
+	Id        string  `json:"id"`
+	LastUsed  *string `json:"lastUsed"`
+	Name      string  `json:"name"`
+}
+
+// ApiKeyCreate defines model for ApiKeyCreate.
+type ApiKeyCreate struct {
+	Name string `json:"name"`
+}
+
+// ApiKeyCreated defines model for ApiKeyCreated.
+type ApiKeyCreated struct {
+	Id string `json:"id"`
+
+	// Key Send as Authorization: Bearer <key>; shown only once
+	Key  string `json:"key"`
+	Name string `json:"name"`
 }
 
 // Author defines model for Author.
@@ -412,12 +452,26 @@ type LoginCover struct {
 	Title        string `json:"title"`
 }
 
+// LoginRequest defines model for LoginRequest.
+type LoginRequest struct {
+	Password string `json:"password"`
+
+	// Remember Keep the session for rememberMeDays instead of until the browser closes
+	Remember *bool `json:"remember,omitempty"`
+
+	// Username User name or email
+	Username string `json:"username"`
+}
+
 // LoginScreen defines model for LoginScreen.
 type LoginScreen struct {
 	Backdrop LoginBackdrop `json:"backdrop"`
 
 	// Covers Filled only when backdrop is "covers".
 	Covers []LoginCover `json:"covers"`
+
+	// NeedsSetup No user exists yet: show the first-run setup form
+	NeedsSetup bool `json:"needsSetup"`
 }
 
 // MediaIssue defines model for MediaIssue.
@@ -442,6 +496,12 @@ type Page struct {
 	Width     int    `json:"width"`
 }
 
+// PasswordChange defines model for PasswordChange.
+type PasswordChange struct {
+	CurrentPassword string `json:"currentPassword"`
+	NewPassword     string `json:"newPassword"`
+}
+
 // ReadProgress defines model for ReadProgress.
 type ReadProgress struct {
 	Completed bool   `json:"completed"`
@@ -451,6 +511,9 @@ type ReadProgress struct {
 
 // ReadingDirection defines model for ReadingDirection.
 type ReadingDirection string
+
+// Role defines model for Role.
+type Role string
 
 // ScanInterval defines model for ScanInterval.
 type ScanInterval string
@@ -484,6 +547,14 @@ type Series struct {
 // SeriesStatus defines model for SeriesStatus.
 type SeriesStatus string
 
+// SetupRequest defines model for SetupRequest.
+type SetupRequest struct {
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
 // Task defines model for Task.
 type Task struct {
 	Error     string    `json:"error"`
@@ -502,16 +573,69 @@ type TaskKind string
 // TaskState defines model for TaskState.
 type TaskState string
 
+// User defines model for User.
+type User struct {
+	AllLibraries bool    `json:"allLibraries"`
+	CanDownload  bool    `json:"canDownload"`
+	CanStream    bool    `json:"canStream"`
+	Email        string  `json:"email"`
+	Id           string  `json:"id"`
+	LastActive   *string `json:"lastActive"`
+
+	// LibraryIds Libraries the user may see when allLibraries is false
+	LibraryIds []string `json:"libraryIds"`
+	Name       string   `json:"name"`
+	Role       Role     `json:"role"`
+}
+
+// UserCreate defines model for UserCreate.
+type UserCreate struct {
+	AllLibraries *bool     `json:"allLibraries,omitempty"`
+	CanDownload  *bool     `json:"canDownload,omitempty"`
+	CanStream    *bool     `json:"canStream,omitempty"`
+	Email        string    `json:"email"`
+	LibraryIds   *[]string `json:"libraryIds,omitempty"`
+	Name         string    `json:"name"`
+	Password     string    `json:"password"`
+	Role         Role      `json:"role"`
+}
+
+// UserUpdate defines model for UserUpdate.
+type UserUpdate struct {
+	AllLibraries *bool     `json:"allLibraries,omitempty"`
+	CanDownload  *bool     `json:"canDownload,omitempty"`
+	CanStream    *bool     `json:"canStream,omitempty"`
+	Email        *string   `json:"email,omitempty"`
+	LibraryIds   *[]string `json:"libraryIds,omitempty"`
+	Name         *string   `json:"name,omitempty"`
+
+	// Password Sets a new password and signs the user out everywhere
+	Password *string `json:"password,omitempty"`
+	Role     *Role   `json:"role,omitempty"`
+}
+
 // BadRequest defines model for BadRequest.
 type BadRequest = Error
 
+// Forbidden defines model for Forbidden.
+type Forbidden = Error
+
 // NotFound defines model for NotFound.
 type NotFound = Error
+
+// TooManyRequests defines model for TooManyRequests.
+type TooManyRequests = Error
+
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Error
 
 // ListSeriesParams defines parameters for ListSeries.
 type ListSeriesParams struct {
 	LibraryId *string `form:"libraryId,omitempty" json:"libraryId,omitempty"`
 }
+
+// LoginJSONRequestBody defines body for Login for application/json ContentType.
+type LoginJSONRequestBody = LoginRequest
 
 // CreateLibraryJSONRequestBody defines body for CreateLibrary for application/json ContentType.
 type CreateLibraryJSONRequestBody = LibraryCreate
@@ -519,8 +643,29 @@ type CreateLibraryJSONRequestBody = LibraryCreate
 // UpdateLibraryJSONRequestBody defines body for UpdateLibrary for application/json ContentType.
 type UpdateLibraryJSONRequestBody = LibraryUpdate
 
+// CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
+type CreateApiKeyJSONRequestBody = ApiKeyCreate
+
+// ChangePasswordJSONRequestBody defines body for ChangePassword for application/json ContentType.
+type ChangePasswordJSONRequestBody = PasswordChange
+
+// SetupJSONRequestBody defines body for Setup for application/json ContentType.
+type SetupJSONRequestBody = SetupRequest
+
+// CreateUserJSONRequestBody defines body for CreateUser for application/json ContentType.
+type CreateUserJSONRequestBody = UserCreate
+
+// UpdateUserJSONRequestBody defines body for UpdateUser for application/json ContentType.
+type UpdateUserJSONRequestBody = UserUpdate
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Login Sign in with a user name (or email) and password
+	// (POST /auth/login)
+	Login(w http.ResponseWriter, r *http.Request)
+	// Logout End this session
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
 
 	// (GET /books/{bookId})
 	GetBook(w http.ResponseWriter, r *http.Request, bookId string)
@@ -554,6 +699,21 @@ type ServerInterface interface {
 	// ScanLibrary Queue a scan (then analysis of new and changed books)
 	// (POST /libraries/{libraryId}/scan)
 	ScanLibrary(w http.ResponseWriter, r *http.Request, libraryId string)
+	// GetMe The signed-in user
+	// (GET /me)
+	GetMe(w http.ResponseWriter, r *http.Request)
+
+	// (GET /me/api-keys)
+	ListApiKeys(w http.ResponseWriter, r *http.Request)
+
+	// (POST /me/api-keys)
+	CreateApiKey(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /me/api-keys/{keyId})
+	DeleteApiKey(w http.ResponseWriter, r *http.Request, keyId string)
+	// ChangePassword Change the password; other sessions are signed out
+	// (PUT /me/password)
+	ChangePassword(w http.ResponseWriter, r *http.Request)
 	// ListMediaIssues Books that failed analysis or whose files are gone
 	// (GET /media/issues)
 	ListMediaIssues(w http.ResponseWriter, r *http.Request)
@@ -572,12 +732,27 @@ type ServerInterface interface {
 	// GetSeriesThumbnail Cover of the series' first book, JPEG
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string)
+	// Setup Create the first administrator (only while no user exists)
+	// (POST /setup)
+	Setup(w http.ResponseWriter, r *http.Request)
 	// ListTasks Running and queued tasks, then the most recent finished ones
 	// (GET /tasks)
 	ListTasks(w http.ResponseWriter, r *http.Request)
 
 	// (POST /tasks/{taskId}/cancel)
 	CancelTask(w http.ResponseWriter, r *http.Request, taskId string)
+	// ListUsers All users (administrators only)
+	// (GET /users)
+	ListUsers(w http.ResponseWriter, r *http.Request)
+
+	// (POST /users)
+	CreateUser(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /users/{userId})
+	DeleteUser(w http.ResponseWriter, r *http.Request, userId string)
+
+	// (PATCH /users/{userId})
+	UpdateUser(w http.ResponseWriter, r *http.Request, userId string)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -588,6 +763,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// Login operation middleware
+func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetBook operation middleware
 func (siw *ServerInterfaceWrapper) GetBook(w http.ResponseWriter, r *http.Request) {
@@ -848,6 +1051,88 @@ func (siw *ServerInterfaceWrapper) ScanLibrary(w http.ResponseWriter, r *http.Re
 	handler.ServeHTTP(w, r)
 }
 
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListApiKeys operation middleware
+func (siw *ServerInterfaceWrapper) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListApiKeys(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateApiKey operation middleware
+func (siw *ServerInterfaceWrapper) CreateApiKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateApiKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteApiKey operation middleware
+func (siw *ServerInterfaceWrapper) DeleteApiKey(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "keyId" -------------
+	var keyId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "keyId", r.PathValue("keyId"), &keyId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "keyId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteApiKey(w, r, keyId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ChangePassword operation middleware
+func (siw *ServerInterfaceWrapper) ChangePassword(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ChangePassword(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMediaIssues operation middleware
 func (siw *ServerInterfaceWrapper) ListMediaIssues(w http.ResponseWriter, r *http.Request) {
 
@@ -987,6 +1272,20 @@ func (siw *ServerInterfaceWrapper) GetSeriesThumbnail(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// Setup operation middleware
+func (siw *ServerInterfaceWrapper) Setup(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Setup(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListTasks operation middleware
 func (siw *ServerInterfaceWrapper) ListTasks(w http.ResponseWriter, r *http.Request) {
 
@@ -1018,6 +1317,86 @@ func (siw *ServerInterfaceWrapper) CancelTask(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CancelTask(w, r, taskId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListUsers operation middleware
+func (siw *ServerInterfaceWrapper) ListUsers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListUsers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateUser operation middleware
+func (siw *ServerInterfaceWrapper) CreateUser(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteUser operation middleware
+func (siw *ServerInterfaceWrapper) DeleteUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteUser(w, r, userId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) UpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", r.PathValue("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "userId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateUser(w, r, userId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1166,11 +1545,25 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/tasks", wrapper.ListTasks)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/tasks/{taskId}/cancel", wrapper.CancelTask)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/media/issues", wrapper.ListMediaIssues)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/setup", wrapper.Setup)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/login", wrapper.Login)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/password", wrapper.ChangePassword)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/api-keys", wrapper.ListApiKeys)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/api-keys", wrapper.CreateApiKey)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/me/api-keys/{keyId}", wrapper.DeleteApiKey)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/users", wrapper.ListUsers)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/users", wrapper.CreateUser)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{userId}", wrapper.DeleteUser)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{userId}", wrapper.UpdateUser)
 
 	return m
 }
 
 type BadRequestJSONResponse Error
+
+type ForbiddenJSONResponse Error
 
 type ImageImageResponse struct {
 	Body io.Reader
@@ -1180,6 +1573,75 @@ type ImageImageResponse struct {
 }
 
 type NotFoundJSONResponse Error
+
+type TooManyRequestsJSONResponse Error
+
+type UnauthorizedJSONResponse Error
+
+type LoginRequestObject struct {
+	Body *LoginJSONRequestBody
+}
+
+type LoginResponseObject interface {
+	VisitLoginResponse(w http.ResponseWriter) error
+}
+
+type Login200JSONResponse User
+
+func (response Login200JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response Login401JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login429JSONResponse struct{ TooManyRequestsJSONResponse }
+
+func (response Login429JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(429)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LogoutRequestObject struct {
+}
+
+type LogoutResponseObject interface {
+	VisitLogoutResponse(w http.ResponseWriter) error
+}
+
+type Logout204Response struct {
+}
+
+func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
 
 type GetBookRequestObject struct {
 	BookId string `json:"bookId"`
@@ -1571,6 +2033,158 @@ func (response ScanLibrary404JSONResponse) VisitScanLibraryResponse(w http.Respo
 	return err
 }
 
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse User
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListApiKeysRequestObject struct {
+}
+
+type ListApiKeysResponseObject interface {
+	VisitListApiKeysResponse(w http.ResponseWriter) error
+}
+
+type ListApiKeys200JSONResponse []ApiKey
+
+func (response ListApiKeys200JSONResponse) VisitListApiKeysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKeyRequestObject struct {
+	Body *CreateApiKeyJSONRequestBody
+}
+
+type CreateApiKeyResponseObject interface {
+	VisitCreateApiKeyResponse(w http.ResponseWriter) error
+}
+
+type CreateApiKey201JSONResponse ApiKeyCreated
+
+func (response CreateApiKey201JSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateApiKey400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateApiKey400JSONResponse) VisitCreateApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteApiKeyRequestObject struct {
+	KeyId string `json:"keyId"`
+}
+
+type DeleteApiKeyResponseObject interface {
+	VisitDeleteApiKeyResponse(w http.ResponseWriter) error
+}
+
+type DeleteApiKey204Response struct {
+}
+
+func (response DeleteApiKey204Response) VisitDeleteApiKeyResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteApiKey404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteApiKey404JSONResponse) VisitDeleteApiKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ChangePasswordRequestObject struct {
+	Body *ChangePasswordJSONRequestBody
+}
+
+type ChangePasswordResponseObject interface {
+	VisitChangePasswordResponse(w http.ResponseWriter) error
+}
+
+type ChangePassword204Response struct {
+}
+
+func (response ChangePassword204Response) VisitChangePasswordResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ChangePassword400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ChangePassword400JSONResponse) VisitChangePasswordResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListMediaIssuesRequestObject struct {
 }
 
@@ -1746,6 +2360,56 @@ func (response GetSeriesThumbnail404JSONResponse) VisitGetSeriesThumbnailRespons
 	return err
 }
 
+type SetupRequestObject struct {
+	Body *SetupJSONRequestBody
+}
+
+type SetupResponseObject interface {
+	VisitSetupResponse(w http.ResponseWriter) error
+}
+
+type Setup201JSONResponse User
+
+func (response Setup201JSONResponse) VisitSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Setup400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response Setup400JSONResponse) VisitSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Setup403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response Setup403JSONResponse) VisitSetupResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListTasksRequestObject struct {
 }
 
@@ -1797,8 +2461,166 @@ func (response CancelTask404JSONResponse) VisitCancelTaskResponse(w http.Respons
 	return err
 }
 
+type ListUsersRequestObject struct {
+}
+
+type ListUsersResponseObject interface {
+	VisitListUsersResponse(w http.ResponseWriter) error
+}
+
+type ListUsers200JSONResponse []User
+
+func (response ListUsers200JSONResponse) VisitListUsersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUserRequestObject struct {
+	Body *CreateUserJSONRequestBody
+}
+
+type CreateUserResponseObject interface {
+	VisitCreateUserResponse(w http.ResponseWriter) error
+}
+
+type CreateUser201JSONResponse User
+
+func (response CreateUser201JSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response CreateUser400JSONResponse) VisitCreateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUserRequestObject struct {
+	UserId string `json:"userId"`
+}
+
+type DeleteUserResponseObject interface {
+	VisitDeleteUserResponse(w http.ResponseWriter) error
+}
+
+type DeleteUser204Response struct {
+}
+
+func (response DeleteUser204Response) VisitDeleteUserResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response DeleteUser400JSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteUser404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteUser404JSONResponse) VisitDeleteUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUserRequestObject struct {
+	UserId string `json:"userId"`
+	Body   *UpdateUserJSONRequestBody
+}
+
+type UpdateUserResponseObject interface {
+	VisitUpdateUserResponse(w http.ResponseWriter) error
+}
+
+type UpdateUser200JSONResponse User
+
+func (response UpdateUser200JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateUser400JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateUser404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UpdateUser404JSONResponse) VisitUpdateUserResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Login Sign in with a user name (or email) and password
+	// (POST /auth/login)
+	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
+	// Logout End this session
+	// (POST /auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
 
 	// (GET /books/{bookId})
 	GetBook(ctx context.Context, request GetBookRequestObject) (GetBookResponseObject, error)
@@ -1832,6 +2654,21 @@ type StrictServerInterface interface {
 	// ScanLibrary Queue a scan (then analysis of new and changed books)
 	// (POST /libraries/{libraryId}/scan)
 	ScanLibrary(ctx context.Context, request ScanLibraryRequestObject) (ScanLibraryResponseObject, error)
+	// GetMe The signed-in user
+	// (GET /me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+
+	// (GET /me/api-keys)
+	ListApiKeys(ctx context.Context, request ListApiKeysRequestObject) (ListApiKeysResponseObject, error)
+
+	// (POST /me/api-keys)
+	CreateApiKey(ctx context.Context, request CreateApiKeyRequestObject) (CreateApiKeyResponseObject, error)
+
+	// (DELETE /me/api-keys/{keyId})
+	DeleteApiKey(ctx context.Context, request DeleteApiKeyRequestObject) (DeleteApiKeyResponseObject, error)
+	// ChangePassword Change the password; other sessions are signed out
+	// (PUT /me/password)
+	ChangePassword(ctx context.Context, request ChangePasswordRequestObject) (ChangePasswordResponseObject, error)
 	// ListMediaIssues Books that failed analysis or whose files are gone
 	// (GET /media/issues)
 	ListMediaIssues(ctx context.Context, request ListMediaIssuesRequestObject) (ListMediaIssuesResponseObject, error)
@@ -1850,12 +2687,27 @@ type StrictServerInterface interface {
 	// GetSeriesThumbnail Cover of the series' first book, JPEG
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(ctx context.Context, request GetSeriesThumbnailRequestObject) (GetSeriesThumbnailResponseObject, error)
+	// Setup Create the first administrator (only while no user exists)
+	// (POST /setup)
+	Setup(ctx context.Context, request SetupRequestObject) (SetupResponseObject, error)
 	// ListTasks Running and queued tasks, then the most recent finished ones
 	// (GET /tasks)
 	ListTasks(ctx context.Context, request ListTasksRequestObject) (ListTasksResponseObject, error)
 
 	// (POST /tasks/{taskId}/cancel)
 	CancelTask(ctx context.Context, request CancelTaskRequestObject) (CancelTaskResponseObject, error)
+	// ListUsers All users (administrators only)
+	// (GET /users)
+	ListUsers(ctx context.Context, request ListUsersRequestObject) (ListUsersResponseObject, error)
+
+	// (POST /users)
+	CreateUser(ctx context.Context, request CreateUserRequestObject) (CreateUserResponseObject, error)
+
+	// (DELETE /users/{userId})
+	DeleteUser(ctx context.Context, request DeleteUserRequestObject) (DeleteUserResponseObject, error)
+
+	// (PATCH /users/{userId})
+	UpdateUser(ctx context.Context, request UpdateUserRequestObject) (UpdateUserResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1895,6 +2747,61 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// Login operation middleware
+func (sh *strictHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var request LoginRequestObject
+
+	var body LoginJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Login(ctx, request.(LoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Login")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginResponseObject); ok {
+		if err := validResponse.VisitLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Logout operation middleware
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var request LogoutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Logout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutResponseObject); ok {
+		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetBook operation middleware
@@ -2192,6 +3099,142 @@ func (sh *strictHandler) ScanLibrary(w http.ResponseWriter, r *http.Request, lib
 	}
 }
 
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListApiKeys operation middleware
+func (sh *strictHandler) ListApiKeys(w http.ResponseWriter, r *http.Request) {
+	var request ListApiKeysRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListApiKeys(ctx, request.(ListApiKeysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListApiKeys")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListApiKeysResponseObject); ok {
+		if err := validResponse.VisitListApiKeysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateApiKey operation middleware
+func (sh *strictHandler) CreateApiKey(w http.ResponseWriter, r *http.Request) {
+	var request CreateApiKeyRequestObject
+
+	var body CreateApiKeyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateApiKey(ctx, request.(CreateApiKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateApiKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateApiKeyResponseObject); ok {
+		if err := validResponse.VisitCreateApiKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteApiKey operation middleware
+func (sh *strictHandler) DeleteApiKey(w http.ResponseWriter, r *http.Request, keyId string) {
+	var request DeleteApiKeyRequestObject
+
+	request.KeyId = keyId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteApiKey(ctx, request.(DeleteApiKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteApiKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteApiKeyResponseObject); ok {
+		if err := validResponse.VisitDeleteApiKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ChangePassword operation middleware
+func (sh *strictHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	var request ChangePasswordRequestObject
+
+	var body ChangePasswordJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ChangePassword(ctx, request.(ChangePasswordRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ChangePassword")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ChangePasswordResponseObject); ok {
+		if err := validResponse.VisitChangePasswordResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListMediaIssues operation middleware
 func (sh *strictHandler) ListMediaIssues(w http.ResponseWriter, r *http.Request) {
 	var request ListMediaIssuesRequestObject
@@ -2344,6 +3387,37 @@ func (sh *strictHandler) GetSeriesThumbnail(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// Setup operation middleware
+func (sh *strictHandler) Setup(w http.ResponseWriter, r *http.Request) {
+	var request SetupRequestObject
+
+	var body SetupJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Setup(ctx, request.(SetupRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Setup")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetupResponseObject); ok {
+		if err := validResponse.VisitSetupResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListTasks operation middleware
 func (sh *strictHandler) ListTasks(w http.ResponseWriter, r *http.Request) {
 	var request ListTasksRequestObject
@@ -2394,55 +3468,188 @@ func (sh *strictHandler) CancelTask(w http.ResponseWriter, r *http.Request, task
 	}
 }
 
+// ListUsers operation middleware
+func (sh *strictHandler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	var request ListUsersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListUsers(ctx, request.(ListUsersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListUsers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListUsersResponseObject); ok {
+		if err := validResponse.VisitListUsersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateUser operation middleware
+func (sh *strictHandler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	var request CreateUserRequestObject
+
+	var body CreateUserJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateUser(ctx, request.(CreateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateUserResponseObject); ok {
+		if err := validResponse.VisitCreateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteUser operation middleware
+func (sh *strictHandler) DeleteUser(w http.ResponseWriter, r *http.Request, userId string) {
+	var request DeleteUserRequestObject
+
+	request.UserId = userId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteUser(ctx, request.(DeleteUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteUserResponseObject); ok {
+		if err := validResponse.VisitDeleteUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateUser operation middleware
+func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, userId string) {
+	var request UpdateUserRequestObject
+
+	request.UserId = userId
+
+	var body UpdateUserJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateUser(ctx, request.(UpdateUserRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateUser")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateUserResponseObject); ok {
+		if err := validResponse.VisitUpdateUserResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // Base64 encoded, compressed with deflate, json marshaled OpenAPI spec.
 // Stored as a slice of fixed-width chunks rather than one concatenated
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"PwA=",
+	"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",
+	"67v1/w0A",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

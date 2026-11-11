@@ -4,6 +4,7 @@ import (
 	"archive/zip"
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"image"
 	"image/color"
@@ -17,6 +18,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"github.com/tabunugoku/cominavi/server/internal/db"
 	"github.com/tabunugoku/cominavi/server/internal/library"
 	"github.com/tabunugoku/cominavi/server/internal/media"
@@ -62,10 +64,14 @@ func writeCBZ(t *testing.T, p string, files map[string][]byte) {
 }
 
 type client struct {
-	t *testing.T
-	h http.Handler
+	t      *testing.T
+	h      http.Handler
+	cookie string // session cookie value, if signed in
+	bearer string // API key, if any
 }
 
+// do sends a request as this client. Writes carry a same-origin Origin
+// header like a browser's; hdr pairs override any default.
 func (c client) do(method, url string, body any, hdr ...string) *httptest.ResponseRecorder {
 	c.t.Helper()
 	var r io.Reader
@@ -76,6 +82,15 @@ func (c client) do(method, url string, body any, hdr ...string) *httptest.Respon
 	req := httptest.NewRequest(method, url, r)
 	if body != nil {
 		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.cookie != "" {
+		req.AddCookie(&http.Cookie{Name: cookieName, Value: c.cookie})
+	}
+	if c.bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearer)
+	}
+	if !safeMethod(method) {
+		req.Header.Set("Origin", "http://"+req.Host)
 	}
 	for i := 0; i+1 < len(hdr); i += 2 {
 		req.Header.Set(hdr[i], hdr[i+1])
@@ -98,24 +113,97 @@ func (c client) json(method, url string, body any, want int, out any) {
 	}
 }
 
-// TestScanAndServe registers a library, lets the scan and analysis run, then
-// reads series, books, pages and covers back through the API.
-func TestScanAndServe(t *testing.T) {
+// sessionFrom returns the session cookie a response set, or "".
+func sessionFrom(rec *httptest.ResponseRecorder) string {
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == cookieName {
+			return ck.Value
+		}
+	}
+	return ""
+}
+
+type env struct {
+	t     *testing.T
+	h     http.Handler
+	db    *sql.DB
+	gate  *SetupGate
+	admin client
+}
+
+// newEnv starts a server on a fresh database and runs first-run setup, so
+// env.admin is a signed-in administrator.
+func newEnv(t *testing.T) *env {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	t.Cleanup(cancel)
 	data := t.TempDir()
 	d, err := db.Open(ctx, filepath.Join(data, "t.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer d.Close()
+	t.Cleanup(func() { d.Close() })
 	q := task.New(d, 2)
 	if err := q.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
+	gate, err := NewSetupGate(ctx, d, data)
+	if err != nil {
+		t.Fatal(err)
+	}
 	lib := &library.Service{DB: d, Queue: q, ThumbDir: filepath.Join(data, "thumbs"), Pages: &media.PageCache{Dir: filepath.Join(data, "pages"), MaxBytes: 1 << 30}}
-	c := client{t, http.StripPrefix("/api/v1", New(Deps{DB: d, Version: "test", Library: lib, Tasks: q}))}
+	h := http.StripPrefix("/api/v1", New(Deps{DB: d, Version: "test", Library: lib, Tasks: q,
+		Auth: auth.Store{DB: d}, Limiter: &auth.Limiter{}, Gate: gate}))
+	e := &env{t: t, h: h, db: d, gate: gate}
+	anon := e.anon()
+	rec := anon.do("POST", "/api/v1/setup", map[string]any{"token": gate.token, "name": "管理人", "email": "admin@example.com", "password": "correct horse"})
+	if rec.Code != 201 {
+		t.Fatalf("setup: %d %s", rec.Code, rec.Body)
+	}
+	e.admin = client{t: t, h: h, cookie: sessionFrom(rec)}
+	return e
+}
 
+func (e *env) anon() client { return client{t: e.t, h: e.h} }
+
+// login signs in as name and returns a client holding the session.
+func (e *env) login(name, password string) client {
+	e.t.Helper()
+	rec := e.anon().do("POST", "/api/v1/auth/login", map[string]any{"username": name, "password": password})
+	if rec.Code != 200 {
+		e.t.Fatalf("login %s: %d %s", name, rec.Code, rec.Body)
+	}
+	return client{t: e.t, h: e.h, cookie: sessionFrom(rec)}
+}
+
+// waitTasks waits until no task is queued or running.
+func (e *env) waitTasks() {
+	e.t.Helper()
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var ts []Task
+		e.admin.json("GET", "/api/v1/tasks", nil, 200, &ts)
+		busy := false
+		for _, tk := range ts {
+			busy = busy || tk.State == Running || tk.State == Queued
+			if tk.State == Failed {
+				e.t.Fatalf("task failed: %+v", tk)
+			}
+		}
+		if !busy && len(ts) > 0 {
+			return
+		}
+		if time.Now().After(deadline) {
+			e.t.Fatalf("tasks did not finish: %+v", ts)
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+}
+
+// TestScanAndServe registers a library, lets the scan and analysis run, then
+// reads series, books, pages and covers back through the API.
+func TestScanAndServe(t *testing.T) {
+	c := newEnv(t).admin
 	root := t.TempDir()
 	red, blue := pngBytes(t, 60, 90, color.RGBA{200, 0, 0, 255}), pngBytes(t, 120, 90, color.RGBA{0, 0, 200, 255})
 	info := []byte(`<?xml version="1.0"?><ComicInfo><Series>夜更けの測量士</Series><Number>1</Number><Writer>北条 灯</Writer><Manga>YesAndRightToLeft</Manga></ComicInfo>`)

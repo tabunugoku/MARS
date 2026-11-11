@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"github.com/tabunugoku/cominavi/server/internal/config"
 	"github.com/tabunugoku/cominavi/server/internal/db"
 	"github.com/tabunugoku/cominavi/server/internal/httpapi"
@@ -63,8 +64,18 @@ func run() error {
 	}
 	go lib.Schedule(ctx)
 
+	gate, err := httpapi.NewSetupGate(ctx, database, cfg.DataDir)
+	if err != nil {
+		return err
+	}
+	store := auth.Store{DB: database}
+	go purgeSessions(ctx, store)
+
 	mux := http.NewServeMux()
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{DB: database, Version: version, Library: lib, Tasks: queue})))
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{
+		DB: database, Version: version, Library: lib, Tasks: queue,
+		Auth: store, Limiter: &auth.Limiter{}, Gate: gate, TrustedProxies: cfg.TrustedProxies,
+	})))
 	if !cfg.Dev {
 		mux.Handle("/", webui.Handler())
 	}
@@ -73,6 +84,9 @@ func run() error {
 		Addr:              cfg.Addr,
 		Handler:           mux,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       time.Minute,
+		IdleTimeout:       2 * time.Minute,
+		MaxHeaderBytes:    64 << 10,
 	}
 	errc := make(chan error, 1)
 	go func() {
@@ -92,4 +106,22 @@ func run() error {
 		return srv.Shutdown(shutdownCtx)
 	}
 	return nil
+}
+
+// purgeSessions deletes expired sessions once an hour.
+func purgeSessions(ctx context.Context, store auth.Store) {
+	t := time.NewTicker(time.Hour)
+	defer t.Stop()
+	for {
+		if n, err := store.PurgeExpired(ctx); err != nil {
+			slog.Warn("purge sessions", "err", err)
+		} else if n > 0 {
+			slog.Info("purged expired sessions", "count", n)
+		}
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+	}
 }

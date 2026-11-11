@@ -5,23 +5,28 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 type Config struct {
 	// DataDir holds the database, thumbnails and the page cache.
 	DataDir string
-	// Addr is the listen address, e.g. "127.0.0.1:25600".
+	// Addr is the listen address, e.g. ":25600" (all interfaces) or "127.0.0.1:25600".
 	Addr string
 	// Dev serves no embedded UI (the Vite dev server proxies /api instead).
 	Dev bool
+	// TrustedProxies are reverse proxies (COMINAVI_TRUSTED_PROXIES, comma-
+	// separated IPs or CIDRs) whose X-Forwarded-For names the real client.
+	TrustedProxies []netip.Prefix
 }
 
 const defaultPort = 25600
 
-// Load reads COMINAVI_DATA, COMINAVI_HOST, COMINAVI_PORT and COMINAVI_DEV.
+// Load reads COMINAVI_DATA, COMINAVI_HOST, COMINAVI_PORT, COMINAVI_DEV and COMINAVI_TRUSTED_PROXIES.
 func Load() (Config, error) {
 	c := Config{DataDir: os.Getenv("COMINAVI_DATA"), Dev: os.Getenv("COMINAVI_DEV") == "1"}
 	if c.DataDir == "" {
@@ -41,13 +46,27 @@ func Load() (Config, error) {
 		}
 		port = n
 	}
-	// Until sign-in exists (milestone M2) the API is open to anyone who can
-	// reach it, so listen on loopback unless told otherwise.
+	// Listen on all interfaces unless COMINAVI_HOST narrows it; every API
+	// route except sign-in, setup and the login screen needs a session.
 	host := os.Getenv("COMINAVI_HOST")
 	if host == "" {
-		host = "127.0.0.1"
+		host = "" // all interfaces; sign-in protects the API
 	}
 	c.Addr = net.JoinHostPort(host, strconv.Itoa(port))
+	for _, f := range strings.Split(os.Getenv("COMINAVI_TRUSTED_PROXIES"), ",") {
+		if f = strings.TrimSpace(f); f == "" {
+			continue
+		}
+		p, err := netip.ParsePrefix(f)
+		if err != nil {
+			a, aerr := netip.ParseAddr(f)
+			if aerr != nil {
+				return c, fmt.Errorf("COMINAVI_TRUSTED_PROXIES: %q is not an IP or CIDR", f)
+			}
+			p = netip.PrefixFrom(a.Unmap(), a.Unmap().BitLen())
+		}
+		c.TrustedProxies = append(c.TrustedProxies, p.Masked())
+	}
 	return c, nil
 }
 

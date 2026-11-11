@@ -9,6 +9,12 @@ info:
   description: Self-hosted comic and manga server.
 servers:
   - url: /api/v1
+# Every operation needs a signed-in user unless it says security: [].
+# Cookie sessions must send a same-origin Origin header on writes (CSRF);
+# API keys (Bearer) are for apps and OPDS readers.
+security:
+  - session: []
+  - apiKey: []
 paths:
   /healthz:
     get:
@@ -220,8 +226,178 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/MediaIssue" } }
+  /setup:
+    post:
+      operationId: setup
+      summary: Create the first administrator (only while no user exists)
+      description: >
+        Needs the one-time setup token the server prints to its log and writes to
+        DATA/setup-token on a first start. Signs the new administrator in.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SetupRequest" }
+      responses:
+        "201":
+          description: Created and signed in (session cookie set)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "403": { $ref: "#/components/responses/Forbidden" }
+  /auth/login:
+    post:
+      operationId: login
+      summary: Sign in with a user name (or email) and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Signed in (session cookie set)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: End this session
+      responses:
+        "204": { description: Signed out (cookie cleared) }
+  /me:
+    get:
+      operationId: getMe
+      summary: The signed-in user
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+  /me/password:
+    put:
+      operationId: changePassword
+      summary: Change the password; other sessions are signed out
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PasswordChange" }
+      responses:
+        "204": { description: Changed }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /me/api-keys:
+    get:
+      operationId: listApiKeys
+      responses:
+        "200":
+          description: The user's API keys (never the key itself)
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/ApiKey" } }
+    post:
+      operationId: createApiKey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ApiKeyCreate" }
+      responses:
+        "201":
+          description: Created; the key is shown only in this response
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ApiKeyCreated" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /me/api-keys/{keyId}:
+    parameters:
+      - { name: keyId, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: deleteApiKey
+      responses:
+        "204": { description: Revoked }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /users:
+    get:
+      operationId: listUsers
+      summary: All users (administrators only)
+      responses:
+        "200":
+          description: Users by name
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/User" } }
+    post:
+      operationId: createUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /users/{userId}:
+    parameters:
+      - { name: userId, in: path, required: true, schema: { type: string } }
+    patch:
+      operationId: updateUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UserUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteUser
+      responses:
+        "204": { description: Deleted }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
 components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: cn_session
+    apiKey:
+      type: http
+      scheme: bearer
   responses:
+    Unauthorized:
+      description: Not signed in
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Forbidden:
+      description: Not allowed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    TooManyRequests:
+      description: Too many failed attempts; retry later
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
     NotFound:
       description: No such item
       content:
@@ -387,6 +563,86 @@ components:
         progress: { type: number, format: double }
         startedAt: { type: string, nullable: true }
         error: { type: string }
+    Role:
+      type: string
+      enum: [admin, user]
+    User:
+      type: object
+      required: [id, name, email, role, canDownload, canStream, allLibraries, libraryIds, lastActive]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        canDownload: { type: boolean }
+        canStream: { type: boolean }
+        allLibraries: { type: boolean }
+        libraryIds: { type: array, items: { type: string }, description: "Libraries the user may see when allLibraries is false" }
+        lastActive: { type: string, nullable: true }
+    UserCreate:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name: { type: string }
+        email: { type: string }
+        password: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        canDownload: { type: boolean }
+        canStream: { type: boolean }
+        allLibraries: { type: boolean }
+        libraryIds: { type: array, items: { type: string } }
+    UserUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        email: { type: string }
+        password: { type: string, description: "Sets a new password and signs the user out everywhere" }
+        role: { $ref: "#/components/schemas/Role" }
+        canDownload: { type: boolean }
+        canStream: { type: boolean }
+        allLibraries: { type: boolean }
+        libraryIds: { type: array, items: { type: string } }
+    SetupRequest:
+      type: object
+      required: [token, name, email, password]
+      properties:
+        token: { type: string }
+        name: { type: string }
+        email: { type: string }
+        password: { type: string }
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string, description: User name or email }
+        password: { type: string }
+        remember: { type: boolean, description: "Keep the session for rememberMeDays instead of until the browser closes" }
+    PasswordChange:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string }
+        newPassword: { type: string }
+    ApiKey:
+      type: object
+      required: [id, name, createdAt, lastUsed]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        createdAt: { type: string }
+        lastUsed: { type: string, nullable: true }
+    ApiKeyCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+    ApiKeyCreated:
+      type: object
+      required: [id, name, key]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        key: { type: string, description: "Send as Authorization: Bearer <key>; shown only once" }
     MediaIssue:
       type: object
       required: [bookId, kind, detail]
@@ -405,8 +661,9 @@ components:
       enum: [compass, covers]
     LoginScreen:
       type: object
-      required: [backdrop, covers]
+      required: [backdrop, covers, needsSetup]
       properties:
+        needsSetup: { type: boolean, description: "No user exists yet: show the first-run setup form" }
         backdrop: { $ref: "#/components/schemas/LoginBackdrop" }
         covers:
           description: Filled only when backdrop is "covers".
