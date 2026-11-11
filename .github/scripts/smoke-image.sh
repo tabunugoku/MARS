@@ -72,6 +72,20 @@ for f in "/sys/fs/cgroup/system.slice/docker-$id.scope/memory.peak" "/sys/fs/cgr
 done
 size=$(docker image inspect -f '{{.Size}}' "$image")
 
+# The image's HEALTHCHECK instruction itself (what TrueNAS shows): the first
+# probe runs one interval (30 s) after start.
+health=""
+for _ in $(seq 30); do
+  health=$(docker inspect -f '{{.State.Health.Status}}' "$name")
+  [ "$health" = healthy ] && break
+  sleep 3
+done
+if [ "$health" != healthy ]; then
+  echo "container health is '$health', want healthy" >&2
+  docker inspect -f '{{json .State.Health}}' "$name" >&2
+  exit 1
+fi
+
 report=$(cat <<EOF
 | measure | value |
 | --- | --- |

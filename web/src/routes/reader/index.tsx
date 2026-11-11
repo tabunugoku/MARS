@@ -79,10 +79,15 @@ function useProgressSaver(
       const key = progressKey(v);
       if (disabled || !moved.current || key === sent.current) return;
       sent.current = key;
+      // One turn, one write: a later regroup (a settings change) without a
+      // new turn does not write again.
+      moved.current = false;
       // getRandomValues, not randomUUID: the latter needs HTTPS, and the server is often plain HTTP on a LAN.
       writer.current ??= Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
       api.setProgress(bookId, v.page, v.completed, { keepalive: true, writer: writer.current, seq: ++seq.current }).catch((err: unknown) => {
-        if (sent.current === key) sent.current = ""; // let the next flush retry
+        // Let the next flush retry.
+        if (sent.current === key) sent.current = "";
+        moved.current = true;
         if (!leaving) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
       });
     },

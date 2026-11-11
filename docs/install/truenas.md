@@ -12,10 +12,11 @@ own.
 
 - Apps are set up: **Apps** has a pool selected for applications.
 - TrueNAS can pull `ghcr.io/tabunugoku/cominavi`. If the package is private,
-  add credentials under **Apps > Configuration > Manage Container Image
-  Registries** (or **Sign-in to a Docker registry**, depending on the
-  screen): registry `ghcr.io`, your GitHub user name, and a personal access
-  token with the `read:packages` scope.
+  add credentials: on the **Installed** screen open **Configuration >
+  Sign-in to a Docker registry**, choose **Add Registry**, pick *Other
+  Registry*, and enter the URI `https://ghcr.io`, a name, your GitHub user
+  name, and a personal access token with the `read:packages` scope as the
+  password.
 
 ## 2. Datasets and permissions
 

@@ -130,6 +130,13 @@ func TestProgressWriterOrder(t *testing.T) {
 	if p := put(map[string]any{"page": 2, "writer": "tab-c", "seq": 3}); p.Page != 2 {
 		t.Fatalf("write after clear refused: %+v", p)
 	}
+	// With nothing stored there is no order left to keep: even a stale write
+	// applies (the alternative would be answering with a position that is
+	// not stored).
+	e.admin.json("DELETE", path, nil, 204, nil)
+	if p := put(map[string]any{"page": 1, "writer": "tab-c", "seq": 1}); p.Page != 1 {
+		t.Fatalf("stale write after clear: %+v", p)
+	}
 	e.admin.json("PUT", path, map[string]any{"page": 1, "writer": strings.Repeat("x", 65), "seq": 3}, 400, nil)
 }
 
