@@ -9,7 +9,7 @@ import {
   Minimize,
   EyeOff,
 } from "@keyline-icons/react";
-import { api, useApi, effectivePrefs, errorMessage, getBookPrefs, getGlobalPrefs, getSeriesPrefs, loadReaderPrefs, scopeOf, setBookPrefs, setSeriesPrefs, type Book, type Page, type ReaderPrefs, type ReaderScope, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
+import { api, useApi, effectivePrefs, errorMessage, getBookPrefs, getGlobalPrefs, getSeriesPrefs, loadReaderPrefs, scopeOf, setBookPrefs, setSeriesPrefs, subscribeReaderPrefs, type Book, type Page, type ReaderPrefs, type ReaderScope, type ReadingDirection, type SeriesReaderPrefs } from "@/api";
 import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
@@ -49,11 +49,16 @@ function buildViews(pages: Page[], spread: ReaderPrefs["spread"]): View[] {
 const progressKey = (p: { page: number; completed: boolean }) => `${p.page}|${p.completed}`;
 
 /** Saves the reading position: a second after the last turn, and right away
- *  when the page is hidden or the reader closes. Opening a book records
- *  nothing until the reader moves (position = the page shown, or "end").
- *  Writes go out one at a time, in order, and a write that a newer one has
- *  superseded before it started is dropped, so an old page never lands after
- *  a newer one. Every write is keepalive, so one in flight survives unload. */
+ *  when the page is hidden or the reader closes.
+ *
+ *  Nothing is recorded until the reader moves on purpose: the position when
+ *  the user first touches, clicks, scrolls or presses a key is the baseline,
+ *  so layout settling (webtoon restore, spread re-anchoring) never counts.
+ *
+ *  Every write goes out at once, keepalive (it survives unload), named with
+ *  this reader's writer id and an increasing seq; the server ignores a write
+ *  older than one it already stored from this writer, so an earlier page
+ *  still in flight can never land after a later one. */
 function useProgressSaver(
   bookId: string,
   page: number,
@@ -62,39 +67,39 @@ function useProgressSaver(
   stored: Book["progress"],
   disabled: boolean,
 ) {
-  const latest = useRef({ page, completed });
-  const start = useRef(position);
+  const latest = useRef({ page, completed, position });
+  const start = useRef<string | null>(null);
   const moved = useRef(false);
-  const storedKey = stored ? progressKey(stored) : "";
-  const acked = useRef(storedKey);
-  const queued = useRef(storedKey);
-  const chain = useRef<Promise<void>>(Promise.resolve());
+  const sent = useRef(stored ? progressKey(stored) : "");
+  const writer = useRef<string | null>(null);
+  const seq = useRef(0);
+  useEffect(() => {
+    const onInput = () => {
+      start.current ??= latest.current.position;
+    };
+    const opts = { capture: true, passive: true } as const;
+    const kinds = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+    kinds.forEach((k) => window.addEventListener(k, onInput, opts));
+    return () => kinds.forEach((k) => window.removeEventListener(k, onInput, opts));
+  }, []);
   const flush = useCallback(
     (leaving: boolean) => {
       const v = latest.current;
+      if (start.current !== null && v.position !== start.current) moved.current = true;
       const key = progressKey(v);
-      if (disabled || !moved.current || key === queued.current) return;
-      queued.current = key;
-      const send = () => {
-        if (queued.current !== key) return; // superseded while waiting
-        return api.setProgress(bookId, v.page, v.completed, { keepalive: true }).then(
-          () => void (acked.current = key),
-          (err: unknown) => {
-            if (queued.current === key) queued.current = acked.current; // let the next flush retry
-            if (!leaving) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
-          },
-        );
-      };
-      // Leaving cannot wait for the queue: send now. A queued older write
-      // then sees it is superseded and stays home.
-      if (leaving) void send();
-      else chain.current = chain.current.then(send);
+      if (disabled || !moved.current || key === sent.current) return;
+      sent.current = key;
+      // getRandomValues, not randomUUID: the latter needs HTTPS, and the server is often plain HTTP on a LAN.
+      writer.current ??= Array.from(crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, "0")).join("");
+      api.setProgress(bookId, v.page, v.completed, { keepalive: true, writer: writer.current, seq: ++seq.current }).catch((err: unknown) => {
+        if (sent.current === key) sent.current = ""; // let the next flush retry
+        if (!leaving) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
+      });
     },
     [bookId, disabled],
   );
   useEffect(() => {
-    latest.current = { page, completed };
-    if (position !== start.current) moved.current = true;
+    latest.current = { page, completed, position };
     const t = setTimeout(() => flush(false), 1000);
     return () => clearTimeout(t);
   }, [page, completed, position, flush]);
@@ -194,22 +199,19 @@ function ReaderBody({
   const [bookPrefs, setBookState] = useState<SeriesReaderPrefs>(() => getBookPrefs(book.id));
   const scope = scopeOf(seriesPrefs, bookPrefs);
   const prefs = useMemo(() => effectivePrefs(seriesPrefs, bookPrefs, globalPrefs, defaultDirection), [seriesPrefs, bookPrefs, globalPrefs, defaultDirection]);
-  // On a refused save the cache has already rolled back (or holds a newer
-  // pending change); the screen takes whatever it holds now.
-  const saveSeries = (p: SeriesReaderPrefs) => {
-    setSeriesState(p);
-    setSeriesPrefs(book.seriesId, p).catch((err: unknown) => {
-      setSeriesState(getSeriesPrefs(book.seriesId));
-      toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
-    });
-  };
-  const saveBook = (p: SeriesReaderPrefs) => {
-    setBookState(p);
-    setBookPrefs(book.id, p).catch((err: unknown) => {
-      setBookState(getBookPrefs(book.id));
-      toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
-    });
-  };
+  // The screen follows the shared cache: a change shows at once, and a
+  // refused save rolls back here too, even if another reader made it.
+  useEffect(
+    () =>
+      subscribeReaderPrefs(() => {
+        setSeriesState(getSeriesPrefs(book.seriesId));
+        setBookState(getBookPrefs(book.id));
+      }),
+    [book.seriesId, book.id],
+  );
+  const saveError = (err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
+  const saveSeries = (p: SeriesReaderPrefs) => void setSeriesPrefs(book.seriesId, p).catch(saveError);
+  const saveBook = (p: SeriesReaderPrefs) => void setBookPrefs(book.id, p).catch(saveError);
   const changeScope = (s: ReaderScope) => {
     if (s === scope) return;
     if (s === "book") return saveBook({ mode: "custom", prefs });
@@ -238,6 +240,7 @@ function ReaderBody({
   // from the previous layout, not the one recomputed with the stale index.
   const anchor = useRef<number>(currentPage);
   const [webtoonPage, setWebtoonPage] = useState(currentPage);
+  const [webtoonEnd, setWebtoonEnd] = useState(false);
   useEffect(() => {
     const a = anchor.current;
     setVi(a === Infinity ? views.length : Math.max(0, views.findIndex((v) => v.pages.includes(a))));
@@ -337,7 +340,8 @@ function ReaderBody({
   const shownPage = webtoon ? webtoonPage : currentPage;
   // The last page (or the end card) counts as finished. Incognito reads leave no trace.
   const lastShown = webtoon ? webtoonPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
-  useProgressSaver(book.id, shownPage, lastShown >= pageCount, atEnd && !webtoon ? "end" : String(shownPage), book.progress, incognito);
+  const finished = webtoon ? webtoonEnd : atEnd;
+  useProgressSaver(book.id, shownPage, lastShown >= pageCount, finished ? "end" : String(shownPage), book.progress, incognito);
 
   // Neighbour views are mounted beside the current one (prev/next) so a turn
   // shows decoded pixels; two further views are preloaded invisibly.
@@ -362,6 +366,7 @@ function ReaderBody({
             anchor.current = p;
             setWebtoonPage(p);
           }}
+          onEnd={setWebtoonEnd}
           onToggleChrome={() => setChrome((c) => !c)}
         />
       ) : (
@@ -595,6 +600,7 @@ function WebtoonView({
   startPage,
   jump,
   onPage,
+  onEnd,
   onToggleChrome,
 }: {
   book: Book;
@@ -604,6 +610,7 @@ function WebtoonView({
   startPage: number;
   jump: { page: number; n: number } | null;
   onPage: (p: number) => void;
+  onEnd: (visible: boolean) => void;
   onToggleChrome: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -618,7 +625,14 @@ function WebtoonView({
       { root: ref.current, rootMargin: "-50% 0px -50% 0px" },
     );
     ref.current?.querySelectorAll("[data-page]").forEach((el) => io.observe(el));
-    return () => io.disconnect();
+    // The end card in view counts as finishing the volume (it may not change the page).
+    const endIo = new IntersectionObserver(([e]) => onEnd(e.isIntersecting), { root: ref.current, threshold: 0.5 });
+    const endEl = ref.current?.querySelector("[data-end]");
+    if (endEl) endIo.observe(endEl);
+    return () => {
+      io.disconnect();
+      endIo.disconnect();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   return (
@@ -635,7 +649,7 @@ function WebtoonView({
             style={{ aspectRatio: `${width || 800} / ${height || 1280}` }}
           />
         ))}
-        <div className="flex justify-center py-16">
+        <div data-end className="flex justify-center py-16">
           <EndCard book={book} next={next} seriesId={book.seriesId} incognito={incognito} />
         </div>
       </div>
