@@ -80,6 +80,16 @@ function useProgressSaver(bookId: string, page: number, completed: boolean, disa
   }, [flush]);
 }
 
+/** Which touch gestures the browser keeps. A page larger than the screen
+ *  ("original", "height") pans natively in both directions, so a drag moves
+ *  the image and pages turn with the tap zones and keys; "width" keeps the
+ *  vertical scroll and leaves horizontal swipes to the page turn. */
+function panTouch(fit: ReaderPrefs["fit"], axis: "x" | "y"): string {
+  if (fit === "original" || fit === "height") return "pan-x pan-y";
+  if (fit === "width" && axis === "x") return "pan-y";
+  return "none";
+}
+
 const bgClass: Record<ReaderPrefs["bg"], string> = {
   black: "bg-black text-white",
   gray: "bg-neutral-800 text-white",
@@ -321,7 +331,7 @@ function ReaderBody({
         <div
           ref={stageRef}
           className="absolute inset-0 touch-none overflow-clip"
-          style={{ touchAction: prefs.fit === "width" && axis === "x" ? "pan-y" : "none" }}
+          style={{ touchAction: panTouch(prefs.fit, axis) }}
           {...swipe.handlers}
         >
           <motion.div className="absolute inset-0" style={{ transform: stripTransform }}>
@@ -448,7 +458,7 @@ function PageImg({ src, page, fit, className }: { src: string; page: number; fit
 
 function PageView({ view, url, rtl, fit }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"] }) {
   const pages = rtl ? [...view.pages].reverse() : view.pages;
-  const scroll = fit === "width" || fit === "original";
+  const scroll = fit !== "screen";
   if (pages.length === 1) {
     return (
       <div className={cn("flex size-full justify-center", scroll ? "items-start overflow-auto" : "items-center")}>
@@ -519,6 +529,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
             type="button"
             data-page={p}
             onClick={() => onPick(p)}
+            style={{ contentVisibility: "auto", containIntrinsicSize: "64px 120px" }}
             className={cn("w-16 shrink-0 rounded outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]", p === current && "ring-2 ring-[var(--brand)]")}
             aria-label={`${p}ページへ`}
             aria-current={p === current ? "page" : undefined}
@@ -575,7 +586,7 @@ function WebtoonView({
             src={url}
             alt={`${p}ページ`}
             loading={Math.abs(p - startPage) < 3 ? "eager" : "lazy"}
-            className="block w-full"
+            className="block w-full [content-visibility:auto]"
             style={{ aspectRatio: `${width || 800} / ${height || 1280}` }}
           />
         ))}
