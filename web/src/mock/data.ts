@@ -12,6 +12,10 @@ import type {
   User,
 } from "@/api/types";
 
+// The mock keeps a seed per cover; mock.ts turns it into thumbnailUrl.
+export type MockSeries = Series & { coverSeed: number };
+export type MockBook = Book & { coverSeed: number };
+
 function rng(seed: number) {
   let s = seed >>> 0;
   return () => {
@@ -50,8 +54,8 @@ const summaries = [
   "宇宙港の片隅にある郵便局は、届け先のない手紙ばかりを集めている。",
 ];
 
-export const series: Series[] = [];
-export const books: Book[] = [];
+export const series: MockSeries[] = [];
+export const books: MockBook[] = [];
 
 function addSeries(libraryId: string, title: string, idx: number, webtoon = false, western = false) {
   const id = `s-${libraryId.slice(4)}-${idx}`;
@@ -62,7 +66,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
     ...(r() > 0.6 ? [{ name: pick(authorsPool), role: "penciller" as const }] : []),
   ];
   const updated = r() * 40;
-  const s: Series = {
+  const s: MockSeries = {
     id,
     libraryId,
     title,
@@ -82,6 +86,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
     booksRead: 0,
     booksInProgress: 0,
     coverSeed: Math.floor(r() * 10000),
+    thumbnailUrl: "",
     createdAt: daysAgo(updated + r() * 300),
     updatedAt: daysAgo(updated),
     lockedFields: r() > 0.8 ? ["summary"] : [],
@@ -94,7 +99,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
     if (n <= readUpTo) progress = { page: pageCount, completed: true, readAt: daysAgo(10 + (readUpTo - n)) };
     else if (n === readUpTo + 1 && readUpTo > 0 && r() > 0.3)
       progress = { page: 1 + Math.floor(r() * (pageCount - 2)), completed: false, readAt: daysAgo(r() * 6) };
-    const b: Book = {
+    const b: MockBook = {
       id: `${id}-b${n}`,
       seriesId: id,
       libraryId,
@@ -113,6 +118,8 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
       mediaStatus: r() > 0.985 ? "error" : "ready",
       progress,
       coverSeed: s.coverSeed + n * 7,
+      thumbnailUrl: "",
+      lockedFields: [],
       createdAt: daysAgo(updated + (bookCount - n) * 3),
     };
     books.push(b);
@@ -146,17 +153,17 @@ export const readLists: ReadList[] = [
 ];
 
 export const users: User[] = [
-  { id: "u-1", name: "admin", email: "admin@example.test", role: "admin", canDownload: true, canStream: true, libraryIds: "all", lastActive: daysAgo(0) },
-  { id: "u-2", name: "ゆう", email: "yu@example.test", role: "user", canDownload: true, canStream: true, libraryIds: ["lib-manga", "lib-webtoon"], lastActive: daysAgo(1) },
-  { id: "u-3", name: "kids", email: "kids@example.test", role: "user", canDownload: false, canStream: true, libraryIds: ["lib-manga"], lastActive: daysAgo(8) },
+  { id: "u-1", name: "admin", email: "admin@example.test", role: "admin", canDownload: true, canStream: true, allLibraries: true, libraryIds: [], lastActive: daysAgo(0) },
+  { id: "u-2", name: "ゆう", email: "yu@example.test", role: "user", canDownload: true, canStream: true, allLibraries: false, libraryIds: ["lib-manga", "lib-webtoon"], lastActive: daysAgo(1) },
+  { id: "u-3", name: "kids", email: "kids@example.test", role: "user", canDownload: false, canStream: true, allLibraries: false, libraryIds: ["lib-manga"], lastActive: daysAgo(8) },
 ];
 
 export const tasks: Task[] = [
-  { id: "t-1", kind: "scan", label: "マンガ をスキャン", libraryId: "lib-manga", state: "running", progress: 0.62, startedAt: daysAgo(0.002) },
-  { id: "t-2", kind: "thumbnail", label: "サムネイルを生成（214件）", libraryId: "lib-manga", state: "queued", progress: 0, startedAt: null },
-  { id: "t-3", kind: "analyze", label: "メディアを解析（38件）", libraryId: "lib-webtoon", state: "queued", progress: 0, startedAt: null },
-  { id: "t-4", kind: "scan", label: "海外コミック をスキャン", libraryId: "lib-comics", state: "done", progress: 1, startedAt: daysAgo(0.3) },
-  { id: "t-5", kind: "hash", label: "ファイルハッシュを計算", libraryId: null, state: "failed", progress: 0.4, startedAt: daysAgo(1) },
+  { id: "t-1", kind: "scan", label: "マンガ をスキャン", libraryId: "lib-manga", state: "running", progress: 0.62, startedAt: daysAgo(0.002), error: "" },
+  { id: "t-2", kind: "thumbnail", label: "サムネイルを生成（214件）", libraryId: "lib-manga", state: "queued", progress: 0, startedAt: null, error: "" },
+  { id: "t-3", kind: "analyze", label: "メディアを解析（38件）", libraryId: "lib-webtoon", state: "queued", progress: 0, startedAt: null, error: "" },
+  { id: "t-4", kind: "scan", label: "海外コミック をスキャン", libraryId: "lib-comics", state: "done", progress: 1, startedAt: daysAgo(0.3), error: "" },
+  { id: "t-5", kind: "hash", label: "ファイルハッシュを計算", libraryId: null, state: "failed", progress: 0.4, startedAt: daysAgo(1), error: "" },
 ];
 
 export const mediaIssues: MediaIssue[] = [
@@ -169,7 +176,7 @@ export const settings: ServerSettings = {
   port: 25600,
   taskThreads: 2,
   thumbnailSize: "medium",
-  thumbnailFormat: "webp",
+  thumbnailFormat: "jpeg",
   rememberMeDays: 30,
   deleteEmptyCollections: true,
   opdsEnabled: true,

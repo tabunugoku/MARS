@@ -1,0 +1,8 @@
+# Generates api.gen.go from the shared contract (api/openapi.yaml).
+package: httpapi
+output: api.gen.go
+generate:
+  std-http-server: true
+  strict-server: true
+  models: true
+  embedded-spec: true

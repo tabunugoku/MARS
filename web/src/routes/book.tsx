@@ -2,7 +2,8 @@ import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, formatBytes, formatDate, useApi, type Author, type MediaStatus } from "@/api";
+import { api, errorMessage, formatBytes, formatDate, useApi, type Author, type MediaStatus } from "@/api";
+import { LoadError } from "@/components/shell/load-error";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
 import { DotTrack } from "@/components/media/dot-track";
@@ -13,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { Tooltip } from "@/components/ui/tooltip";
-import { pageArt } from "@/lib/art";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -44,15 +44,23 @@ export default function Screen() {
 
 function BookPage({ id }: { id: string }) {
   const navigate = useNavigate();
-  const { data } = useApi(async () => {
+  const { data, error, reload } = useApi(async () => {
     const book = await api.book(id);
     if (!book) return null;
-    const [series, adjacent] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id)]);
-    return { book, series, adjacent };
+    const [series, adjacent, pages] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id), api.pages(id).catch(() => [])]);
+    return { book, series, adjacent, pages };
   }, [id]);
 
-  const [readOverride, setReadOverride] = useState<boolean | null>(null);
   const [allPages, setAllPages] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  if (error) {
+    return (
+      <Page>
+        <LoadError message={error} onRetry={reload} />
+      </Page>
+    );
+  }
 
   if (data === undefined) {
     return (
@@ -80,17 +88,27 @@ function BookPage({ id }: { id: string }) {
   }
 
   const { book, series, adjacent } = data;
-  const completed = readOverride ?? !!book.progress?.completed;
+  const completed = !!book.progress?.completed;
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
   const dots = Math.min(book.pageCount, 60);
-  const shownPages = allPages ? book.pageCount : Math.min(PREVIEW_PAGES, book.pageCount);
+  const shownPages = allPages ? data.pages.length : Math.min(PREVIEW_PAGES, data.pages.length);
   const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
+  // Marking read needs the page count and a readable archive.
+  const canMarkRead = book.pageCount > 0 && book.mediaStatus === "ready";
 
-  const toggleRead = () => {
-    const next = !completed;
-    setReadOverride(next);
-    toast.success(next ? "既読にしました" : "未読にしました");
+  const toggleRead = async () => {
+    setBusy(true);
+    try {
+      if (completed) await api.clearProgress(book.id);
+      else await api.setProgress(book.id, book.pageCount, true);
+      toast.success(completed ? "未読にしました" : "既読にしました");
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -133,7 +151,7 @@ function BookPage({ id }: { id: string }) {
 
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="mx-auto w-[160px] shrink-0 md:mx-0 md:w-[200px]">
-          <Cover seed={book.coverSeed} title={series?.title ?? book.title} label={String(book.number)} priority />
+          <Cover src={book.thumbnailUrl} title={series?.title ?? book.title} label={String(book.number)} priority />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">
@@ -164,15 +182,17 @@ function BookPage({ id }: { id: string }) {
             <Button variant="secondary" asChild>
               <Link to={`/read/${book.id}?page=1`}>最初から読む</Link>
             </Button>
+            <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead}>
+              {completed ? "未読にする" : "既読にする"}
+            </Button>
             <DropdownMenu>
               <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="シークレットモードで読む" onSelect={() => navigate(`/read/${book.id}?incognito=1`)} />
-                <MenuItem index={1} label={completed ? "未読にする" : "既読にする"} onSelect={toggleRead} />
-                <MenuItem index={2} label="ダウンロード" />
               </DropdownContent>
             </DropdownMenu>
           </div>
+          {!canMarkRead && <p className={cn(typeClass("caption"), "text-muted-foreground")}>解析が終わっていません</p>}
 
           <dl className="mt-4 max-w-2xl divide-y divide-border">
             <Fact label="発売日">{book.releaseDate ? formatDate(book.releaseDate) : "未設定"}</Fact>
@@ -192,7 +212,7 @@ function BookPage({ id }: { id: string }) {
               className="group block rounded-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <img
-                src={pageArt(book.coverSeed, n)}
+                src={data.pages[n - 1].url}
                 alt=""
                 loading="lazy"
                 decoding="async"

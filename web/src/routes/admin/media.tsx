@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router";
-import { RefreshCw, Bin } from "@keyline-icons/react";
-import { api, useApi, type Book, type MediaIssue } from "@/api";
+import { RefreshCw } from "@keyline-icons/react";
+import { api, errorMessage, useApi, type Book, type MediaIssue } from "@/api";
+import { LoadError } from "@/components/shell/load-error";
 import { Cover } from "@/components/media/cover";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,23 +10,37 @@ import { Tabs, TabsItem, TabsPanel } from "@/components/ui/tabs";
 import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
-import { ConfirmDialog, IconAction, TableSkeleton } from "./_parts";
+import { IconAction, TableSkeleton } from "./_parts";
 
 const HEADS = ["表紙", "シリーズ", "パス", "詳細", "操作"];
 
 type Row = { issue: MediaIssue; book: Book; series: string };
 
 export default function Screen() {
-  const { data } = useApi(async () => {
+  const { data, error, reload } = useApi(async () => {
     const [issues, series] = await Promise.all([api.mediaIssues(), api.series()]);
     const books = await api.booksByIds(issues.map((i) => i.bookId));
     return { issues, books, titles: new Map(series.map((s) => [s.id, s.title])) };
   }, []);
 
   const [tab, setTab] = useState(0);
-  const [trashed, setTrashed] = useState<Set<string>>(new Set());
-  const [confirm, setConfirm] = useState<Book | null>(null);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
+
+  const reanalyze = async (bookId: string) => {
+    setBusyIds((s) => new Set(s).add(bookId));
+    try {
+      await api.analyzeBook(bookId);
+      toast.success("再解析を開始しました");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusyIds((s) => {
+        const next = new Set(s);
+        next.delete(bookId);
+        return next;
+      });
+    }
+  };
 
   // Rows per tab: エラー also gathers unsupported files, since the spec has no tab for them.
   const rowsFor = (kinds: MediaIssue["kind"][]): Row[] => {
@@ -33,7 +48,7 @@ export default function Screen() {
     const out: Row[] = [];
     for (const issue of data.issues) {
       const book = data.books.find((b) => b.id === issue.bookId);
-      if (!book || !kinds.includes(issue.kind) || trashed.has(book.id)) continue;
+      if (!book || !kinds.includes(issue.kind)) continue;
       out.push({ issue, book, series: data.titles.get(book.seriesId) ?? book.title });
     }
     return out;
@@ -48,7 +63,9 @@ export default function Screen() {
     <Page>
       <PageHeader title="メディア管理" />
 
-      {!data && <TableSkeleton heads={HEADS} rows={3} />}
+      {error && !data && <LoadError message={error} onRetry={reload} />}
+
+      {!error && !data && <TableSkeleton heads={HEADS} rows={3} />}
 
       {data && (
         <>
@@ -76,7 +93,7 @@ export default function Screen() {
                         <TableRow key={`${issue.kind}-${book.id}`} index={r}>
                           <TableCell>
                             <div className="w-8">
-                              <Cover seed={book.coverSeed} title={series} label={String(book.number)} />
+                              <Cover src={book.thumbnailUrl} title={series} label={String(book.number)} />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -91,8 +108,11 @@ export default function Screen() {
                           <TableCell className="min-w-[200px]">{issue.detail}</TableCell>
                           <TableCell>
                             <div className="flex gap-1">
-                              <IconAction label="再解析" icon={RefreshCw} onClick={() => toast.success("再解析を開始しました")} />
-                              <IconAction label="ゴミ箱へ" icon={Bin} onClick={() => { setConfirm(book); setConfirmOpen(true); }} />
+                              <IconAction
+                                label="再解析"
+                                icon={RefreshCw}
+                                onClick={() => !busyIds.has(book.id) && reanalyze(book.id)}
+                              />
                             </div>
                           </TableCell>
                         </TableRow>
@@ -105,18 +125,6 @@ export default function Screen() {
           ))}
         </>
       )}
-
-      <ConfirmDialog
-        open={confirmOpen}
-        onOpenChange={setConfirmOpen}
-        title="ゴミ箱へ移動しますか"
-        body={`「${confirm?.title ?? ""}」のファイルをゴミ箱に移動します。`}
-        confirmLabel="ゴミ箱へ"
-        onConfirm={() => {
-          if (confirm) setTrashed(new Set([...trashed, confirm.id]));
-          toast.success("ゴミ箱へ移動しました");
-        }}
-      />
     </Page>
   );
 }

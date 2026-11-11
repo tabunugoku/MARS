@@ -2,7 +2,16 @@ import type { IconComponent } from "@/lib/icon-context";
 import { useState, type ReactNode } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { Lock, Plus, Unlock, X } from "@keyline-icons/react";
-import { statusLabel, type Author, type ReadingDirection, type Series, type SeriesStatus } from "@/api";
+import {
+  api,
+  errorMessage,
+  statusLabel,
+  type Author,
+  type ReadingDirection,
+  type Series,
+  type SeriesStatus,
+  type SeriesUpdate,
+} from "@/api";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -77,21 +86,83 @@ function initialForm(s: Series): Form {
   };
 }
 
+const splitList = (raw: string) =>
+  raw
+    .split(",")
+    .map((x) => x.trim())
+    .filter(Boolean);
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/** "" clears the field (null); otherwise a whole number. undefined when the text is not one. */
+function parseOptionalInt(raw: string): number | null | undefined {
+  const t = raw.trim();
+  if (t === "") return null;
+  const n = Number(t);
+  return Number.isInteger(n) ? n : undefined;
+}
+
+/** Only the fields the user changed, compared with the series as loaded.
+ *  The server locks every field it receives, so unchanged fields must stay
+ *  out. Throws a message when a number field is not a whole number. */
+function changesOf(form: Form, s: Series, locked: string[]): SeriesUpdate {
+  const c: SeriesUpdate = {};
+  if (form.title !== s.title) c.title = form.title;
+  if (form.titleSort !== s.titleSort) c.titleSort = form.titleSort;
+  if (form.summary !== s.summary) c.summary = form.summary;
+  if (form.status !== s.status) c.status = form.status;
+  if (form.readingDirection !== s.readingDirection) c.readingDirection = form.readingDirection;
+  if (form.publisher !== s.publisher) c.publisher = form.publisher;
+  if (form.language !== s.language) c.language = form.language;
+
+  const age = parseOptionalInt(form.ageRating);
+  if (age === undefined) throw new Error("年齢区分は整数で入力してください");
+  if (age !== s.ageRating) c.ageRating = age;
+  const total = parseOptionalInt(form.totalBookCount);
+  if (total === undefined) throw new Error("総巻数は整数で入力してください");
+  if (total !== s.totalBookCount) c.totalBookCount = total;
+
+  const authors = form.authors
+    .map((a) => ({ name: a.name.trim(), role: a.role }))
+    .filter((a) => a.name !== "");
+  const sameAuthors =
+    authors.length === s.authors.length && authors.every((a, i) => a.name === s.authors[i].name && a.role === s.authors[i].role);
+  if (!sameAuthors) c.authors = authors;
+
+  const genres = splitList(form.genres);
+  if (!sameList(genres, s.genres)) c.genres = genres;
+  const tags = splitList(form.tags);
+  if (!sameList(tags, s.tags)) c.tags = tags;
+
+  // Lock list: sent only when the user toggled a lock. It replaces the whole
+  // list, so fields the dialog does not show keep their locks, and the fields
+  // being saved stay locked (saving a field locks it on the server).
+  const lockChanged = !sameList([...locked].sort(), [...s.lockedFields].sort());
+  if (lockChanged) {
+    const shown = Object.keys(fieldLabel);
+    const hidden = s.lockedFields.filter((f) => !shown.includes(f));
+    c.lockedFields = [...new Set([...hidden, ...locked, ...Object.keys(c)])];
+  }
+  return c;
+}
+
 /** Metadata editor. Mounted fresh on each open (parent uses a key), so the
- *  form always starts from the series' current values. Saving is a mockup:
- *  the toast confirms and nothing is persisted. */
+ *  form always starts from the series' current values. Save sends only the
+ *  changed fields; the saved series goes back to the parent through onSaved. */
 export function EditDialog({
   series,
   open,
   onOpenChange,
+  onSaved,
 }: {
   series: Series;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSaved: (series: Series) => void;
 }) {
   const [form, setForm] = useState<Form>(() => initialForm(series));
   const [locked, setLocked] = useState<string[]>(series.lockedFields);
   const [tab, setTab] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
   const toggleLock = (field: string) =>
@@ -102,9 +173,29 @@ export function EditDialog({
       form.authors.map((a, j) => (j === i ? { ...a, ...patch } : a)),
     );
 
-  const save = () => {
-    toast.success("メタデータを保存しました");
-    onOpenChange(false);
+  const save = async () => {
+    let changes: SeriesUpdate;
+    try {
+      changes = changesOf(form, series, locked);
+    } catch (err) {
+      toast.error(errorMessage(err));
+      return;
+    }
+    if (Object.keys(changes).length === 0) {
+      onOpenChange(false);
+      return;
+    }
+    setSaving(true);
+    try {
+      const updated = await api.updateSeries(series.id, changes);
+      toast.success("メタデータを保存しました");
+      onSaved(updated);
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const lockProps = { locked, onToggle: toggleLock };
@@ -234,10 +325,12 @@ export function EditDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="secondary" disabled={saving} onClick={() => onOpenChange(false)}>
             キャンセル
           </Button>
-          <Button onClick={save}>保存</Button>
+          <Button disabled={saving} onClick={save}>
+            保存
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

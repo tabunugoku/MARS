@@ -17,7 +17,7 @@ import { motion } from "motion/react";
  *  the sidebar becomes a drawer opened from the "ライブラリ" tab. */
 export function AppShell() {
   return (
-    <SidebarProvider peek="hover">
+    <SidebarProvider peek="hover" className="h-svh">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <CompassBackdrop />

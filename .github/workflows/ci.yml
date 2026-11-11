@@ -1,0 +1,61 @@
+name: ci
+
+on:
+  push:
+    branches: [main, "feat/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/check-budget.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist
+          retention-days: 3
+
+  server:
+    runs-on: ubuntu-latest
+    needs: web
+    defaults:
+      run:
+        working-directory: server
+    env:
+      CGO_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Generated code is up to date
+        run: |
+          go generate ./...
+          git diff --exit-code -- .
+      - run: go vet ./...
+      - run: go test ./...
+      - uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: server/internal/webui/dist
+      - name: Build static binaries
+        run: |
+          GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/cominavi-amd64 ./cmd/cominavi
+          GOOS=linux GOARCH=arm64 go build -trimpath -o /tmp/cominavi-arm64 ./cmd/cominavi
+          ls -l /tmp/cominavi-*
