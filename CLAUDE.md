@@ -5,8 +5,11 @@ Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: Reac
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
 Current phase: **UI mockup approved** (tag `design/approved-v2`, 2026-11-11;
-v2 adds the floating save island). Backend: M0 (foundation) and M1 (scan
-and page serving) and M2 (sign-in and users) done; M3 (browsing API) is next.
+v2 adds the floating save island). Backend: M0 (foundation), M1 (scan and
+page serving), M2 (sign-in and users) and M3 (browsing API) done; M4
+(connecting the frontend) is next. Every API operation is classified in
+`server/internal/httpapi/access.go` (`opAccess`); an unlisted one is refused,
+and series/books are read only through the builders in `query.go`.
 The server listens on all interfaces (`COMINAVI_HOST` narrows it); a first
 start prints a one-time setup token and writes it to `DATA/setup-token`. The plan is in milestones M0–M5. `web/` runs on mock data behind `web/src/api/`;
 the same code becomes the production frontend once the Go API exists.
