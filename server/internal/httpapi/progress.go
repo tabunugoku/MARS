@@ -59,29 +59,44 @@ func (s *server) MarkSeriesRead(ctx context.Context, req MarkSeriesReadRequestOb
 	if !ok {
 		return MarkSeriesRead404JSONResponse{notFound("シリーズが見つかりません")}, nil
 	}
-	uid := currentUser(ctx).ID
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	if req.Body != nil && req.Body.Completed {
-		// Read on the book's last page, or page 1 for a book with no pages.
-		_, err = tx.ExecContext(ctx, `INSERT INTO read_progress (user_id, book_id, page, completed, read_at)
-			SELECT ?, b.id, max(b.page_count, 1), 1, ? FROM books b WHERE b.series_id = ? AND b.deleted_at IS NULL
-			ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = 1, read_at = excluded.read_at`,
-			uid, time.Now().UTC().Format(time.RFC3339), req.SeriesId)
-	} else {
-		_, err = tx.ExecContext(ctx, `DELETE FROM read_progress WHERE user_id = ?
-			AND book_id IN (SELECT id FROM books WHERE series_id = ?)`, uid, req.SeriesId)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
+	if err := s.markRead(ctx, "series_id", req.SeriesId, req.Body != nil && req.Body.Completed); err != nil {
 		return nil, err
 	}
 	return MarkSeriesRead204Response{}, nil
+}
+
+func (s *server) MarkLibraryRead(ctx context.Context, req MarkLibraryReadRequestObject) (MarkLibraryReadResponseObject, error) {
+	cond, args := libScope(ctx, "l.id")
+	var one int
+	err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM libraries l WHERE l.id = ? AND `+cond, append([]any{req.LibraryId}, args...)...).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return MarkLibraryRead404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := s.markRead(ctx, "library_id", req.LibraryId, req.Body != nil && req.Body.Completed); err != nil {
+		return nil, err
+	}
+	return MarkLibraryRead204Response{}, nil
+}
+
+// markRead marks every live book whose col (series_id or library_id) is id
+// read, or clears the caller's progress on them. The caller checked access.
+func (s *server) markRead(ctx context.Context, col, id string, completed bool) error {
+	uid := currentUser(ctx).ID
+	var err error
+	if completed {
+		// Read on the book's last page, or page 1 for a book with no pages.
+		_, err = s.DB.ExecContext(ctx, `INSERT INTO read_progress (user_id, book_id, page, completed, read_at)
+			SELECT ?, b.id, max(b.page_count, 1), 1, ? FROM books b WHERE b.`+col+` = ? AND b.deleted_at IS NULL
+			ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = 1, read_at = excluded.read_at`,
+			uid, time.Now().UTC().Format(time.RFC3339), id)
+	} else {
+		_, err = s.DB.ExecContext(ctx, `DELETE FROM read_progress WHERE user_id = ?
+			AND book_id IN (SELECT id FROM books WHERE `+col+` = ?)`, uid, id)
+	}
+	return err
 }
 
 var defaultGlobalPrefs = GlobalReaderPrefs{

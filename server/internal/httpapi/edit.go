@@ -489,3 +489,22 @@ func execCount(ctx context.Context, tx *sql.Tx, q string) (int, error) {
 func (s *server) GetPublicCover(context.Context, GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error) {
 	return GetPublicCover404JSONResponse{notFound("not routed")}, nil
 }
+
+// AnalyzeBook marks the book outdated and queues its library's analysis,
+// which picks up every outdated book.
+func (s *server) AnalyzeBook(ctx context.Context, req AnalyzeBookRequestObject) (AnalyzeBookResponseObject, error) {
+	var lib string
+	err := s.DB.QueryRowContext(ctx, `UPDATE books SET media_status = 'outdated' WHERE id = ? AND deleted_at IS NULL RETURNING library_id`,
+		req.BookId).Scan(&lib)
+	if errors.Is(err, sql.ErrNoRows) {
+		return AnalyzeBook404JSONResponse{notFound("本が見つかりません")}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	t, err := s.Library.QueueAnalyze(ctx, lib)
+	if err != nil {
+		return nil, err
+	}
+	return AnalyzeBook202JSONResponse(toTask(t)), nil
+}

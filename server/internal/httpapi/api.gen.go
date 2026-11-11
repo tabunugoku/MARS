@@ -856,6 +856,11 @@ type LoginScreen struct {
 	NeedsSetup bool `json:"needsSetup"`
 }
 
+// MeUpdate defines model for MeUpdate.
+type MeUpdate struct {
+	Name string `json:"name"`
+}
+
 // MediaIssue defines model for MediaIssue.
 type MediaIssue struct {
 	BookId string         `json:"bookId"`
@@ -1208,6 +1213,12 @@ type CreateLibraryJSONRequestBody = LibraryCreate
 // UpdateLibraryJSONRequestBody defines body for UpdateLibrary for application/json ContentType.
 type UpdateLibraryJSONRequestBody = LibraryUpdate
 
+// MarkLibraryReadJSONRequestBody defines body for MarkLibraryRead for application/json ContentType.
+type MarkLibraryReadJSONRequestBody = SeriesReadUpdate
+
+// UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
+type UpdateMeJSONRequestBody = MeUpdate
+
 // CreateApiKeyJSONRequestBody defines body for CreateApiKey for application/json ContentType.
 type CreateApiKeyJSONRequestBody = ApiKeyCreate
 
@@ -1264,6 +1275,9 @@ type ServerInterface interface {
 	// GetAdjacentBooks The previous and next book in the series, for "next volume" in the reader
 	// (GET /books/{bookId}/adjacent)
 	GetAdjacentBooks(w http.ResponseWriter, r *http.Request, bookId string)
+	// AnalyzeBook Analyze the book again (administrators only); queues its library's analysis
+	// (POST /books/{bookId}/analyze)
+	AnalyzeBook(w http.ResponseWriter, r *http.Request, bookId string)
 
 	// (GET /books/{bookId}/pages)
 	ListBookPages(w http.ResponseWriter, r *http.Request, bookId string)
@@ -1318,12 +1332,18 @@ type ServerInterface interface {
 
 	// (PATCH /libraries/{libraryId})
 	UpdateLibrary(w http.ResponseWriter, r *http.Request, libraryId string)
+	// MarkLibraryRead Mark every book of the library read (completed true) or unread (false) for the caller
+	// (PUT /libraries/{libraryId}/read-progress)
+	MarkLibraryRead(w http.ResponseWriter, r *http.Request, libraryId string)
 	// ScanLibrary Queue a scan (then analysis of new and changed books)
 	// (POST /libraries/{libraryId}/scan)
 	ScanLibrary(w http.ResponseWriter, r *http.Request, libraryId string)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(w http.ResponseWriter, r *http.Request)
+	// UpdateMe Change the caller's own display name
+	// (PATCH /me)
+	UpdateMe(w http.ResponseWriter, r *http.Request)
 
 	// (GET /me/api-keys)
 	ListApiKeys(w http.ResponseWriter, r *http.Request)
@@ -1540,6 +1560,32 @@ func (siw *ServerInterfaceWrapper) GetAdjacentBooks(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAdjacentBooks(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AnalyzeBook operation middleware
+func (siw *ServerInterfaceWrapper) AnalyzeBook(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AnalyzeBook(w, r, bookId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1973,6 +2019,32 @@ func (siw *ServerInterfaceWrapper) UpdateLibrary(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// MarkLibraryRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkLibraryRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "libraryId" -------------
+	var libraryId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "libraryId", r.PathValue("libraryId"), &libraryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkLibraryRead(w, r, libraryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ScanLibrary operation middleware
 func (siw *ServerInterfaceWrapper) ScanLibrary(w http.ResponseWriter, r *http.Request) {
 
@@ -2004,6 +2076,20 @@ func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request)
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateMe operation middleware
+func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateMe(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3003,6 +3089,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/libraries/{libraryId}", wrapper.GetLibrary)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/libraries/{libraryId}", wrapper.UpdateLibrary)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/libraries/{libraryId}/scan", wrapper.ScanLibrary)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/libraries/{libraryId}/read-progress", wrapper.MarkLibraryRead)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series", wrapper.ListSeries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}", wrapper.GetSeries)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/series/{seriesId}", wrapper.UpdateSeries)
@@ -3020,6 +3107,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/login", wrapper.Login)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/auth/logout", wrapper.Logout)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me", wrapper.GetMe)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/me", wrapper.UpdateMe)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/me/password", wrapper.ChangePassword)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/me/api-keys", wrapper.ListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/me/api-keys", wrapper.CreateApiKey)
@@ -3029,6 +3117,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/users/{userId}", wrapper.DeleteUser)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/users/{userId}", wrapper.UpdateUser)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/series/{seriesId}/read-progress", wrapper.MarkSeriesRead)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/books/{bookId}/analyze", wrapper.AnalyzeBook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/adjacent", wrapper.GetAdjacentBooks)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/books/{bookId}/progress", wrapper.ClearBookProgress)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/books/{bookId}/progress", wrapper.SetBookProgress)
@@ -3254,6 +3343,42 @@ func (response GetAdjacentBooks200JSONResponse) VisitGetAdjacentBooksResponse(w 
 type GetAdjacentBooks404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetAdjacentBooks404JSONResponse) VisitGetAdjacentBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnalyzeBookRequestObject struct {
+	BookId string `json:"bookId"`
+}
+
+type AnalyzeBookResponseObject interface {
+	VisitAnalyzeBookResponse(w http.ResponseWriter) error
+}
+
+type AnalyzeBook202JSONResponse Task
+
+func (response AnalyzeBook202JSONResponse) VisitAnalyzeBookResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AnalyzeBook404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AnalyzeBook404JSONResponse) VisitAnalyzeBookResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -3896,6 +4021,37 @@ func (response UpdateLibrary404JSONResponse) VisitUpdateLibraryResponse(w http.R
 	return err
 }
 
+type MarkLibraryReadRequestObject struct {
+	LibraryId string `json:"libraryId"`
+	Body      *MarkLibraryReadJSONRequestBody
+}
+
+type MarkLibraryReadResponseObject interface {
+	VisitMarkLibraryReadResponse(w http.ResponseWriter) error
+}
+
+type MarkLibraryRead204Response struct {
+}
+
+func (response MarkLibraryRead204Response) VisitMarkLibraryReadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type MarkLibraryRead404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response MarkLibraryRead404JSONResponse) VisitMarkLibraryReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ScanLibraryRequestObject struct {
 	LibraryId string `json:"libraryId"`
 }
@@ -3963,6 +4119,42 @@ func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMeRequestObject struct {
+	Body *UpdateMeJSONRequestBody
+}
+
+type UpdateMeResponseObject interface {
+	VisitUpdateMeResponse(w http.ResponseWriter) error
+}
+
+type UpdateMe200JSONResponse User
+
+func (response UpdateMe200JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateMe400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UpdateMe400JSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -5171,6 +5363,9 @@ type StrictServerInterface interface {
 	// GetAdjacentBooks The previous and next book in the series, for "next volume" in the reader
 	// (GET /books/{bookId}/adjacent)
 	GetAdjacentBooks(ctx context.Context, request GetAdjacentBooksRequestObject) (GetAdjacentBooksResponseObject, error)
+	// AnalyzeBook Analyze the book again (administrators only); queues its library's analysis
+	// (POST /books/{bookId}/analyze)
+	AnalyzeBook(ctx context.Context, request AnalyzeBookRequestObject) (AnalyzeBookResponseObject, error)
 
 	// (GET /books/{bookId}/pages)
 	ListBookPages(ctx context.Context, request ListBookPagesRequestObject) (ListBookPagesResponseObject, error)
@@ -5225,12 +5420,18 @@ type StrictServerInterface interface {
 
 	// (PATCH /libraries/{libraryId})
 	UpdateLibrary(ctx context.Context, request UpdateLibraryRequestObject) (UpdateLibraryResponseObject, error)
+	// MarkLibraryRead Mark every book of the library read (completed true) or unread (false) for the caller
+	// (PUT /libraries/{libraryId}/read-progress)
+	MarkLibraryRead(ctx context.Context, request MarkLibraryReadRequestObject) (MarkLibraryReadResponseObject, error)
 	// ScanLibrary Queue a scan (then analysis of new and changed books)
 	// (POST /libraries/{libraryId}/scan)
 	ScanLibrary(ctx context.Context, request ScanLibraryRequestObject) (ScanLibraryResponseObject, error)
 	// GetMe The signed-in user
 	// (GET /me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// UpdateMe Change the caller's own display name
+	// (PATCH /me)
+	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
 
 	// (GET /me/api-keys)
 	ListApiKeys(ctx context.Context, request ListApiKeysRequestObject) (ListApiKeysResponseObject, error)
@@ -5513,6 +5714,32 @@ func (sh *strictHandler) GetAdjacentBooks(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAdjacentBooksResponseObject); ok {
 		if err := validResponse.VisitGetAdjacentBooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AnalyzeBook operation middleware
+func (sh *strictHandler) AnalyzeBook(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request AnalyzeBookRequestObject
+
+	request.BookId = bookId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AnalyzeBook(ctx, request.(AnalyzeBookRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AnalyzeBook")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AnalyzeBookResponseObject); ok {
+		if err := validResponse.VisitAnalyzeBookResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -6014,6 +6241,39 @@ func (sh *strictHandler) UpdateLibrary(w http.ResponseWriter, r *http.Request, l
 	}
 }
 
+// MarkLibraryRead operation middleware
+func (sh *strictHandler) MarkLibraryRead(w http.ResponseWriter, r *http.Request, libraryId string) {
+	var request MarkLibraryReadRequestObject
+
+	request.LibraryId = libraryId
+
+	var body MarkLibraryReadJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkLibraryRead(ctx, request.(MarkLibraryReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkLibraryRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkLibraryReadResponseObject); ok {
+		if err := validResponse.VisitMarkLibraryReadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ScanLibrary operation middleware
 func (sh *strictHandler) ScanLibrary(w http.ResponseWriter, r *http.Request, libraryId string) {
 	var request ScanLibraryRequestObject
@@ -6057,6 +6317,37 @@ func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetMeResponseObject); ok {
 		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateMe operation middleware
+func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	var request UpdateMeRequestObject
+
+	var body UpdateMeJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateMe(ctx, request.(UpdateMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
+		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7064,110 +7355,112 @@ func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, user
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"K/Uvn5FM1iO1tDdvM4/wBsTk5kV0//n+/wYA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

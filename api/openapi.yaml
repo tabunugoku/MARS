@@ -109,6 +109,20 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /libraries/{libraryId}/read-progress:
+    parameters:
+      - { name: libraryId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: markLibraryRead
+      summary: Mark every book of the library read (completed true) or unread (false) for the caller
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesReadUpdate" }
+      responses:
+        "204": { description: Done }
+        "404": { $ref: "#/components/responses/NotFound" }
   /series:
     get:
       operationId: listSeries
@@ -325,6 +339,21 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
         "401": { $ref: "#/components/responses/Unauthorized" }
+    patch:
+      operationId: updateMe
+      summary: Change the caller's own display name
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MeUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "400": { $ref: "#/components/responses/BadRequest" }
   /me/password:
     put:
       operationId: changePassword
@@ -429,6 +458,19 @@ paths:
             schema: { $ref: "#/components/schemas/SeriesReadUpdate" }
       responses:
         "204": { description: Done }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/analyze:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: analyzeBook
+      summary: Analyze the book again (administrators only); queues its library's analysis
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
         "404": { $ref: "#/components/responses/NotFound" }
   /books/{bookId}/adjacent:
     parameters:
@@ -1213,3 +1255,8 @@ components:
       properties:
         series: { type: integer }
         books: { type: integer }
+    MeUpdate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }

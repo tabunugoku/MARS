@@ -22,7 +22,7 @@ var opAccess = map[string]access{
 	// Public or own account
 	"GetHealth": anyone, "GetLoginScreen": anyone, "GetPublicCover": anyone,
 	"Login": anyone, "Logout": anyone, "Setup": anyone,
-	"GetMe": anyone, "ChangePassword": anyone,
+	"GetMe": anyone, "UpdateMe": anyone, "ChangePassword": anyone,
 	"ListApiKeys": anyone, "CreateApiKey": anyone, "DeleteApiKey": anyone,
 	"GetReaderPrefs": anyone, "SetGlobalReaderPrefs": anyone,
 	"SetSeriesReaderPrefs": anyone, "DeleteSeriesReaderPrefs": anyone,
@@ -33,13 +33,13 @@ var opAccess = map[string]access{
 	"ListSeries": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
 	"GetBook": anyone, "GetBookThumbnail": anyone, "ListBookPages": anyone, "GetBookPage": anyone,
 	"GetAdjacentBooks": anyone, "GetDashboard": anyone, "Search": anyone,
-	"SetBookProgress": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,
+	"SetBookProgress": anyone, "MarkLibraryRead": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,
 	"ListCollections": anyone, "GetCollection": anyone, "ListCollectionSeries": anyone,
 	"ListReadLists": anyone, "GetReadList": anyone, "ListReadListBooks": anyone,
 
 	// Administration
 	"CreateLibrary": adminOnly, "UpdateLibrary": adminOnly, "DeleteLibrary": adminOnly, "ScanLibrary": adminOnly,
-	"ListTasks": adminOnly, "CancelTask": adminOnly, "ListMediaIssues": adminOnly, "EmptyTrash": adminOnly,
+	"AnalyzeBook": adminOnly, "ListTasks": adminOnly, "CancelTask": adminOnly, "ListMediaIssues": adminOnly, "EmptyTrash": adminOnly,
 	"ListUsers": adminOnly, "CreateUser": adminOnly, "UpdateUser": adminOnly, "DeleteUser": adminOnly,
 	"GetSettings": adminOnly, "UpdateSettings": adminOnly,
 	"UpdateSeries": adminOnly, "UpdateBook": adminOnly,

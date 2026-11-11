@@ -69,6 +69,22 @@ func (s *server) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponse
 	return GetMe200JSONResponse(u), nil
 }
 
+func (s *server) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (UpdateMeResponseObject, error) {
+	n := strings.TrimSpace(req.Body.Name)
+	if msg := checkName(n); msg != "" {
+		return UpdateMe400JSONResponse{badRequest(msg)}, nil
+	}
+	uid := currentUser(ctx).ID
+	if _, err := s.DB.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, n, uid); err != nil {
+		return nil, err
+	}
+	u, err := s.userByID(ctx, uid)
+	if err != nil {
+		return nil, err
+	}
+	return UpdateMe200JSONResponse(u), nil
+}
+
 func (s *server) ListUsers(ctx context.Context, _ ListUsersRequestObject) (ListUsersResponseObject, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT `+userCols+` FROM users ORDER BY name COLLATE NOCASE`)
 	if err != nil {
