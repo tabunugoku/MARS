@@ -117,8 +117,8 @@ export default function Screen() {
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {hero.progress && (
-              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
-                {`// 前回の続き · ${ymd(hero.progress.readAt)}`}
+              <p className={cn(typeClass("caption"), "text-muted-foreground")}>
+                前回の続き · <span className="font-mono tabular-nums">{ymd(hero.progress.readAt)}</span>
               </p>
             )}
             <h2 className={cn(typeClass("title"), "line-clamp-2")} style={{ fontVariationSettings: fontWeights.semibold }}>

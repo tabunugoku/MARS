@@ -53,8 +53,10 @@ panels, headings, icons, secondary buttons).
   opacity steps of them. No uppercase, no letter-spacing.
 - **Meta in mono**: figures and metadata that read like chart coordinates
   (page "P.46 / 212", sizes, counts, dates in a hero context line) use
-  `font-mono` at the caption role, muted. A context line may start with
-  `// ` (e.g. `// 前回の続き · 2026.11.09`); at most one per screen.
+  `font-mono` at the caption role, muted. Only the figure is mono; the words
+  around it stay in the UI face (`前回の続き · ` + mono `2026.11.09`). No
+  `// ` code-comment prefixes or other eyebrows: this is a reading app, not a
+  developer tool.
 - **Colours**: `brand` is violet: actions, selection, read progress, the
   primary call to action (at most one per screen). `here` (cyan, `bg-here`,
   `text-here`) marks only "you are here": the current reading position in a
@@ -79,8 +81,9 @@ panels, headings, icons, secondary buttons).
   `CoverGrid`; horizontal rows are `Shelf` + `ShelfItem`.
 - **Motion**: springs for anything that moves (`spring.*` from
   `@/lib/springs`, or motion/react spring options); CSS transitions use
-  80–300ms with `ease-[cubic-bezier(0.16,1,0.3,1)]` (glide) or
-  `ease-[cubic-bezier(0.34,1.45,0.64,1)]` (a lift that overshoots a little).
+  80–300ms with the one glide curve `ease-[cubic-bezier(0.16,1,0.3,1)]`.
+  No overshooting curves on hover or press; overshoot belongs only to the
+  springs that model something physical (page turns, the compass needle).
   Animate transform/opacity only. Respect reduced motion. Allowed on load:
   the dots of a `DotTrack` filling in and `CountUp` numbers; nothing flies in.
   No looping motion except loading states. Already built in, so don't

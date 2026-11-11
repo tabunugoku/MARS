@@ -35,7 +35,7 @@ export function SeriesCard({ series, priority, className }: { series: Series; pr
       className={cn("group block rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background", className)}
     >
       <div className="relative">
-        <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.34,1.45,0.64,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
+        <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
         <Cover
           seed={series.coverSeed}
           title={series.title}
@@ -65,7 +65,7 @@ export function BookCard({ book, seriesTitle, priority, className, to }: { book:
       className={cn("group block rounded-[8px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background", className)}
     >
       <div className="relative">
-        <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.34,1.45,0.64,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
+        <div data-cover-lift className="relative transition-transform duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-1 motion-reduce:transform-none">
         <Cover seed={book.coverSeed} title={seriesTitle ?? book.title} label={String(book.number)} progress={progress} read={p?.completed} priority={priority} />
           <Spotlight />
         </div>

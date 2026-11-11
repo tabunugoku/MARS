@@ -9,7 +9,14 @@ import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 
-const WALL = Array.from({ length: 36 }, (_, i) => i);
+// Decoration only (aria-hidden): invented titles, so the wall reads as a
+// shelf rather than numbered placeholders.
+const WALL_TITLES = [
+  "夜更けの測量士", "潮見坂ブックス", "白線の向こう側", "鉄と紙飛行機", "まどろみ天文台", "千年喫茶ほたる",
+  "灯台守のレシピ", "雨音サーキット", "ひだまり探偵社", "砂時計の騎士", "月面ベーカリー", "青のアトリエ",
+  "とおりゃんせ電車", "ことのは図書館", "星屑ガレージ", "風見鶏の約束", "遠雷マーチ", "硝子の庭師",
+];
+const WALL = Array.from({ length: 36 }, (_, i) => ({ seed: i, title: WALL_TITLES[i % WALL_TITLES.length] }));
 
 export default function Screen() {
   const navigate = useNavigate();
@@ -30,14 +37,13 @@ export default function Screen() {
     <div className="relative flex min-h-dvh overflow-hidden bg-background">
       <div aria-hidden className="relative hidden md:block md:w-[55%] md:overflow-hidden">
         <div className="grid grid-cols-6 gap-3 p-6">
-          {WALL.map((i) => (
-            <Cover key={i} seed={i} title={String(i)} />
+          {WALL.map((c) => (
+            <Cover key={c.seed} seed={c.seed} title={c.title} />
           ))}
         </div>
         <div className="absolute inset-0 bg-background/70 tone" />
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
+        <div className="absolute inset-0 grid place-items-center">
           <AppMark size={96} />
-          <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>// Comic Navigator</p>
         </div>
       </div>
 
@@ -92,7 +98,7 @@ export default function Screen() {
             type="submit"
             className={cn(
               "inline-flex h-9 pointer-coarse:h-11 w-full items-center justify-center rounded-lg bg-brand px-4 text-brand-foreground",
-              "transition-[filter,transform] duration-200 ease-[cubic-bezier(0.34,1.45,0.64,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
+              "transition-[filter,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
               "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               typeClass("body"),
             )}

@@ -25,7 +25,7 @@ export function BrandAction({
       to={to}
       className={cn(
         "inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-brand px-4 text-brand-foreground",
-        "transition-[filter,transform] duration-200 ease-[cubic-bezier(0.34,1.45,0.64,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
+        "transition-[filter,transform] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
         "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         typeClass("body"),
         block && "w-full",
