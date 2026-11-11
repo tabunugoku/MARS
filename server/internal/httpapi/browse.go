@@ -202,32 +202,12 @@ func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject
 	return GetDashboard200JSONResponse(d), nil
 }
 
-// idList runs a query whose rows are single id columns.
-func (s *server) idList(ctx context.Context, q string, args ...any) ([]string, error) {
-	rows, err := s.DB.QueryContext(ctx, q, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	out := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		out = append(out, id)
-	}
-	return out, rows.Err()
-}
-
 func (s *server) Search(ctx context.Context, req SearchRequestObject) (SearchResponseObject, error) {
 	q := strings.TrimSpace(req.Params.Q)
 	res := SearchResult{Series: []Series{}, Books: []Book{}, Collections: []Collection{}, ReadLists: []ReadList{}}
 	if q == "" {
 		return Search200JSONResponse(res), nil
 	}
-	admin := currentUser(ctx).IsAdmin()
-
 	// trigram needs three characters; shorter queries use LIKE on the index.
 	var seriesCond, bookCond string
 	var match any
@@ -250,83 +230,17 @@ func (s *server) Search(ctx context.Context, req SearchRequestObject) (SearchRes
 	}
 	res.Series, res.Books = series, books
 
-	// Collections and read lists match by name. A normal user gets only those
-	// with at least one member they may see; members are listed the same way.
+	// Collections and read lists match by name, with the visibility rule of
+	// lists.go (a normal user sees only those with a member they may see).
 	pat := likePattern(q)
-	cScope, cArgs := libScope(ctx, "s.library_id")
-	cols := `SELECT c.id, c.name, c.ordered FROM collections c WHERE c.name LIKE ? ESCAPE '\'`
-	cargs := []any{pat}
-	if !admin {
-		cols += ` AND EXISTS (SELECT 1 FROM collection_series cs JOIN series s ON s.id = cs.series_id
-		  WHERE cs.collection_id = c.id AND s.deleted_at IS NULL AND ` + cScope + `)`
-		cargs = append(cargs, cArgs...)
-	}
-	cols += ` ORDER BY c.name, c.id LIMIT 20`
-	rows, err := s.DB.QueryContext(ctx, cols, cargs...)
+	cs, err := s.collections(ctx, ` WHERE name LIKE ? ESCAPE '\'`, pat)
 	if err != nil {
 		return nil, err
 	}
-	var cs []Collection
-	for rows.Next() {
-		var c Collection
-		var ordered int
-		if err := rows.Scan(&c.Id, &c.Name, &ordered); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		c.Ordered = ordered != 0
-		cs = append(cs, c)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for i := range cs {
-		members, err := s.idList(ctx, `SELECT cs.series_id FROM collection_series cs JOIN series s ON s.id = cs.series_id
-		  WHERE cs.collection_id = ? AND s.deleted_at IS NULL AND `+cScope+` ORDER BY cs.position, cs.series_id`,
-			append([]any{cs[i].Id}, cArgs...)...)
-		if err != nil {
-			return nil, err
-		}
-		cs[i].SeriesIds = members
-	}
-	res.Collections = append(res.Collections, cs...)
-
-	bScope, bArgs := libScope(ctx, "b.library_id")
-	lists := `SELECT r.id, r.name, r.summary FROM read_lists r WHERE r.name LIKE ? ESCAPE '\'`
-	largs := []any{pat}
-	if !admin {
-		lists += ` AND EXISTS (SELECT 1 FROM read_list_books rb JOIN books b ON b.id = rb.book_id
-		  WHERE rb.read_list_id = r.id AND b.deleted_at IS NULL AND ` + bScope + `)`
-		largs = append(largs, bArgs...)
-	}
-	lists += ` ORDER BY r.name, r.id LIMIT 20`
-	rows, err = s.DB.QueryContext(ctx, lists, largs...)
+	rl, err := s.readLists(ctx, ` WHERE name LIKE ? ESCAPE '\'`, pat)
 	if err != nil {
 		return nil, err
 	}
-	var rl []ReadList
-	for rows.Next() {
-		var x ReadList
-		if err := rows.Scan(&x.Id, &x.Name, &x.Summary); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		rl = append(rl, x)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	for i := range rl {
-		members, err := s.idList(ctx, `SELECT rb.book_id FROM read_list_books rb JOIN books b ON b.id = rb.book_id
-		  WHERE rb.read_list_id = ? AND b.deleted_at IS NULL AND `+bScope+` ORDER BY rb.position, rb.book_id`,
-			append([]any{rl[i].Id}, bArgs...)...)
-		if err != nil {
-			return nil, err
-		}
-		rl[i].BookIds = members
-	}
-	res.ReadLists = append(res.ReadLists, rl...)
+	res.Collections, res.ReadLists = cs[:min(len(cs), 20)], rl[:min(len(rl), 20)]
 	return Search200JSONResponse(res), nil
 }
