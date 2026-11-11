@@ -1,12 +1,21 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { DotTrack } from "@/components/media/dot-track";
-import { Link, useParams } from "react-router";
-import { Play } from "@keyline-icons/react";
-import { api, useApi, type Book } from "@/api";
+import { Link, useNavigate, useParams } from "react-router";
+import { MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
+import { toast } from "@yusufceng1z/ding-react";
+import { api, errorMessage, useApi, type Book } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
 import { Cover } from "@/components/media/cover";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
+import { LoadError } from "@/components/shell/load-error";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { MenuItem } from "@/components/ui/menu-item";
+import { Tooltip } from "@/components/ui/tooltip";
 import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { typeClass } from "@/lib/type-scale";
@@ -14,13 +23,33 @@ import { cn } from "@/lib/utils";
 
 export default function Screen() {
   const { readListId = "" } = useParams();
+  const navigate = useNavigate();
+  const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const { data } = useApi(async () => {
+  const { data, error, reload } = useApi(async () => {
     const rl = await api.readList(readListId);
-    if (!rl) return { rl: null, books: [] as Book[], titles: new Map<string, string>() };
-    const [books, series] = await Promise.all([api.booksByIds(rl.bookIds), api.series()]);
-    return { rl, books, titles: new Map(series.map((s) => [s.id, s.title])) };
+    if (!rl) return { rl: null, books: [] as Book[], titles: new Map<string, string>(), isAdmin: false };
+    const [books, me] = await Promise.all([api.readListBooks(readListId), api.me()]);
+    // Series titles only for the series these books belong to.
+    const seriesIds = [...new Set(books.map((b) => b.seriesId))];
+    const series = await api.seriesByIds(seriesIds);
+    return {
+      rl,
+      books,
+      titles: new Map(series.map((s) => [s.id, s.title])),
+      isAdmin: me.role === "admin",
+    };
   }, [readListId]);
+
+  if (error) {
+    return (
+      <Page>
+        <LoadError message={error} onRetry={reload} />
+      </Page>
+    );
+  }
 
   if (!data) {
     return (
@@ -35,7 +64,7 @@ export default function Screen() {
     );
   }
 
-  const { rl, books, titles } = data;
+  const { rl, books, titles, isAdmin } = data;
   if (!rl) {
     return (
       <Page>
@@ -46,14 +75,101 @@ export default function Screen() {
 
   const next = books.find((b) => !b.progress?.completed) ?? books[0];
 
+  const openDialog = (kind: "rename" | "delete") => {
+    setName(rl.name);
+    setDialog(kind);
+  };
+
+  const save = () => {
+    setBusy(true);
+    api
+      .updateReadList(rl.id, { name: name.trim() })
+      .then(() => {
+        toast.success("名前を変更しました");
+        setDialog(null);
+        reload();
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const remove = () => {
+    setBusy(true);
+    api
+      .deleteReadList(rl.id)
+      .then(() => {
+        toast.success("削除しました");
+        navigate("/readlists");
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <Page>
       <PageHeader
         back={{ to: "/readlists", label: "リーディングリスト" }}
         title={rl.name}
         meta={rl.summary || undefined}
-        actions={next && <BrandAction to={`/read/${next.id}`} icon={Play}>最初から読む</BrandAction>}
+        actions={
+          <>
+            {next && <BrandAction to={`/read/${next.id}`} icon={Play}>最初から読む</BrandAction>}
+            {isAdmin && (
+              <DropdownMenu>
+                <Tooltip content="その他の操作">
+                  <span className="inline-flex">
+                    <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
+                      <MoreHorizontal size={16} />
+                    </DropdownTrigger>
+                  </span>
+                </Tooltip>
+                <DropdownContent align="end">
+                  <MenuItem index={0} label="名前を変更" icon={SquarePen} onSelect={() => openDialog("rename")} />
+                  <MenuItem index={1} label="削除" onSelect={() => openDialog("delete")} />
+                </DropdownContent>
+              </DropdownMenu>
+            )}
+          </>
+        }
       />
+
+      <Dialog open={dialog !== null} onOpenChange={(o) => !o && setDialog(null)}>
+        <DialogContent size="sm">
+          {dialog === "rename" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>名前を変更</DialogTitle>
+              </DialogHeader>
+              <Field>
+                <FieldLabel htmlFor="readlist-name">名前</FieldLabel>
+                <Input id="readlist-name" value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <DialogFooter>
+                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <Button variant="primary" disabled={!name.trim() || busy} onClick={save}>
+                  保存
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <DialogTitle>リーディングリストを削除</DialogTitle>
+              </DialogHeader>
+              <p className={cn(typeClass("body"), "text-muted-foreground")}>
+                「{rl.name}」を削除します。巻は削除されません。
+              </p>
+              <DialogFooter>
+                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <Button variant="destructive" disabled={busy} onClick={remove}>
+                  削除
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {books.length === 0 ? (
         <EmptyState title="巻がありません" body="巻の詳細からこのリーディングリストに追加できます" />
       ) : (

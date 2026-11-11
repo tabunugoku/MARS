@@ -2,10 +2,11 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
 import { MoreHorizontal, SquarePen } from "@keyline-icons/react";
-import { api, useApi } from "@/api";
+import { api, errorMessage, useApi, type Series } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Block, GridSkeleton } from "@/components/media/skeletons";
+import { LoadError } from "@/components/shell/load-error";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
@@ -21,12 +22,22 @@ export default function Screen() {
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const { data } = useApi(async () => {
+  const { data, error, reload } = useApi(async () => {
     const c = await api.collection(collectionId);
-    const series = c ? await api.seriesByIds(c.seriesIds) : [];
-    return { c, series };
+    if (!c) return { c: null, series: [] as Series[], isAdmin: false };
+    const [series, me] = await Promise.all([api.collectionSeries(collectionId), api.me()]);
+    return { c, series, isAdmin: me.role === "admin" };
   }, [collectionId]);
+
+  if (error) {
+    return (
+      <Page>
+        <LoadError message={error} onRetry={reload} />
+      </Page>
+    );
+  }
 
   if (!data) {
     return (
@@ -37,7 +48,7 @@ export default function Screen() {
     );
   }
 
-  const { c, series } = data;
+  const { c, series, isAdmin } = data;
   if (!c) {
     return (
       <Page>
@@ -51,6 +62,31 @@ export default function Screen() {
     setDialog(kind);
   };
 
+  const save = () => {
+    setBusy(true);
+    api
+      .updateCollection(c.id, { name: name.trim() })
+      .then(() => {
+        toast.success("名前を変更しました");
+        setDialog(null);
+        reload();
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const remove = () => {
+    setBusy(true);
+    api
+      .deleteCollection(c.id)
+      .then(() => {
+        toast.success("削除しました");
+        navigate("/collections");
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
   return (
     <Page>
       <PageHeader
@@ -58,19 +94,21 @@ export default function Screen() {
         title={c.name}
         meta={`シリーズ ${c.seriesIds.length} · ${c.ordered ? "手動の並び順" : "自動の並び順"}`}
         actions={
-          <DropdownMenu>
-            <Tooltip content="その他の操作">
-              <span className="inline-flex">
-                <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
-                  <MoreHorizontal size={16} />
-                </DropdownTrigger>
-              </span>
-            </Tooltip>
-            <DropdownContent align="end">
-              <MenuItem index={0} label="名前を変更" icon={SquarePen} onSelect={() => openDialog("rename")} />
-              <MenuItem index={1} label="削除" onSelect={() => openDialog("delete")} />
-            </DropdownContent>
-          </DropdownMenu>
+          isAdmin && (
+            <DropdownMenu>
+              <Tooltip content="その他の操作">
+                <span className="inline-flex">
+                  <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
+                    <MoreHorizontal size={16} />
+                  </DropdownTrigger>
+                </span>
+              </Tooltip>
+              <DropdownContent align="end">
+                <MenuItem index={0} label="名前を変更" icon={SquarePen} onSelect={() => openDialog("rename")} />
+                <MenuItem index={1} label="削除" onSelect={() => openDialog("delete")} />
+              </DropdownContent>
+            </DropdownMenu>
+          )
         }
       />
 
@@ -87,14 +125,7 @@ export default function Screen() {
               </Field>
               <DialogFooter>
                 <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
-                <Button
-                  variant="primary"
-                  disabled={!name.trim()}
-                  onClick={() => {
-                    toast.success("名前を変更しました");
-                    setDialog(null);
-                  }}
-                >
+                <Button variant="primary" disabled={!name.trim() || busy} onClick={save}>
                   保存
                 </Button>
               </DialogFooter>
@@ -109,13 +140,7 @@ export default function Screen() {
               </p>
               <DialogFooter>
                 <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    toast.success("削除しました");
-                    navigate("/collections");
-                  }}
-                >
+                <Button variant="destructive" disabled={busy} onClick={remove}>
                   削除
                 </Button>
               </DialogFooter>

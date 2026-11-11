@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsItem } from "@/components/ui/tabs";
 import { Cover } from "@/components/media/cover";
 import { Block } from "@/components/media/skeletons";
+import { api, errorMessage } from "@/api";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
@@ -29,12 +30,31 @@ export function ViewSwitch({ current }: { current: "collections" | "readlists" }
   );
 }
 
-/** Creates a collection or reading list. Mock-era: confirms and closes only. */
+/** Creates a collection or reading list, then opens it. Administrators only (the caller hides it). */
 export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
+  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [manual, setManual] = useState(false);
+  const [busy, setBusy] = useState(false);
   const isCollection = kind === "collection";
+
+  const submit = () => {
+    setBusy(true);
+    const created: Promise<{ id: string }> = isCollection
+      ? api.createCollection({ name: name.trim(), ordered: manual })
+      : api.createReadList({ name: name.trim() });
+    created
+      .then((item) => {
+        toast.success("作成しました");
+        setName("");
+        setManual(false);
+        setOpen(false);
+        navigate(isCollection ? `/collections/${item.id}` : `/readlists/${item.id}`);
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -52,16 +72,7 @@ export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
         </div>
         <DialogFooter>
           <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
-          <Button
-            variant="primary"
-            disabled={!name.trim()}
-            onClick={() => {
-              toast.success("作成しました");
-              setName("");
-              setManual(false);
-              setOpen(false);
-            }}
-          >
+          <Button variant="primary" disabled={!name.trim() || busy} onClick={submit}>
             作成
           </Button>
         </DialogFooter>
