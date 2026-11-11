@@ -419,34 +419,40 @@ func (s *server) serveThumbnail(kind string) http.HandlerFunc {
 			writeError(w, http.StatusNotFound, "表紙がありません")
 			return
 		}
-		p, err := s.Library.ThumbnailPath(r.Context(), kind, id)
-		if errors.Is(err, library.ErrNotFound) {
-			writeError(w, http.StatusNotFound, "表紙がありません")
-			return
-		}
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
-			return
-		}
-		f, err := os.Open(p)
-		if err != nil {
-			writeError(w, http.StatusNotFound, "表紙がありません")
-			return
-		}
-		defer f.Close()
-		st, err := f.Stat()
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
-			return
-		}
-		h := w.Header()
-		h.Set("Content-Type", "image/jpeg")
-		h.Set("X-Content-Type-Options", "nosniff")
-		// Thumbnails are regenerated in place, so revalidate instead of
-		// caching forever; ServeContent answers 304 from Last-Modified.
-		h.Set("Cache-Control", "private, no-cache")
-		http.ServeContent(w, r, "", st.ModTime(), f)
+		s.sendThumbnail(w, r, kind, id)
 	}
+}
+
+// sendThumbnail writes the cover of a book or series. The caller has
+// already decided that the requester may see it.
+func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id string) {
+	p, err := s.Library.ThumbnailPath(r.Context(), kind, id)
+	if errors.Is(err, library.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "表紙がありません")
+		return
+	}
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+		return
+	}
+	f, err := os.Open(p)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "表紙がありません")
+		return
+	}
+	defer f.Close()
+	st, err := f.Stat()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+		return
+	}
+	h := w.Header()
+	h.Set("Content-Type", "image/jpeg")
+	h.Set("X-Content-Type-Options", "nosniff")
+	// Thumbnails are regenerated in place, so revalidate instead of
+	// caching forever; ServeContent answers 304 from Last-Modified.
+	h.Set("Cache-Control", "private, no-cache")
+	http.ServeContent(w, r, "", st.ModTime(), f)
 }
 
 // ─── Tasks and media issues ──────────────────────────────────────────────────

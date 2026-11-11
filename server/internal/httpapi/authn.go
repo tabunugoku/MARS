@@ -58,6 +58,10 @@ func isPublic(r *http.Request) bool {
 	case "/auth/login", "/setup":
 		return r.Method == http.MethodPost
 	}
+	// The cover wall; servePublicCover serves only the covers on it.
+	if rest, ok := strings.CutPrefix(r.URL.Path, "/public/covers/"); ok && rest != "" && !strings.Contains(rest, "/") {
+		return r.Method == http.MethodGet
+	}
 	return false
 }
 

@@ -55,6 +55,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
 	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
 	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
+	mux.HandleFunc("GET /public/covers/{seriesId}", s.servePublicCover)
 	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
 	return s.authenticate(mux)
 }
@@ -72,8 +73,4 @@ func (s *server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHe
 	return GetHealth200JSONResponse{Status: Ok, Version: s.Version}, nil
 }
 
-// GetLoginScreen is public: it returns covers only when an admin chose the
-// cover wall. The setting arrives with the settings API (M3).
-func (s *server) GetLoginScreen(ctx context.Context, _ GetLoginScreenRequestObject) (GetLoginScreenResponseObject, error) {
-	return GetLoginScreen200JSONResponse{Backdrop: Compass, Covers: []LoginCover{}, NeedsSetup: s.Gate.open()}, nil
-}
+// GetLoginScreen is in public.go.
