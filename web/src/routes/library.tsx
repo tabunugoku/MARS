@@ -2,8 +2,9 @@ import type { IconComponent } from "@/lib/icon-context";
 import { useMemo, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
-import { ArrowUpDown, CircleCheck, MoreHorizontal, Radar, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
-import { api, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
+import { ArrowUpDown, Circle, CircleCheck, MoreHorizontal, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
+import { api, errorMessage, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
+import { LoadError } from "@/components/shell/load-error";
 import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
@@ -37,6 +38,7 @@ export default function Screen() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
 
   const isAll = libraryId === "all";
   const scope = isAll ? undefined : libraryId;
@@ -69,10 +71,14 @@ export default function Screen() {
   };
   const clearAll = () => update({ read: null, status: null, genre: null });
 
-  const libs = useApi(() => api.libraries(), []);
+  const me = useApi(() => api.me(), []);
+  const isAdmin = me.data?.role === "admin";
+  const libs = useApi(() => (isAll ? api.libraries() : Promise.resolve([])), [isAll]);
+  // One library by id: null when it does not exist or is hidden from the caller.
+  const one = useApi(() => (isAll ? Promise.resolve(undefined) : api.library(libraryId)), [libraryId]);
   // Unfiltered list of this scope: source for the genre options.
   const scoped = useApi(() => api.series({ libraryId: scope }), [scope]);
-  const { data: series } = useApi(
+  const seriesList = useApi(
     () =>
       api.series({
         libraryId: scope,
@@ -84,13 +90,14 @@ export default function Screen() {
       }),
     [scope, sort, desc, read.join(), status.join(), genre.join()],
   );
+  const series = seriesList.data;
 
   const genres = useMemo(
     () => [...new Set((scoped.data ?? []).flatMap((s) => s.genres))].sort((a, b) => a.localeCompare(b, "ja")),
     [scoped.data],
   );
 
-  const library = libs.data?.find((l) => l.id === libraryId);
+  const library = isAll ? undefined : (one.data ?? undefined);
   const libraryList = libs.data ?? [];
   const totals = isAll
     ? libraryList.reduce(
@@ -105,15 +112,49 @@ export default function Screen() {
     </span>
   ) : undefined;
 
-  const scanItems = [
-    { label: "スキャン", icon: Scan, run: () => toast.success("スキャンを開始しました") },
-    { label: "詳細スキャン", icon: Radar, run: () => toast.success("スキャンを開始しました") },
-  ];
-  const menuItems = [
-    ...(isAll ? [] : scanItems),
-    { label: "ライブラリを既読にする", icon: CircleCheck, run: () => toast.success("既読にしました") },
-    ...(isAll ? [] : [{ label: "ライブラリ設定", icon: Settings, run: () => navigate("/admin/libraries") }]),
-  ];
+  // Runs a library-wide action; the list reloads so read state shows at once.
+  const runAction = async (call: () => Promise<unknown>, done: string, reloadList: boolean) => {
+    setBusy(true);
+    try {
+      await call();
+      toast.success(done);
+      if (reloadList) {
+        seriesList.reload();
+        one.reload();
+      }
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+  const menuItems = isAll
+    ? []
+    : [
+        ...(isAdmin
+          ? [
+              {
+                label: "スキャン",
+                icon: Scan,
+                disabled: busy,
+                run: () => runAction(() => api.scanLibrary(libraryId), "スキャンを開始しました", false),
+              },
+            ]
+          : []),
+        {
+          label: "ライブラリを既読にする",
+          icon: CircleCheck,
+          disabled: busy,
+          run: () => runAction(() => api.markLibraryRead(libraryId, true), "既読にしました", true),
+        },
+        {
+          label: "ライブラリを未読にする",
+          icon: Circle,
+          disabled: busy,
+          run: () => runAction(() => api.markLibraryRead(libraryId, false), "未読にしました", true),
+        },
+        ...(isAdmin ? [{ label: "ライブラリ設定", icon: Settings, disabled: false, run: () => navigate("/admin/libraries") }] : []),
+      ];
 
   const chips = [
     ...read.map((v) => ({ key: `read-${v}`, label: READ_STATES.find((r) => r.value === v)?.label ?? v, remove: () => toggle("read", read, v) })),
@@ -138,7 +179,7 @@ export default function Screen() {
             </Tooltip>
             <DropdownContent align="end">
               {menuItems.map((item, i) => (
-                <MenuItem key={item.label} index={i} label={item.label} icon={item.icon} onSelect={item.run} />
+                <MenuItem key={item.label} index={i} label={item.label} icon={item.icon} disabled={item.disabled} onSelect={item.run} />
               ))}
             </DropdownContent>
           </DropdownMenu>
@@ -146,6 +187,24 @@ export default function Screen() {
       }
     />
   );
+
+  if (!isAll && one.data === null) {
+    return (
+      <Page>
+        <EmptyState title="ライブラリが見つかりません" body="ライブラリの一覧からもう一度選んでください" />
+      </Page>
+    );
+  }
+
+  const failed = one.error ?? seriesList.error;
+  if (failed) {
+    return (
+      <Page>
+        {header}
+        <LoadError message={failed} onRetry={() => { one.reload(); seriesList.reload(); }} />
+      </Page>
+    );
+  }
 
   if (!series) {
     return (

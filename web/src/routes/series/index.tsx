@@ -3,7 +3,8 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowDown, ArrowUp, ChevronLeft, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, formatDate, statusLabel, useApi } from "@/api";
+import { api, errorMessage, formatDate, statusLabel, useApi, type Series } from "@/api";
+import { LoadError } from "@/components/shell/load-error";
 import { BookCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
 import { CountUp } from "@/components/media/count-up";
@@ -28,7 +29,7 @@ export default function Screen() {
 }
 
 function SeriesPage({ id }: { id: string }) {
-  const { data } = useApi(async () => {
+  const { data, error, reload } = useApi(async () => {
     const series = await api.seriesById(id);
     if (!series) return null;
     const [library, books] = await Promise.all([api.library(series.libraryId), api.booksOfSeries(id)]);
@@ -40,6 +41,17 @@ function SeriesPage({ id }: { id: string }) {
   const [more, setMore] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editRun, setEditRun] = useState(0);
+  // The series as last saved from the edit dialog; cleared when the page reloads.
+  const [saved, setSaved] = useState<Series | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  if (error) {
+    return (
+      <Page>
+        <LoadError message={error} onRetry={reload} />
+      </Page>
+    );
+  }
 
   if (data === undefined) {
     return (
@@ -66,12 +78,27 @@ function SeriesPage({ id }: { id: string }) {
     );
   }
 
-  const { series, library, books } = data;
+  const { library, books } = data;
+  const series = saved ?? data.series;
   const total = series.totalBookCount ?? series.bookCount;
 
   // Primary action: resume the book in progress, else the first unread one;
   // when everything is read, start over from book 1.
   const allRead = books.length > 0 && books.every((b) => b.progress?.completed);
+
+  const markRead = async (completed: boolean) => {
+    setBusy(true);
+    try {
+      await api.markSeriesRead(id, completed);
+      toast.success(completed ? "既読にしました" : "未読にしました");
+      setSaved(null);
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
   const started = books.some((b) => b.progress);
   const next = books.find((b) => b.progress && !b.progress.completed) ?? books.find((b) => !b.progress?.completed);
   const primary = allRead
@@ -139,16 +166,13 @@ function SeriesPage({ id }: { id: string }) {
                 {primary.label}
               </BrandAction>
             )}
-            <Button variant="secondary" onClick={() => toast.success("既読にしました")}>
-              既読にする
+            <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)}>
+              {allRead ? "未読にする" : "既読にする"}
             </Button>
             <DropdownMenu>
               <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="メタデータを編集" onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
-                <MenuItem index={1} label="ZIP でダウンロード" />
-                <MenuItem index={2} label="コレクションに追加" />
-                <MenuItem index={3} label="サムネイルを変更" />
               </DropdownContent>
             </DropdownMenu>
           </div>
@@ -231,6 +255,7 @@ function SeriesPage({ id }: { id: string }) {
         series={series}
         open={editOpen}
         onOpenChange={setEditOpen}
+        onSaved={(s) => setSaved(s)}
       />
     </Page>
   );
