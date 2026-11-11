@@ -101,7 +101,13 @@ paths:
       - { name: libraryId, in: path, required: true, schema: { type: string } }
     post:
       operationId: scanLibrary
-      summary: Queue a scan (then analysis of new and changed books)
+      summary: Queue a scan (then analysis of new and changed books; with deep, of every book)
+      parameters:
+        - name: deep
+          in: query
+          required: false
+          description: Analyse every book again, even when its file is unchanged
+          schema: { type: boolean }
       responses:
         "202":
           description: Queued
@@ -776,6 +782,89 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Image" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/file:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: downloadBook
+      summary: The book's original file (needs the download permission; Range supported)
+      responses:
+        "200":
+          description: File bytes, Content-Disposition attachment with an RFC 5987 UTF-8 filename
+          content:
+            application/octet-stream:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series/{seriesId}/file:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: downloadSeries
+      summary: Every book of the series as one ZIP, streamed and stored without recompression (needs the download permission)
+      responses:
+        "200":
+          description: ZIP bytes (no Content-Length), Content-Disposition attachment
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/Forbidden" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/regenerate-thumbnail:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: regenerateBookThumbnail
+      summary: Make the book's thumbnail again from its cover page (administrators only)
+      responses:
+        "204": { description: Done }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/cover:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setBookCover
+      summary: Choose the page the book's thumbnail is made from, and make it (administrators only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CoverUpdate" }
+      responses:
+        "200":
+          description: The book with its new cover page
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series/{seriesId}/regenerate-thumbnails:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: regenerateSeriesThumbnails
+      summary: Queue thumbnail regeneration for every book of the series (administrators only)
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /libraries/{libraryId}/regenerate-thumbnails:
+    parameters:
+      - { name: libraryId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: regenerateLibraryThumbnails
+      summary: Queue thumbnail regeneration for every book of the library (administrators only)
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "404": { $ref: "#/components/responses/NotFound" }
 components:
   securitySchemes:
     session:
@@ -916,7 +1005,7 @@ components:
         readAt: { type: string }
     Book:
       type: object
-      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields]
+      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields, coverPage]
       properties:
         id: { type: string }
         seriesId: { type: string }
@@ -940,6 +1029,12 @@ components:
         thumbnailUrl: { type: string }
         createdAt: { type: string }
         lockedFields: { type: array, items: { type: string } }
+        coverPage: { type: integer, description: "Page the thumbnail is made from (1 unless an administrator chose another)" }
+    CoverUpdate:
+      type: object
+      required: [page]
+      properties:
+        page: { type: integer, minimum: 1 }
     Page:
       type: object
       required: [number, width, height, mediaType, url]
