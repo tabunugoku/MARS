@@ -448,7 +448,8 @@ function IconBtn({ label, onClick, children, pressed }: { label: string; onClick
 
 function PageImg({ src, page, fit, className }: { src: string; page: number; fit: ReaderPrefs["fit"]; className?: string }) {
   const fitCls = {
-    screen: "max-h-full max-w-full object-contain",
+    // Fills the stage both ways and keeps the aspect, so low-resolution scans grow too.
+    screen: "size-full object-contain",
     height: "h-full w-auto max-w-none",
     width: "w-full h-auto max-h-none",
     original: "max-w-none max-h-none",
@@ -471,7 +472,12 @@ function PageView({ view, url, rtl, fit }: { view: View; url: (page: number) => 
     <div className={cn("flex size-full justify-center", scroll ? "items-start overflow-auto" : "items-center")}>
       {pages.map((p) => (
         <div key={p} className={cn("flex h-full w-1/2 items-center", p === pages[0] ? "justify-end" : "justify-start")}>
-          <PageImg src={url(p)} page={p} fit={fit === "width" ? "width" : "screen"} />
+          <PageImg
+            src={url(p)}
+            page={p}
+            fit={fit === "width" ? "width" : "screen"}
+            className={fit === "width" ? undefined : p === pages[0] ? "object-right" : "object-left"}
+          />
         </div>
       ))}
     </div>
