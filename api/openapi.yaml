@@ -32,8 +32,368 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/LoginScreen" }
+  /libraries:
+    get:
+      operationId: listLibraries
+      summary: All libraries
+      responses:
+        "200":
+          description: Libraries in name order
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Library" } }
+    post:
+      operationId: createLibrary
+      summary: Register a folder as a library and queue its first scan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LibraryCreate" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+  /libraries/{libraryId}:
+    parameters:
+      - { name: libraryId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getLibrary
+      responses:
+        "200":
+          description: The library
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    patch:
+      operationId: updateLibrary
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LibraryUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Library" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteLibrary
+      summary: Forget a library (files on disk are not touched)
+      responses:
+        "204": { description: Deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /libraries/{libraryId}/scan:
+    parameters:
+      - { name: libraryId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: scanLibrary
+      summary: Queue a scan (then analysis of new and changed books)
+      responses:
+        "202":
+          description: Queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Task" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series:
+    get:
+      operationId: listSeries
+      summary: Series, optionally in one library (filters and paging arrive in M3)
+      parameters:
+        - { name: libraryId, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Series in title order
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
+  /series/{seriesId}:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getSeries
+      responses:
+        "200":
+          description: The series
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Series" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series/{seriesId}/books:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listSeriesBooks
+      responses:
+        "200":
+          description: Books in number order
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series/{seriesId}/thumbnail:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getSeriesThumbnail
+      summary: Cover of the series' first book, JPEG
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getBook
+      responses:
+        "200":
+          description: The book
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/thumbnail:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getBookThumbnail
+      summary: Cover thumbnail, JPEG
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/pages:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: listBookPages
+      responses:
+        "200":
+          description: Pages in reading order
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Page" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/pages/{page}:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+      - { name: page, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getBookPage
+      summary: One page image as stored in the archive (ETag, long private cache)
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "304": { description: Not modified }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /tasks:
+    get:
+      operationId: listTasks
+      summary: Running and queued tasks, then the most recent finished ones
+      responses:
+        "200":
+          description: Tasks
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/Task" } }
+  /tasks/{taskId}/cancel:
+    parameters:
+      - { name: taskId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: cancelTask
+      responses:
+        "204": { description: Cancelled (or already finished) }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /media/issues:
+    get:
+      operationId: listMediaIssues
+      summary: Books that failed analysis or whose files are gone
+      responses:
+        "200":
+          description: Issues
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/MediaIssue" } }
 components:
+  responses:
+    NotFound:
+      description: No such item
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    BadRequest:
+      description: The request is invalid
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Image:
+      description: Image bytes
+      content:
+        image/*:
+          schema: { type: string, format: binary }
   schemas:
+    Error:
+      type: object
+      required: [message]
+      properties:
+        message: { type: string }
+    LibraryKind:
+      type: string
+      enum: [manga, webtoon, comics, books]
+    ScanInterval:
+      type: string
+      enum: ["off", hourly, daily, weekly]
+    Library:
+      type: object
+      required: [id, name, root, kind, seriesCount, bookCount, sizeBytes, lastScan, scanInterval, watch, importComicInfo, importLocalArtwork, exclude]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        root: { type: string }
+        kind: { $ref: "#/components/schemas/LibraryKind" }
+        seriesCount: { type: integer }
+        bookCount: { type: integer }
+        sizeBytes: { type: integer, format: int64 }
+        lastScan: { type: string, nullable: true, description: "RFC 3339; null before the first scan" }
+        scanInterval: { $ref: "#/components/schemas/ScanInterval" }
+        watch: { type: boolean }
+        importComicInfo: { type: boolean }
+        importLocalArtwork: { type: boolean }
+        exclude: { type: array, items: { type: string } }
+    LibraryCreate:
+      type: object
+      required: [name, root, kind]
+      properties:
+        name: { type: string }
+        root: { type: string, description: Absolute folder path on the server }
+        kind: { $ref: "#/components/schemas/LibraryKind" }
+        scanInterval: { $ref: "#/components/schemas/ScanInterval" }
+        importComicInfo: { type: boolean }
+        exclude: { type: array, items: { type: string } }
+    LibraryUpdate:
+      type: object
+      properties:
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/LibraryKind" }
+        scanInterval: { $ref: "#/components/schemas/ScanInterval" }
+        importComicInfo: { type: boolean }
+        exclude: { type: array, items: { type: string } }
+    ReadingDirection:
+      type: string
+      enum: [ltr, rtl, vertical, webtoon]
+    SeriesStatus:
+      type: string
+      enum: [ongoing, ended, hiatus, abandoned]
+    MediaStatus:
+      type: string
+      enum: [ready, error, unsupported, outdated]
+    BookFormat:
+      type: string
+      enum: [cbz, cbr, cb7, pdf, epub]
+    Author:
+      type: object
+      required: [name, role]
+      properties:
+        name: { type: string }
+        role: { type: string, enum: [writer, penciller, colorist, translator, editor, cover] }
+    Series:
+      type: object
+      required: [id, libraryId, title, titleSort, alternateTitles, status, summary, publisher, readingDirection, ageRating, language, genres, tags, authors, totalBookCount, bookCount, booksRead, booksInProgress, thumbnailUrl, createdAt, updatedAt, lockedFields]
+      properties:
+        id: { type: string }
+        libraryId: { type: string }
+        title: { type: string }
+        titleSort: { type: string }
+        alternateTitles: { type: array, items: { type: string } }
+        status: { $ref: "#/components/schemas/SeriesStatus" }
+        summary: { type: string }
+        publisher: { type: string }
+        readingDirection: { $ref: "#/components/schemas/ReadingDirection" }
+        ageRating: { type: integer, nullable: true }
+        language: { type: string }
+        genres: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
+        totalBookCount: { type: integer, nullable: true }
+        bookCount: { type: integer }
+        booksRead: { type: integer }
+        booksInProgress: { type: integer }
+        thumbnailUrl: { type: string }
+        createdAt: { type: string }
+        updatedAt: { type: string }
+        lockedFields: { type: array, items: { type: string } }
+    ReadProgress:
+      type: object
+      required: [page, completed, readAt]
+      properties:
+        page: { type: integer }
+        completed: { type: boolean }
+        readAt: { type: string }
+    Book:
+      type: object
+      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt]
+      properties:
+        id: { type: string }
+        seriesId: { type: string }
+        libraryId: { type: string }
+        title: { type: string }
+        number: { type: number, format: double }
+        numberSort: { type: number, format: double }
+        summary: { type: string }
+        releaseDate: { type: string, nullable: true }
+        isbn: { type: string }
+        authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
+        tags: { type: array, items: { type: string } }
+        format: { $ref: "#/components/schemas/BookFormat" }
+        path: { type: string }
+        sizeBytes: { type: integer, format: int64 }
+        pageCount: { type: integer }
+        mediaStatus: { $ref: "#/components/schemas/MediaStatus" }
+        progress:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReadProgress" }]
+        thumbnailUrl: { type: string }
+        createdAt: { type: string }
+    Page:
+      type: object
+      required: [number, width, height, mediaType, url]
+      properties:
+        number: { type: integer }
+        width: { type: integer }
+        height: { type: integer }
+        mediaType: { type: string }
+        url: { type: string }
+    TaskKind:
+      type: string
+      enum: [scan, analyze, thumbnail, hash, trash]
+    TaskState:
+      type: string
+      enum: [running, queued, done, failed, cancelled]
+    Task:
+      type: object
+      required: [id, kind, label, libraryId, state, progress, startedAt, error]
+      properties:
+        id: { type: string }
+        kind: { $ref: "#/components/schemas/TaskKind" }
+        label: { type: string }
+        libraryId: { type: string, nullable: true }
+        state: { $ref: "#/components/schemas/TaskState" }
+        progress: { type: number, format: double }
+        startedAt: { type: string, nullable: true }
+        error: { type: string }
+    MediaIssue:
+      type: object
+      required: [bookId, kind, detail]
+      properties:
+        bookId: { type: string }
+        kind: { type: string, enum: [error, missing, duplicate, unsupported] }
+        detail: { type: string }
     Health:
       type: object
       required: [status, version]

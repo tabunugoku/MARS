@@ -9,12 +9,16 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/config"
 	"github.com/tabunugoku/cominavi/server/internal/db"
 	"github.com/tabunugoku/cominavi/server/internal/httpapi"
+	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/cominavi/server/internal/media"
+	"github.com/tabunugoku/cominavi/server/internal/task"
 	"github.com/tabunugoku/cominavi/server/internal/webui"
 )
 
@@ -47,8 +51,20 @@ func run() error {
 	}
 	defer database.Close()
 
+	queue := task.New(database, runtime.NumCPU()/2+1)
+	if err := queue.Run(ctx); err != nil {
+		return err
+	}
+	lib := &library.Service{
+		DB:       database,
+		Queue:    queue,
+		ThumbDir: cfg.ThumbnailDir(),
+		Pages:    &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
+	}
+	go lib.Schedule(ctx)
+
 	mux := http.NewServeMux()
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{DB: database, Version: version})))
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{DB: database, Version: version, Library: lib, Tasks: queue})))
 	if !cfg.Dev {
 		mux.Handle("/", webui.Handler())
 	}

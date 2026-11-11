@@ -4,6 +4,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -12,7 +13,7 @@ import (
 type Config struct {
 	// DataDir holds the database, thumbnails and the page cache.
 	DataDir string
-	// Addr is the listen address, e.g. ":25600".
+	// Addr is the listen address, e.g. "127.0.0.1:25600".
 	Addr string
 	// Dev serves no embedded UI (the Vite dev server proxies /api instead).
 	Dev bool
@@ -20,7 +21,7 @@ type Config struct {
 
 const defaultPort = 25600
 
-// Load reads COMINAVI_DATA, COMINAVI_PORT and COMINAVI_DEV.
+// Load reads COMINAVI_DATA, COMINAVI_HOST, COMINAVI_PORT and COMINAVI_DEV.
 func Load() (Config, error) {
 	c := Config{DataDir: os.Getenv("COMINAVI_DATA"), Dev: os.Getenv("COMINAVI_DEV") == "1"}
 	if c.DataDir == "" {
@@ -40,7 +41,13 @@ func Load() (Config, error) {
 		}
 		port = n
 	}
-	c.Addr = fmt.Sprintf(":%d", port)
+	// Until sign-in exists (milestone M2) the API is open to anyone who can
+	// reach it, so listen on loopback unless told otherwise.
+	host := os.Getenv("COMINAVI_HOST")
+	if host == "" {
+		host = "127.0.0.1"
+	}
+	c.Addr = net.JoinHostPort(host, strconv.Itoa(port))
 	return c, nil
 }
 

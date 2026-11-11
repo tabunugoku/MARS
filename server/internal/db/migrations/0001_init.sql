@@ -24,7 +24,8 @@ CREATE TABLE series (
   id                 TEXT PRIMARY KEY,
   library_id         TEXT NOT NULL REFERENCES libraries(id) ON DELETE CASCADE,
   dir                TEXT NOT NULL,          -- folder relative to the library root ('' for root oneshots)
-  oneshot_file       TEXT,                   -- set when a file at the root is its own series
+  oneshot_file       TEXT NOT NULL DEFAULT '', -- set when a file at the root is its own series ('' for folders;
+                                             -- not NULL, since NULLs never conflict in UNIQUE)
   title              TEXT NOT NULL,
   title_sort         TEXT NOT NULL,
   alternate_titles   TEXT NOT NULL DEFAULT '[]',
@@ -66,6 +67,7 @@ CREATE TABLE books (
   page_count    INTEGER NOT NULL DEFAULT 0,
   media_status  TEXT NOT NULL DEFAULT 'outdated' CHECK (media_status IN ('ready','error','unsupported','outdated')),
   media_error   TEXT NOT NULL DEFAULT '',
+  thumbnail     TEXT NOT NULL DEFAULT '',    -- file name under DATA/thumbnails, '' until made
   deleted_at    TEXT,
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,

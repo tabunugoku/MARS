@@ -1,6 +1,8 @@
 // Package httpapi implements the REST API described in api/openapi.yaml.
 // The routing and request/response types are generated (api.gen.go); this
-// package only holds the handlers.
+// package only holds the handlers. Image routes (pages, thumbnails) are
+// registered by hand so they can use http.ServeContent (ETag, 304, Range);
+// they are still described in the spec.
 package httpapi
 
 //go:generate go tool oapi-codegen -config oapi-codegen.yaml ../../../api/openapi.yaml
@@ -8,12 +10,19 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"log/slog"
 	"net/http"
+
+	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/cominavi/server/internal/task"
 )
 
 type Deps struct {
 	DB      *sql.DB
 	Version string
+	Library *library.Service
+	Tasks   *task.Queue
 }
 
 type server struct{ Deps }
@@ -22,7 +31,28 @@ var _ StrictServerInterface = (*server)(nil)
 
 // New returns the API handler, rooted at "/" (mount it under /api/v1).
 func New(d Deps) http.Handler {
-	return HandlerFromMux(NewStrictHandler(&server{d}, nil), http.NewServeMux())
+	s := &server{d}
+	strict := NewStrictHandlerWithOptions(s, nil, StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(w, http.StatusBadRequest, err.Error())
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			slog.Error("api", "path", r.URL.Path, "err", err)
+			writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		},
+	})
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
+	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
+	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
+	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
+	return mux
+}
+
+func writeError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	_ = json.NewEncoder(w).Encode(Error{Message: msg})
 }
 
 func (s *server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHealthResponseObject, error) {
@@ -33,7 +63,7 @@ func (s *server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHe
 }
 
 // GetLoginScreen is public: it returns covers only when an admin chose the
-// cover wall. Until libraries exist (M1) there is nothing to show.
+// cover wall. The setting arrives with the settings API (M3).
 func (s *server) GetLoginScreen(ctx context.Context, _ GetLoginScreenRequestObject) (GetLoginScreenResponseObject, error) {
 	return GetLoginScreen200JSONResponse{Backdrop: Compass, Covers: []LoginCover{}}, nil
 }

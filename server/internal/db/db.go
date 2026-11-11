@@ -25,7 +25,11 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 		"?_pragma=journal_mode(WAL)" +
 		"&_pragma=foreign_keys(1)" +
 		"&_pragma=busy_timeout(5000)" +
-		"&_pragma=synchronous(NORMAL)"
+		"&_pragma=synchronous(NORMAL)" +
+		// Transactions take the write lock up front: a deferred transaction
+		// that reads then writes fails with SQLITE_BUSY at once when another
+		// writer is active, and busy_timeout does not cover that upgrade.
+		"&_txlock=immediate"
 	d, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, err

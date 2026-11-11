@@ -38,10 +38,399 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/libraries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All libraries */
+        get: operations["listLibraries"];
+        put?: never;
+        /** Register a folder as a library and queue its first scan */
+        post: operations["createLibrary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/libraries/{libraryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getLibrary"];
+        put?: never;
+        post?: never;
+        /** Forget a library (files on disk are not touched) */
+        delete: operations["deleteLibrary"];
+        options?: never;
+        head?: never;
+        patch: operations["updateLibrary"];
+        trace?: never;
+    };
+    "/libraries/{libraryId}/scan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue a scan (then analysis of new and changed books) */
+        post: operations["scanLibrary"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Series, optionally in one library (filters and paging arrive in M3) */
+        get: operations["listSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/{seriesId}/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listSeriesBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/{seriesId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        /** Cover of the series' first book, JPEG */
+        get: operations["getSeriesThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getBook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        /** Cover thumbnail, JPEG */
+        get: operations["getBookThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/pages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listBookPages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/pages/{page}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+                page: number;
+            };
+            cookie?: never;
+        };
+        /** One page image as stored in the archive (ETag, long private cache) */
+        get: operations["getBookPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Running and queued tasks, then the most recent finished ones */
+        get: operations["listTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tasks/{taskId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["cancelTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/media/issues": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Books that failed analysis or whose files are gone */
+        get: operations["listMediaIssues"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Error: {
+            message: string;
+        };
+        /** @enum {string} */
+        LibraryKind: "manga" | "webtoon" | "comics" | "books";
+        /** @enum {string} */
+        ScanInterval: "off" | "hourly" | "daily" | "weekly";
+        Library: {
+            id: string;
+            name: string;
+            root: string;
+            kind: components["schemas"]["LibraryKind"];
+            seriesCount: number;
+            bookCount: number;
+            /** Format: int64 */
+            sizeBytes: number;
+            /** @description RFC 3339; null before the first scan */
+            lastScan: string | null;
+            scanInterval: components["schemas"]["ScanInterval"];
+            watch: boolean;
+            importComicInfo: boolean;
+            importLocalArtwork: boolean;
+            exclude: string[];
+        };
+        LibraryCreate: {
+            name: string;
+            /** @description Absolute folder path on the server */
+            root: string;
+            kind: components["schemas"]["LibraryKind"];
+            scanInterval?: components["schemas"]["ScanInterval"];
+            importComicInfo?: boolean;
+            exclude?: string[];
+        };
+        LibraryUpdate: {
+            name?: string;
+            kind?: components["schemas"]["LibraryKind"];
+            scanInterval?: components["schemas"]["ScanInterval"];
+            importComicInfo?: boolean;
+            exclude?: string[];
+        };
+        /** @enum {string} */
+        ReadingDirection: "ltr" | "rtl" | "vertical" | "webtoon";
+        /** @enum {string} */
+        SeriesStatus: "ongoing" | "ended" | "hiatus" | "abandoned";
+        /** @enum {string} */
+        MediaStatus: "ready" | "error" | "unsupported" | "outdated";
+        /** @enum {string} */
+        BookFormat: "cbz" | "cbr" | "cb7" | "pdf" | "epub";
+        Author: {
+            name: string;
+            /** @enum {string} */
+            role: "writer" | "penciller" | "colorist" | "translator" | "editor" | "cover";
+        };
+        Series: {
+            id: string;
+            libraryId: string;
+            title: string;
+            titleSort: string;
+            alternateTitles: string[];
+            status: components["schemas"]["SeriesStatus"];
+            summary: string;
+            publisher: string;
+            readingDirection: components["schemas"]["ReadingDirection"];
+            ageRating: number | null;
+            language: string;
+            genres: string[];
+            tags: string[];
+            authors: components["schemas"]["Author"][];
+            totalBookCount: number | null;
+            bookCount: number;
+            booksRead: number;
+            booksInProgress: number;
+            thumbnailUrl: string;
+            createdAt: string;
+            updatedAt: string;
+            lockedFields: string[];
+        };
+        ReadProgress: {
+            page: number;
+            completed: boolean;
+            readAt: string;
+        };
+        Book: {
+            id: string;
+            seriesId: string;
+            libraryId: string;
+            title: string;
+            /** Format: double */
+            number: number;
+            /** Format: double */
+            numberSort: number;
+            summary: string;
+            releaseDate: string | null;
+            isbn: string;
+            authors: components["schemas"]["Author"][];
+            tags: string[];
+            format: components["schemas"]["BookFormat"];
+            path: string;
+            /** Format: int64 */
+            sizeBytes: number;
+            pageCount: number;
+            mediaStatus: components["schemas"]["MediaStatus"];
+            progress: components["schemas"]["ReadProgress"] | null;
+            thumbnailUrl: string;
+            createdAt: string;
+        };
+        Page: {
+            number: number;
+            width: number;
+            height: number;
+            mediaType: string;
+            url: string;
+        };
+        /** @enum {string} */
+        TaskKind: "scan" | "analyze" | "thumbnail" | "hash" | "trash";
+        /** @enum {string} */
+        TaskState: "running" | "queued" | "done" | "failed" | "cancelled";
+        Task: {
+            id: string;
+            kind: components["schemas"]["TaskKind"];
+            label: string;
+            libraryId: string | null;
+            state: components["schemas"]["TaskState"];
+            /** Format: double */
+            progress: number;
+            startedAt: string | null;
+            error: string;
+        };
+        MediaIssue: {
+            bookId: string;
+            /** @enum {string} */
+            kind: "error" | "missing" | "duplicate" | "unsupported";
+            detail: string;
+        };
         Health: {
             /** @enum {string} */
             status: "ok";
@@ -59,7 +448,35 @@ export interface components {
             title: string;
         };
     };
-    responses: never;
+    responses: {
+        /** @description No such item */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The request is invalid */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description Image bytes */
+        Image: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "image/*": string;
+            };
+        };
+    };
     parameters: never;
     requestBodies: never;
     headers: never;
@@ -103,6 +520,374 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LoginScreen"];
+                };
+            };
+        };
+    };
+    listLibraries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Libraries in name order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Library"][];
+                };
+            };
+        };
+    };
+    createLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LibraryCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Library"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The library */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Library"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LibraryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Library"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    scanLibrary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listSeries: {
+        parameters: {
+            query?: {
+                libraryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Series in title order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"][];
+                };
+            };
+        };
+    };
+    getSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The series */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listSeriesBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Books in number order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getSeriesThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Image"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The book */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBookThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Image"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listBookPages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pages in reading order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Page"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBookPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+                page: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Image"];
+            /** @description Not modified */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tasks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"][];
+                };
+            };
+        };
+    };
+    cancelTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                taskId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cancelled (or already finished) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMediaIssues: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Issues */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaIssue"][];
                 };
             };
         };
