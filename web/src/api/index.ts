@@ -3,7 +3,7 @@
 // signature. Keep screens free of direct "@/mock" imports.
 import { useEffect, useState, type DependencyList } from "react";
 import * as db from "@/mock/data";
-import type { Book, LoginScreen, Series, SeriesQuery, ServerSettings } from "./types";
+import type { Book, LoginBackdrop, LoginScreen, Series, SeriesQuery, ServerSettings } from "./types";
 
 export * from "./types";
 export * from "./reader-prefs";
@@ -111,10 +111,13 @@ export const api = {
   tasks: () => delay(db.tasks),
   mediaIssues: () => delay(db.mediaIssues),
   settings: () => delay(loadSettings()),
-  /** Mock save: kept in localStorage so the choice survives a reload. */
-  saveSettings: (s: ServerSettings) => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
-    return delay(s);
+  /** Saves only the fields the admin changed, merged into the latest stored
+   *  settings, so an older tab cannot overwrite a newer change it never saw
+   *  (e.g. turn the public cover wall back on). Mock: kept in localStorage. */
+  saveSettings: async (changes: Partial<ServerSettings>): Promise<ServerSettings> => {
+    const next = { ...loadSettings(), ...changes };
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+    return delay(next);
   },
 
   /** Public: the sign-in page calls this before anyone is signed in, so it
@@ -134,14 +137,23 @@ export const api = {
 
 const SETTINGS_KEY = "cn-mock-server-settings";
 function loadSettings(): ServerSettings {
+  let stored: Record<string, unknown> = {};
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...db.settings, ...(JSON.parse(raw) as Partial<ServerSettings>) };
+    const parsed: unknown = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}");
+    if (parsed && typeof parsed === "object") stored = parsed as Record<string, unknown>;
   } catch {
-    /* ignore malformed mock storage */
+    /* malformed mock storage: fall back to defaults */
   }
-  return db.settings;
+  // Keep a stored field only when it has the default's type, and the backdrop
+  // only when it is a known value; anything else falls back to the default.
+  const out = { ...db.settings } as Record<string, unknown>;
+  for (const [k, v] of Object.entries(db.settings)) {
+    if (k in stored && typeof stored[k] === typeof v && stored[k] !== null) out[k] = stored[k];
+  }
+  if (!LOGIN_BACKDROPS.includes(out.loginBackdrop as LoginBackdrop)) out.loginBackdrop = db.settings.loginBackdrop;
+  return out as unknown as ServerSettings;
 }
+const LOGIN_BACKDROPS: LoginBackdrop[] = ["compass", "covers"];
 
 /** Minimal async hook for the mock era. Swap for TanStack Query with the real API. */
 export function useApi<T>(fn: () => Promise<T>, deps: DependencyList): { data: T | undefined; loading: boolean } {

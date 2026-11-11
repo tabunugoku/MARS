@@ -51,12 +51,19 @@ export default function Screen() {
   }
 
   const patch = (p: Partial<ServerSettings>) => setDraft({ ...cur, ...p });
-  const save = () => {
-    if (!draft) return;
-    void api.saveSettings(draft);
-    setSaved(draft);
-    setDraft(null);
-    toast.success("設定を保存しました");
+  const save = async () => {
+    if (!draft || !base) return;
+    const changes = Object.fromEntries(
+      Object.entries(draft).filter(([k, v]) => base[k as keyof ServerSettings] !== v),
+    ) as Partial<ServerSettings>;
+    try {
+      setSaved(await api.saveSettings(changes));
+      setDraft(null);
+      toast.success("設定を保存しました");
+    } catch {
+      // Keep the draft so nothing typed is lost.
+      toast.error("設定を保存できませんでした");
+    }
   };
 
   return (
@@ -145,6 +152,7 @@ export default function Screen() {
               <FieldLabel id="set-login-backdrop">ログイン画面</FieldLabel>
               <RadioGroup
                 aria-labelledby="set-login-backdrop"
+                aria-describedby="set-login-backdrop-note"
                 value={cur.loginBackdrop}
                 onValueChange={(v) => patch({ loginBackdrop: v as ServerSettings["loginBackdrop"] })}
               >
@@ -152,7 +160,7 @@ export default function Screen() {
                   <RadioItem key={k} index={i} value={k} label={BACKDROP_LABEL[k]} />
                 ))}
               </RadioGroup>
-              <FieldDescription>{BACKDROP_NOTE[cur.loginBackdrop]}</FieldDescription>
+              <FieldDescription id="set-login-backdrop-note">{BACKDROP_NOTE[cur.loginBackdrop]}</FieldDescription>
             </Field>
           </FieldGroup>
         </section>

@@ -100,7 +100,9 @@ export default function Screen() {
   );
 }
 
-const WALL_SIZE = 42; // 7 rows of 6: enough to fill a tall panel
+// 12 rows of 6: covers are about a third of the panel's width wide, so this
+// fills a panel up to ~2.5x as tall as it is wide (tablet portrait included).
+const WALL_SIZE = 72;
 
 // Beside the form, chosen by an admin in サーバー設定 → ログイン画面. Neither
 // carries the app mark: the form already does.
@@ -112,10 +114,13 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
     const wall = screen.covers.length ? Array.from({ length: WALL_SIZE }, (_, i) => screen.covers[i % screen.covers.length]) : [];
     return (
       <>
-        <div className="grid grid-cols-6 gap-3 p-6">
-          {wall.map((c, i) => (
-            <Cover key={i} seed={c.seed} title={c.title} />
-          ))}
+        {/* Out of flow and clipped, so the wall never sets the page height. */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="grid grid-cols-6 gap-3 p-6">
+            {wall.map((c, i) => (
+              <Cover key={i} seed={c.seed} title={c.title} />
+            ))}
+          </div>
         </div>
         <div className="absolute inset-0 bg-background/70 tone" />
       </>
