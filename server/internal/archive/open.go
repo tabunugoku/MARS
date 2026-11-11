@@ -20,28 +20,7 @@ func formatOf(name string) (Format, bool) {
 	return "", false
 }
 
-func open(path string) (Archive, Format, error) {
-	f, ok := formatOf(path)
-	if !ok {
-		return nil, "", fmt.Errorf("%w: unknown extension on %q", ErrUnsupported, filepath.Base(path))
-	}
-	var (
-		a   Archive
-		err error
-	)
-	switch f {
-	case CBZ:
-		a, err = openZip(path)
-	case CBR:
-		a, err = openRar(path)
-	case CB7:
-		a, err = openSevenZip(path)
-	}
-	if err != nil {
-		return nil, f, err
-	}
-	return a, f, nil
-}
+func open(path string) (Archive, Format, error) { return OpenPath(PathOf(path)) }
 
 // headerErr marks a parse failure as ErrUnsupported and keeps the reader's
 // own error in the chain. OS errors (missing file, permissions) pass through

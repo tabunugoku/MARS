@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 
 	"github.com/bodgit/sevenzip"
 )
@@ -14,18 +15,19 @@ type sevenFile struct {
 }
 
 type sevenArchive struct {
-	rc     *sevenzip.ReadCloser
+	file   *os.File
 	files  []sevenFile
 	byName map[string]*sevenzip.File
 }
 
-func openSevenZip(path string) (Archive, error) {
-	rc, err := sevenzip.OpenReader(path)
+func openSevenZip(file *os.File, size int64) (Archive, error) {
+	sr, err := sevenzip.NewReader(file, size)
 	if err != nil {
+		file.Close()
 		return nil, headerErr(err)
 	}
-	a := &sevenArchive{rc: rc, byName: make(map[string]*sevenzip.File)}
-	for _, f := range rc.File {
+	a := &sevenArchive{file: file, byName: make(map[string]*sevenzip.File)}
+	for _, f := range sr.File {
 		if f.FileInfo().IsDir() {
 			continue
 		}
@@ -85,12 +87,22 @@ func (a *sevenArchive) Open(name string) (io.ReadCloser, error) {
 }
 
 func (a *sevenArchive) Walk(fn func(e Entry, r io.Reader) error) error {
+	return a.walkLimited(newBudget(Limit{}), fn)
+}
+
+func (a *sevenArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error) error {
 	for _, sf := range a.files {
 		rc, err := sf.f.Open()
 		if err != nil {
 			return sevenErr(err)
 		}
-		err = fn(sf.Entry, sevenReader{rc})
+		r := b.reader(sevenReader{rc})
+		err = fn(sf.Entry, r)
+		if err == nil {
+			// The next entry of a solid folder decodes past whatever is
+			// left of this one; do it here, within the budget.
+			err = b.drain(sevenReader{rc})
+		}
 		cerr := rc.Close()
 		switch {
 		case errors.Is(err, SkipRest):
@@ -107,4 +119,4 @@ func (a *sevenArchive) Walk(fn func(e Entry, r io.Reader) error) error {
 // RandomAccess is false: solid folders may decode everything before an entry.
 func (a *sevenArchive) RandomAccess() bool { return false }
 
-func (a *sevenArchive) Close() error { return a.rc.Close() }
+func (a *sevenArchive) Close() error { return a.file.Close() }

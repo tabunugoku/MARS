@@ -3,6 +3,7 @@ package media
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"image"
 	_ "image/gif"  // decoder registration for DecodeConfig
@@ -56,7 +57,15 @@ func isComicInfo(name string) bool {
 // and cover. Errors from archive.Open pass through unchanged, so callers can
 // check errors.Is(err, archive.ErrUnsupported).
 func Analyze(path string) (Analysis, error) {
-	a, format, err := archive.Open(path)
+	return AnalyzeContext(context.Background(), archive.PathOf(path))
+}
+
+// AnalyzeContext is Analyze that stops when ctx ends, after AnalyzeTimeout,
+// or once the book has decompressed MaxDecompressed bytes.
+func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
+	ctx, cancel := context.WithTimeout(ctx, AnalyzeTimeout)
+	defer cancel()
+	a, format, err := archive.OpenPath(path)
 	if err != nil {
 		return Analysis{}, err
 	}
@@ -102,7 +111,7 @@ func Analyze(path string) (Analysis, error) {
 		ciSeen   bool
 		pageSeen = make([]bool, len(names))
 	)
-	err = a.Walk(func(e archive.Entry, r io.Reader) error {
+	err = archive.WalkLimited(a, archive.Limit{Ctx: ctx, MaxBytes: MaxDecompressed}, func(e archive.Entry, r io.Reader) error {
 		if ciName != "" && e.Name == ciName {
 			if ciSeen {
 				return nil

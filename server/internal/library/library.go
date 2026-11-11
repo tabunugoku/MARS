@@ -192,7 +192,7 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	if err != nil {
 		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
 	}
-	a, err := media.Analyze(full)
+	a, err := media.AnalyzeContext(ctx, full)
 	switch {
 	case errors.Is(err, archive.ErrUnsupported):
 		return seriesID, nil, s.markBook(ctx, bookID, v, "unsupported", err.Error())
@@ -269,26 +269,17 @@ func (s *Service) markBook(ctx context.Context, bookID string, v version, status
 	return err
 }
 
-// resolve joins a stored relative path onto the library root and refuses
-// anything outside it: '..' in the stored path, and symlinks (in the book
-// path or swapped in after the scan) that lead out of the root.
-func resolve(root, rel string) (string, error) {
+// resolve pairs a stored relative path with the library root, refusing
+// '..' and absolute paths.
+func resolve(root, rel string) (archive.Path, error) {
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
-		return "", fmt.Errorf("不正なパス: %q", rel)
+		return archive.Path{}, fmt.Errorf("不正なパス: %q", rel)
 	}
-	full := filepath.Join(root, filepath.FromSlash(rel))
-	realRoot, err := filepath.EvalSymlinks(root)
-	if err != nil {
-		return "", err
-	}
-	real, err := filepath.EvalSymlinks(full)
-	if err != nil {
-		return "", err
-	}
-	if r, err := filepath.Rel(realRoot, real); err != nil || !filepath.IsLocal(r) {
-		return "", fmt.Errorf("ライブラリの外を指しています: %q", rel)
-	}
-	return real, nil
+	// Containment is enforced when the file is opened: archive.OpenPath
+	// goes through os.Root, which refuses anything that resolves outside
+	// root at that moment, symlinks included. A check here followed by an
+	// open by name would leave a window to swap a folder for a symlink.
+	return archive.Path{Root: root, Rel: rel}, nil
 }
 
 func locked(lockedJSON string) map[string]bool {
@@ -448,7 +439,7 @@ func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, err
 	etag := fmt.Sprintf(`"%s-%d-%s"`, bookID, n, v)
 
 	if archive.Format(format) == archive.CBZ {
-		a, _, err := archive.Open(full)
+		a, _, err := archive.OpenPath(full)
 		if err != nil {
 			return Page{}, err
 		}

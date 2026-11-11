@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/tabunugoku/cominavi/server/internal/archive"
 )
 
 // bookFixture writes a sample zip and returns its path, pages and the bytes
@@ -32,7 +34,7 @@ func bookFixture(t *testing.T) (string, []Page, map[int][]byte) {
 
 // readPage opens page n through Open and returns its bytes, closing the file.
 func readPage(ctx context.Context, c *PageCache, bookID, key, archivePath string, pages []Page, n int) ([]byte, error) {
-	f, err := c.Open(ctx, bookID, key, archivePath, pages, n)
+	f, err := c.Open(ctx, bookID, key, archive.PathOf(archivePath), pages, n)
 	if err != nil {
 		return nil, err
 	}

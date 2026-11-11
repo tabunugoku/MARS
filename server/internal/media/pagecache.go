@@ -56,7 +56,7 @@ type bookLock struct {
 // a different key re-extracts. The file is opened while the book's lock is
 // held, so eviction cannot delete it between validation and open. The caller
 // must close it.
-func (c *PageCache) Open(ctx context.Context, bookID, key, archivePath string, pages []Page, n int) (*os.File, error) {
+func (c *PageCache) Open(ctx context.Context, bookID, key string, archivePath archive.Path, pages []Page, n int) (*os.File, error) {
 	if !bookIDPattern.MatchString(bookID) {
 		return nil, fmt.Errorf("media: invalid book id %q", bookID)
 	}
@@ -157,7 +157,7 @@ func (c *PageCache) valid(bookDir, key string) bool {
 // extract makes room for the book, then writes it. It waits for an extraction
 // slot first, and gives up with ctx.Err() if ctx ends while waiting. The
 // caller must hold the book's lock.
-func (c *PageCache) extract(ctx context.Context, bookID, key, archivePath string, pages []Page) error {
+func (c *PageCache) extract(ctx context.Context, bookID, key string, archivePath archive.Path, pages []Page) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (c *PageCache) extract(ctx context.Context, bookID, key, archivePath string
 	}
 	defer func() { <-sem }()
 
-	info, err := os.Stat(archivePath)
+	info, err := archivePath.Stat()
 	if err != nil {
 		return err
 	}
@@ -187,7 +187,7 @@ func (c *PageCache) extract(ctx context.Context, bookID, key, archivePath string
 }
 
 // writeBook writes every page into a temp dir, then swaps it in for Dir/<bookID>.
-func (c *PageCache) writeBook(ctx context.Context, bookID, key, archivePath string, pages []Page) error {
+func (c *PageCache) writeBook(ctx context.Context, bookID, key string, archivePath archive.Path, pages []Page) error {
 	tmp, err := os.MkdirTemp(c.Dir, bookID+tmpInfix)
 	if err != nil {
 		return err
@@ -226,7 +226,7 @@ func (c *PageCache) writeBook(ctx context.Context, bookID, key, archivePath stri
 // Duplicate entry names keep the first page number, and duplicate entries in
 // the archive keep the first occurrence. It returns the entry names that were
 // written, mapped to their page number. It stops with ctx.Err() once ctx ends.
-func writePages(ctx context.Context, dir, archivePath string, pages []Page) (map[string]int, error) {
+func writePages(ctx context.Context, dir string, archivePath archive.Path, pages []Page) (map[string]int, error) {
 	want := make(map[string]int, len(pages))
 	for _, p := range pages {
 		if _, dup := want[p.Entry]; !dup {
@@ -235,14 +235,16 @@ func writePages(ctx context.Context, dir, archivePath string, pages []Page) (map
 	}
 	written := make(map[string]int, len(want))
 
-	a, _, err := archive.Open(archivePath)
+	a, _, err := archive.OpenPath(archivePath)
 	if err != nil {
 		return nil, err
 	}
 	defer a.Close()
 
 	var total int64
-	err = a.Walk(func(e archive.Entry, r io.Reader) error {
+	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
+	defer cancel()
+	err = archive.WalkLimited(a, archive.Limit{Ctx: ctx, MaxBytes: MaxDecompressed}, func(e archive.Entry, r io.Reader) error {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
