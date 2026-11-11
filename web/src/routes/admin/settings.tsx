@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Bin, Copy } from "@keyline-icons/react";
 import { api, errorMessage, formatDate, useApi, type ApiKey, type ApiKeyCreated, type ServerSettings } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
@@ -35,6 +35,8 @@ export default function Screen() {
 
   const [keyName, setKeyName] = useState("");
   const [creatingKey, setCreatingKey] = useState(false);
+  // A second Enter before the first answer would create a second live key.
+  const keyInFlight = useRef(false);
   const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
   const [removingKey, setRemovingKey] = useState<ApiKey | null>(null);
   const [removeKeyOpen, setRemoveKeyOpen] = useState(false);
@@ -87,7 +89,8 @@ export default function Screen() {
 
   const createKey = async () => {
     const name = keyName.trim();
-    if (!name) return;
+    if (!name || keyInFlight.current) return;
+    keyInFlight.current = true;
     setCreatingKey(true);
     try {
       const created = await api.createApiKey(name);
@@ -97,6 +100,7 @@ export default function Screen() {
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
+      keyInFlight.current = false;
       setCreatingKey(false);
     }
   };
@@ -267,6 +271,7 @@ export default function Screen() {
                   aria-label="APIキーの名前"
                   placeholder="名前"
                   value={keyName}
+                  disabled={creatingKey}
                   onChange={(e) => setKeyName(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") void createKey();

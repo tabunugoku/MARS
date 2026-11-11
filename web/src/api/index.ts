@@ -1,7 +1,7 @@
 // The only module screens talk to for data: the API (Go server, or the mock
 // with VITE_API=mock), its types, reader settings and small formatters.
 // Keep screens free of direct "@/mock" imports.
-import { useEffect, useState, type DependencyList } from "react";
+import { useEffect, useRef, useState, type DependencyList } from "react";
 import { ApiError } from "./http";
 import type { Series } from "./types";
 
@@ -29,9 +29,13 @@ export function useApi<T>(
     error: null,
   });
   const [tick, setTick] = useState(0);
+  // A reload keeps the current data on screen; new deps (another id) never do.
+  const lastTick = useRef(tick);
   useEffect(() => {
     let live = true;
-    setState((s) => (tick > 0 ? { ...s, loading: true } : { data: undefined, loading: true, error: null }));
+    const isReload = tick !== lastTick.current;
+    lastTick.current = tick;
+    setState((s) => (isReload ? { ...s, loading: true } : { data: undefined, loading: true, error: null }));
     fn().then(
       (data) => live && setState({ data, loading: false, error: null }),
       (err: unknown) => live && setState({ data: undefined, loading: false, error: errorMessage(err) }),

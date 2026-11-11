@@ -46,30 +46,58 @@ function buildViews(pages: Page[], spread: ReaderPrefs["spread"]): View[] {
   return views;
 }
 
+const progressKey = (p: { page: number; completed: boolean }) => `${p.page}|${p.completed}`;
+
 /** Saves the reading position: a second after the last turn, and right away
- *  (keepalive) when the page is hidden or the reader closes. Opening a book
- *  alone records nothing. */
-function useProgressSaver(bookId: string, page: number, completed: boolean, disabled: boolean) {
+ *  when the page is hidden or the reader closes. Opening a book records
+ *  nothing until the reader moves (position = the page shown, or "end").
+ *  Writes go out one at a time, in order, and a write that a newer one has
+ *  superseded before it started is dropped, so an old page never lands after
+ *  a newer one. Every write is keepalive, so one in flight survives unload. */
+function useProgressSaver(
+  bookId: string,
+  page: number,
+  completed: boolean,
+  position: string,
+  stored: Book["progress"],
+  disabled: boolean,
+) {
   const latest = useRef({ page, completed });
-  const sent = useRef(`${page}|${completed}`);
+  const start = useRef(position);
+  const moved = useRef(false);
+  const storedKey = stored ? progressKey(stored) : "";
+  const acked = useRef(storedKey);
+  const queued = useRef(storedKey);
+  const chain = useRef<Promise<void>>(Promise.resolve());
   const flush = useCallback(
-    (keepalive: boolean) => {
+    (leaving: boolean) => {
       const v = latest.current;
-      const key = `${v.page}|${v.completed}`;
-      if (disabled || key === sent.current) return;
-      sent.current = key;
-      api.setProgress(bookId, v.page, v.completed, { keepalive }).catch((err: unknown) => {
-        sent.current = "";
-        if (!keepalive) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
-      });
+      const key = progressKey(v);
+      if (disabled || !moved.current || key === queued.current) return;
+      queued.current = key;
+      const send = () => {
+        if (queued.current !== key) return; // superseded while waiting
+        return api.setProgress(bookId, v.page, v.completed, { keepalive: true }).then(
+          () => void (acked.current = key),
+          (err: unknown) => {
+            if (queued.current === key) queued.current = acked.current; // let the next flush retry
+            if (!leaving) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
+          },
+        );
+      };
+      // Leaving cannot wait for the queue: send now. A queued older write
+      // then sees it is superseded and stays home.
+      if (leaving) void send();
+      else chain.current = chain.current.then(send);
     },
     [bookId, disabled],
   );
   useEffect(() => {
     latest.current = { page, completed };
+    if (position !== start.current) moved.current = true;
     const t = setTimeout(() => flush(false), 1000);
     return () => clearTimeout(t);
-  }, [page, completed, flush]);
+  }, [page, completed, position, flush]);
   useEffect(() => {
     const onHide = () => flush(true);
     window.addEventListener("pagehide", onHide);
@@ -166,13 +194,21 @@ function ReaderBody({
   const [bookPrefs, setBookState] = useState<SeriesReaderPrefs>(() => getBookPrefs(book.id));
   const scope = scopeOf(seriesPrefs, bookPrefs);
   const prefs = useMemo(() => effectivePrefs(seriesPrefs, bookPrefs, globalPrefs, defaultDirection), [seriesPrefs, bookPrefs, globalPrefs, defaultDirection]);
+  // On a refused save the cache has already rolled back (or holds a newer
+  // pending change); the screen takes whatever it holds now.
   const saveSeries = (p: SeriesReaderPrefs) => {
     setSeriesState(p);
-    setSeriesPrefs(book.seriesId, p).catch((err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`));
+    setSeriesPrefs(book.seriesId, p).catch((err: unknown) => {
+      setSeriesState(getSeriesPrefs(book.seriesId));
+      toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
+    });
   };
   const saveBook = (p: SeriesReaderPrefs) => {
     setBookState(p);
-    setBookPrefs(book.id, p).catch((err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`));
+    setBookPrefs(book.id, p).catch((err: unknown) => {
+      setBookState(getBookPrefs(book.id));
+      toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
+    });
   };
   const changeScope = (s: ReaderScope) => {
     if (s === scope) return;
@@ -301,12 +337,12 @@ function ReaderBody({
   const shownPage = webtoon ? webtoonPage : currentPage;
   // The last page (or the end card) counts as finished. Incognito reads leave no trace.
   const lastShown = webtoon ? webtoonPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
-  useProgressSaver(book.id, shownPage, lastShown >= pageCount, incognito);
+  useProgressSaver(book.id, shownPage, lastShown >= pageCount, atEnd && !webtoon ? "end" : String(shownPage), book.progress, incognito);
 
   // Neighbour views are mounted beside the current one (prev/next) so a turn
   // shows decoded pixels; two further views are preloaded invisibly.
   const slot = (i: number) =>
-    i < 0 ? null : i === views.length ? <EndCard key="end" book={book} next={next} seriesId={book.seriesId} /> : i > views.length ? null : (
+    i < 0 ? null : i === views.length ? <EndCard key="end" book={book} next={next} seriesId={book.seriesId} incognito={incognito} /> : i > views.length ? null : (
       <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} />
     );
 
@@ -319,6 +355,7 @@ function ReaderBody({
           book={book}
           pages={pages}
           next={next}
+          incognito={incognito}
           startPage={webtoonPage}
           jump={jump}
           onPage={(p) => {
@@ -494,7 +531,7 @@ function Preload({ urls }: { urls: string[] }) {
   );
 }
 
-function EndCard({ book, next, seriesId }: { book: Book; next: Book | null; seriesId: string }) {
+function EndCard({ book, next, seriesId, incognito }: { book: Book; next: Book | null; seriesId: string; incognito: boolean }) {
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 px-6 text-center" onPointerDown={(e) => e.stopPropagation()}>
       <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
@@ -503,7 +540,7 @@ function EndCard({ book, next, seriesId }: { book: Book; next: Book | null; seri
       {next ? (
         <>
           <img src={next.thumbnailUrl} alt="" className="w-32 rounded-md shadow-lg" />
-          <BrandAction to={`/read/${next.id}?page=1`}>次の巻を読む（{next.title}）</BrandAction>
+          <BrandAction to={`/read/${next.id}?page=1${incognito ? "&incognito=1" : ""}`}>次の巻を読む（{next.title}）</BrandAction>
         </>
       ) : (
         <p className={cn(typeClass("body"), "opacity-70")}>このシリーズの最新巻です。</p>
@@ -554,6 +591,7 @@ function WebtoonView({
   book,
   pages,
   next,
+  incognito,
   startPage,
   jump,
   onPage,
@@ -562,6 +600,7 @@ function WebtoonView({
   book: Book;
   pages: Page[];
   next: Book | null;
+  incognito: boolean;
   startPage: number;
   jump: { page: number; n: number } | null;
   onPage: (p: number) => void;
@@ -597,7 +636,7 @@ function WebtoonView({
           />
         ))}
         <div className="flex justify-center py-16">
-          <EndCard book={book} next={next} seriesId={book.seriesId} />
+          <EndCard book={book} next={next} seriesId={book.seriesId} incognito={incognito} />
         </div>
       </div>
     </div>

@@ -53,26 +53,45 @@ export function loadReaderPrefs(): Promise<void> {
 export function getGlobalPrefs(): GlobalReaderPrefs {
   return cache.global;
 }
-/** Applies a change to the cache at once and undoes it if the server refuses. */
-function writeThrough(apply: () => void, undo: () => void, send: () => Promise<void>): Promise<void> {
-  apply();
-  return send().catch((err: unknown) => {
-    undo();
-    throw err;
-  });
+/** One cached value and how to read and replace it. */
+interface Slot<V> {
+  get: () => V;
+  set: (v: V) => void;
 }
 
-function setScoped(map: Map<string, ReaderPrefs>, id: string, p: SeriesReaderPrefs, put: () => Promise<void>, del: () => Promise<void>) {
-  const before = map.get(id);
-  const restore = () => (before ? map.set(id, before) : map.delete(id));
-  return p.mode === "global"
-    ? writeThrough(() => map.delete(id), restore, del)
-    : writeThrough(() => map.set(id, p.prefs), restore, put);
+/** Per setting: writes run one at a time in order; acked is the last value
+ *  the server accepted; seq tells the newest write apart. */
+const queues = new Map<string, { chain: Promise<void>; acked: unknown; seq: number }>();
+
+/** Applies a change to the cache at once and writes it through. Writes to the
+ *  same setting reach the server in order. When one fails and no newer one is
+ *  waiting, the cache goes back to what the server last accepted (not to the
+ *  value before this write, which a newer success may have replaced). */
+function writeThrough<V>(key: string, slot: Slot<V>, next: V, send: () => Promise<void>): Promise<void> {
+  let q = queues.get(key);
+  if (!q) queues.set(key, (q = { chain: Promise.resolve(), acked: slot.get(), seq: 0 }));
+  const queue = q;
+  const n = ++queue.seq;
+  slot.set(next);
+  const run = queue.chain.then(send).then(
+    () => void (queue.acked = next),
+    (err: unknown) => {
+      if (n === queue.seq) slot.set(queue.acked as V);
+      throw err;
+    },
+  );
+  queue.chain = run.catch(() => undefined);
+  return run;
+}
+
+function setScoped(kind: string, map: Map<string, ReaderPrefs>, id: string, p: SeriesReaderPrefs, put: () => Promise<void>, del: () => Promise<void>) {
+  const slot: Slot<ReaderPrefs | undefined> = { get: () => map.get(id), set: (v) => (v ? map.set(id, v) : map.delete(id)) };
+  return p.mode === "global" ? writeThrough(`${kind}:${id}`, slot, undefined, del) : writeThrough(`${kind}:${id}`, slot, p.prefs, put);
 }
 
 export function setGlobalPrefs(p: GlobalReaderPrefs): Promise<void> {
-  const before = cache.global;
-  return writeThrough(() => (cache.global = p), () => (cache.global = before), () => api.putGlobalPrefs(p));
+  const slot: Slot<GlobalReaderPrefs> = { get: () => cache.global, set: (v) => (cache.global = v) };
+  return writeThrough("global", slot, p, () => api.putGlobalPrefs(p));
 }
 
 const asScoped = (p: ReaderPrefs | undefined): SeriesReaderPrefs => (p ? { mode: "custom", prefs: p } : { mode: "global" });
@@ -81,7 +100,7 @@ export function getSeriesPrefs(seriesId: string): SeriesReaderPrefs {
   return asScoped(cache.series.get(seriesId));
 }
 export function setSeriesPrefs(seriesId: string, p: SeriesReaderPrefs): Promise<void> {
-  return setScoped(cache.series, seriesId, p,
+  return setScoped("series", cache.series, seriesId, p,
     () => api.putSeriesPrefs(seriesId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteSeriesPrefs(seriesId));
 }
 
@@ -89,7 +108,7 @@ export function getBookPrefs(bookId: string): SeriesReaderPrefs {
   return asScoped(cache.books.get(bookId));
 }
 export function setBookPrefs(bookId: string, p: SeriesReaderPrefs): Promise<void> {
-  return setScoped(cache.books, bookId, p,
+  return setScoped("book", cache.books, bookId, p,
     () => api.putBookPrefs(bookId, (p as { prefs: ReaderPrefs }).prefs), () => api.deleteBookPrefs(bookId));
 }
 
