@@ -236,7 +236,7 @@ export default function Screen() {
                 onChange={(e) => set({ root: e.target.value })}
               />
               <FieldDescription>
-                {dlg.id ? "フォルダは作成後に変更できません" : "サーバー上の絶対パス。例: /data/comics"}
+                {dlg.id ? "フォルダは作成後に変更できません" : "サーバー上の絶対パス。Docker ではマウント先のパス（例: /comics）"}
               </FieldDescription>
             </Field>
             <div className="grid gap-3 sm:grid-cols-2">

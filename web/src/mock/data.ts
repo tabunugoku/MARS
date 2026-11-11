@@ -28,9 +28,9 @@ const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length)];
 const daysAgo = (d: number) => new Date(Date.UTC(2026, 10, 10) - d * 86400000).toISOString();
 
 export const libraries: Library[] = [
-  { id: "lib-manga", name: "マンガ", root: "/data/manga", kind: "manga", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(0.1), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: true, exclude: ["@eaDir", "#recycle"] },
-  { id: "lib-webtoon", name: "Webtoon", root: "/data/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: false, exclude: [] },
-  { id: "lib-comics", name: "海外コミック", root: "/data/comics", kind: "comics", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(6), scanInterval: "weekly", watch: false, importComicInfo: true, importLocalArtwork: true, exclude: [] },
+  { id: "lib-manga", name: "マンガ", root: "/comics/manga", kind: "manga", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(0.1), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: true, exclude: ["@eaDir", "#recycle"] },
+  { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: false, exclude: [] },
+  { id: "lib-comics", name: "海外コミック", root: "/comics/western", kind: "comics", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(6), scanInterval: "weekly", watch: false, importComicInfo: true, importLocalArtwork: true, exclude: [] },
 ];
 
 const mangaTitles = [
