@@ -101,7 +101,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Series, optionally in one library (filters and paging arrive in M3) */
+        /** Series the caller may see, filtered, sorted and paged */
         get: operations["listSeries"];
         put?: never;
         post?: never;
@@ -126,7 +126,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Edit series metadata (administrators only) */
+        patch: operations["updateSeries"];
         trace?: never;
     };
     "/series/{seriesId}/books": {
@@ -181,7 +182,8 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /** Edit book metadata (administrators only) */
+        patch: operations["updateBook"];
         trace?: never;
     };
     "/books/{bookId}/thumbnail": {
@@ -450,6 +452,329 @@ export interface paths {
         patch: operations["updateUser"];
         trace?: never;
     };
+    "/series/{seriesId}/read-progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Mark every book of the series read (completed true) or unread (false) for the caller */
+        put: operations["markSeriesRead"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/adjacent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        /** The previous and next book in the series, for "next volume" in the reader */
+        get: operations["getAdjacentBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Save the caller's reading position; completed defaults to page == pageCount */
+        put: operations["setBookProgress"];
+        post?: never;
+        /** Mark the book unread for the caller */
+        delete: operations["clearBookProgress"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Home shelves for the caller, newest first, at most 12-16 items each */
+        get: operations["getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Substring search over titles, authors and ISBN (any length, Japanese included) */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Collections with at least one series the caller may see */
+        get: operations["listCollections"];
+        put?: never;
+        post: operations["createCollection"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getCollection"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteCollection"];
+        options?: never;
+        head?: never;
+        patch: operations["updateCollection"];
+        trace?: never;
+    };
+    "/collections/{collectionId}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listCollectionSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/read-lists": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Reading lists with at least one book the caller may see */
+        get: operations["listReadLists"];
+        put?: never;
+        post: operations["createReadList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/read-lists/{readListId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getReadList"];
+        put?: never;
+        post?: never;
+        delete: operations["deleteReadList"];
+        options?: never;
+        head?: never;
+        patch: operations["updateReadList"];
+        trace?: never;
+    };
+    "/read-lists/{readListId}/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["listReadListBooks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-prefs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The caller's global reader settings and every series and book override */
+        get: operations["getReaderPrefs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-prefs/global": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setGlobalReaderPrefs"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-prefs/series/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setSeriesReaderPrefs"];
+        post?: never;
+        /** Go back to the global settings for this series */
+        delete: operations["deleteSeriesReaderPrefs"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/reader-prefs/books/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["setBookReaderPrefs"];
+        post?: never;
+        /** Go back to the series (or global) settings for this book */
+        delete: operations["deleteBookReaderPrefs"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Server settings (administrators only) */
+        get: operations["getSettings"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Change only the given fields, merged into the stored settings */
+        patch: operations["updateSettings"];
+        trace?: never;
+    };
+    "/trash/empty": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete series and books whose files are gone (administrators only) */
+        post: operations["emptyTrash"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/public/covers/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        /** A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers) */
+        get: operations["getPublicCover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -559,6 +884,7 @@ export interface components {
             progress: components["schemas"]["ReadProgress"] | null;
             thumbnailUrl: string;
             createdAt: string;
+            lockedFields: string[];
         };
         Page: {
             number: number;
@@ -672,6 +998,174 @@ export interface components {
         LoginCover: {
             thumbnailUrl: string;
             title: string;
+        };
+        /**
+         * @description releaseDate is the earliest release date among the series' books (series without one sort last)
+         * @enum {string}
+         */
+        SeriesSort: "title" | "updated" | "created" | "releaseDate" | "bookCount";
+        /** @enum {string} */
+        ReadState: "unread" | "inProgress" | "read";
+        /** @description Fields to change. Every field given here is also locked, so scans and ComicInfo.xml leave it alone; lockedFields, when given, replaces the lock list instead. */
+        SeriesUpdate: {
+            title?: string;
+            titleSort?: string;
+            alternateTitles?: string[];
+            status?: components["schemas"]["SeriesStatus"];
+            summary?: string;
+            publisher?: string;
+            readingDirection?: components["schemas"]["ReadingDirection"];
+            ageRating?: number | null;
+            language?: string;
+            genres?: string[];
+            tags?: string[];
+            authors?: components["schemas"]["Author"][];
+            totalBookCount?: number | null;
+            lockedFields?: string[];
+        };
+        /** @description Fields to change; locking works as in SeriesUpdate */
+        BookUpdate: {
+            title?: string;
+            /** Format: double */
+            number?: number;
+            /** Format: double */
+            numberSort?: number;
+            summary?: string;
+            releaseDate?: string | null;
+            isbn?: string;
+            authors?: components["schemas"]["Author"][];
+            tags?: string[];
+            lockedFields?: string[];
+        };
+        AdjacentBooks: {
+            prev: components["schemas"]["Book"] | null;
+            next: components["schemas"]["Book"] | null;
+        };
+        ProgressUpdate: {
+            /** @description 1-based; at most the book's pageCount */
+            page: number;
+            completed?: boolean;
+        };
+        SeriesReadUpdate: {
+            completed: boolean;
+        };
+        Dashboard: {
+            /** @description Started, not finished, last read first */
+            keepReading: components["schemas"]["Book"][];
+            /** @description First unread book of each series whose previous book is finished */
+            onDeck: components["schemas"]["Book"][];
+            recentlyAddedBooks: components["schemas"]["Book"][];
+            recentlyAddedSeries: components["schemas"]["Series"][];
+            recentlyUpdatedSeries: components["schemas"]["Series"][];
+            /** @description Finished, last read first */
+            recentlyRead: components["schemas"]["Book"][];
+        };
+        SearchResult: {
+            series: components["schemas"]["Series"][];
+            books: components["schemas"]["Book"][];
+            collections: components["schemas"]["Collection"][];
+            readLists: components["schemas"]["ReadList"][];
+        };
+        Collection: {
+            id: string;
+            name: string;
+            /** @description Keep seriesIds order; otherwise shown by title */
+            ordered: boolean;
+            seriesIds: string[];
+        };
+        CollectionCreate: {
+            name: string;
+            ordered?: boolean;
+            seriesIds?: string[];
+        };
+        CollectionUpdate: {
+            name?: string;
+            ordered?: boolean;
+            /** @description Replaces the members (administrators see every library) */
+            seriesIds?: string[];
+        };
+        ReadList: {
+            id: string;
+            name: string;
+            summary: string;
+            bookIds: string[];
+        };
+        ReadListCreate: {
+            name: string;
+            summary?: string;
+            bookIds?: string[];
+        };
+        ReadListUpdate: {
+            name?: string;
+            summary?: string;
+            bookIds?: string[];
+        };
+        ReaderPrefs: {
+            direction: components["schemas"]["ReadingDirection"];
+            /** @enum {string} */
+            spread: "off" | "on" | "cover";
+            /** @enum {string} */
+            fit: "screen" | "width" | "height" | "original";
+            /** @enum {string} */
+            bg: "black" | "gray" | "white";
+        };
+        GlobalReaderPrefs: {
+            /**
+             * @description series follows each series' own direction
+             * @enum {string}
+             */
+            direction: "ltr" | "rtl" | "vertical" | "webtoon" | "series";
+            /** @enum {string} */
+            spread: "off" | "on" | "cover";
+            /** @enum {string} */
+            fit: "screen" | "width" | "height" | "original";
+            /** @enum {string} */
+            bg: "black" | "gray" | "white";
+        };
+        ReaderPrefsAll: {
+            global: components["schemas"]["GlobalReaderPrefs"];
+            /** @description By series id */
+            series: {
+                [key: string]: components["schemas"]["ReaderPrefs"];
+            };
+            /** @description By book id */
+            books: {
+                [key: string]: components["schemas"]["ReaderPrefs"];
+            };
+        };
+        ServerSettings: {
+            /** @description Takes effect after a restart */
+            port: number;
+            taskThreads: number;
+            /** @enum {string} */
+            thumbnailSize: "small" | "medium" | "large" | "xlarge";
+            /**
+             * @description Only jpeg is produced today
+             * @enum {string}
+             */
+            thumbnailFormat: "webp" | "jpeg" | "avif";
+            rememberMeDays: number;
+            deleteEmptyCollections: boolean;
+            opdsEnabled: boolean;
+            koboSyncEnabled: boolean;
+            loginBackdrop: components["schemas"]["LoginBackdrop"];
+        };
+        ServerSettingsUpdate: {
+            port?: number;
+            taskThreads?: number;
+            /** @enum {string} */
+            thumbnailSize?: "small" | "medium" | "large" | "xlarge";
+            /** @enum {string} */
+            thumbnailFormat?: "webp" | "jpeg" | "avif";
+            rememberMeDays?: number;
+            deleteEmptyCollections?: boolean;
+            opdsEnabled?: boolean;
+            koboSyncEnabled?: boolean;
+            loginBackdrop?: components["schemas"]["LoginBackdrop"];
+        };
+        TrashResult: {
+            series: number;
+            books: number;
         };
     };
     responses: {
@@ -921,6 +1415,18 @@ export interface operations {
         parameters: {
             query?: {
                 libraryId?: string;
+                /** @description Substring of the title, an alternate title or an author */
+                search?: string;
+                status?: components["schemas"]["SeriesStatus"][];
+                /** @description Any of these genres */
+                genres?: string[];
+                /** @description For the caller */
+                readState?: components["schemas"]["ReadState"][];
+                sort?: components["schemas"]["SeriesSort"];
+                desc?: boolean;
+                /** @description Page size; all when omitted */
+                limit?: number;
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -928,9 +1434,10 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Series in title order */
+            /** @description One page of series; X-Total-Count has the count before paging */
             200: {
                 headers: {
+                    "X-Total-Count"?: number;
                     [name: string]: unknown;
                 };
                 content: {
@@ -959,6 +1466,34 @@ export interface operations {
                     "application/json": components["schemas"]["Series"];
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1020,6 +1555,34 @@ export interface operations {
                     "application/json": components["schemas"]["Book"];
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -1417,6 +1980,642 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    markSeriesRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesReadUpdate"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getAdjacentBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Neighbours (null at either end) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdjacentBooks"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setBookProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProgressUpdate"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadProgress"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    clearBookProgress: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Cleared */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getDashboard: {
+        parameters: {
+            query?: {
+                libraryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Shelves */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matches the caller may see */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SearchResult"];
+                };
+            };
+        };
+    };
+    listCollections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"][];
+                };
+            };
+        };
+    };
+    createCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collection (seriesIds holds only series the caller may see) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectionUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listCollectionSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Series in collection order (or title order when not ordered) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listReadLists: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description By name */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"][];
+                };
+            };
+        };
+    };
+    createReadList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadListCreate"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getReadList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The list (bookIds holds only books the caller may see) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteReadList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateReadList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadListUpdate"];
+            };
+        };
+        responses: {
+            /** @description Updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listReadListBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Books in list order */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All reader settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReaderPrefsAll"];
+                };
+            };
+        };
+    };
+    setGlobalReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GlobalReaderPrefs"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    setSeriesReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReaderPrefs"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteSeriesReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed (also when there was none) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    setBookReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReaderPrefs"];
+            };
+        };
+        responses: {
+            /** @description Saved */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteBookReaderPrefs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed (also when there was none) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current settings, defaults filled in */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSettings"];
+                };
+            };
+        };
+    };
+    updateSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ServerSettingsUpdate"];
+            };
+        };
+        responses: {
+            /** @description Settings after the change */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ServerSettings"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    emptyTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description How many rows were removed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashResult"];
+                };
+            };
+        };
+    };
+    getPublicCover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Image"];
             404: components["responses"]["NotFound"];
         };
     };
