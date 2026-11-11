@@ -102,7 +102,8 @@ export default function Screen() {
 
 const WALL_SIZE = 42; // 7 rows of 6: enough to fill a tall panel
 
-// Beside the form, chosen by an admin in サーバー設定 → ログイン画面.
+// Beside the form, chosen by an admin in サーバー設定 → ログイン画面. Neither
+// carries the app mark: the form already does.
 // Until the choice arrives the panel stays plain, so neither flashes.
 function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
   if (!screen) return null;
@@ -117,15 +118,11 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
           ))}
         </div>
         <div className="absolute inset-0 bg-background/70 tone" />
-        <div className="absolute inset-0 grid place-items-center">
-          <AppMark size={96} />
-        </div>
       </>
     );
   }
-  // The night chart: the same rose as behind every screen, on its own (the
-  // form already carries the mark). Its needle swings in once to the mark's
-  // own 35° heading.
+  // The night chart: the same rose as behind every screen. Its needle swings
+  // in once to the mark's own 35° heading.
   return (
     <>
       <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />
