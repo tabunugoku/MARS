@@ -182,15 +182,14 @@ export default function Screen() {
     daily: t("intervalDaily"),
     weekly: t("intervalWeekly"),
   };
-  // right: the numeric and action columns are right-aligned.
   const heads = [
-    { label: t("colName"), right: false },
-    { label: t("colRoot"), right: false },
-    { label: t("colSeries"), right: true },
-    { label: t("colBooks"), right: true },
-    { label: t("colSize"), right: true },
-    { label: t("colLastScan"), right: false },
-    { label: t("colActions"), right: true },
+    { label: t("colName") },
+    { label: t("colRoot") },
+    { label: t("colSeries") },
+    { label: t("colBooks") },
+    { label: t("colSize") },
+    { label: t("colLastScan") },
+    { label: t("colActions") },
   ];
   const { data: libs, error, reload } = useApi(() => api.libraries(), []);
   const [dlg, setDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -315,7 +314,7 @@ export default function Screen() {
             <TableHeader>
               <TableRow>
                 {heads.map((h) => (
-                  <TableHead key={h.label} className={cn("whitespace-nowrap", h.right && "text-right")}>
+                  <TableHead key={h.label} className="whitespace-nowrap">
                     {h.label}
                   </TableHead>
                 ))}
@@ -340,12 +339,12 @@ export default function Screen() {
                       )}
                     </TableCell>
                     <TableCell className={cn(typeClass("caption"), "max-w-[260px] truncate font-mono")}>{l.root}</TableCell>
-                    <TableCell className="text-right tabular-nums">{l.seriesCount}</TableCell>
-                    <TableCell className="text-right tabular-nums">{l.bookCount}</TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap">{formatBytes(l.sizeBytes)}</TableCell>
+                    <TableCell className="tabular-nums">{l.seriesCount}</TableCell>
+                    <TableCell className="tabular-nums">{l.bookCount}</TableCell>
+                    <TableCell className="tabular-nums whitespace-nowrap">{formatBytes(l.sizeBytes)}</TableCell>
                     <TableCell className="whitespace-nowrap">{l.lastScan ? relTime(l.lastScan) : t("notScanned")}</TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
+                      <div className="flex gap-1">
                         <IconAction label={t("scan")} icon={RefreshCw} onClick={() => !busy && scan(l)} />
                         <IconAction label={t("edit")} icon={SquarePen} onClick={() => !busy && openEdit(l)} />
                         <IconAction
