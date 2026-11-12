@@ -11,6 +11,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"log/slog"
 	"net/http"
@@ -47,6 +48,10 @@ func New(d Deps) http.Handler {
 	s := &server{d}
 	strict := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{requireAdmin}, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			if errors.Is(err, errReadRequired) {
+				writeError(r.Context(), w, http.StatusBadRequest, "bad_request.read_required")
+				return
+			}
 			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {

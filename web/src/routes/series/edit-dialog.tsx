@@ -1,17 +1,20 @@
 import type { IconComponent } from "@/lib/icon-context";
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { toast } from "@yusufceng1z/ding-react";
-import { Lock, Plus, Unlock, X } from "@keyline-icons/react";
+import { Lock, Plus, Unlock, Upload, X } from "@keyline-icons/react";
 import {
   api,
   errorMessage,
   statusLabel,
+  useApi,
   type Author,
   type ReadingDirection,
   type Series,
   type SeriesStatus,
   type SeriesUpdate,
 } from "@/api";
+import { Cover } from "@/components/media/cover";
+import { typeClass } from "@/lib/type-scale";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -63,6 +66,22 @@ const m = defineMessages({
     keptOnScan: "スキャンで上書きされません",
     overwrittenOnScan: "スキャンで上書きされます",
     lockField: "{name}をロック",
+    tabCover: "表紙",
+    coverCurrent: "現在の表紙",
+    coverSourceBook: "表紙にする巻の表紙",
+    coverSourceUpload: "アップロードした画像",
+    coverSourceLocal: "フォルダの表紙ファイル",
+    coverCaption: "アップロードした画像が最優先です。次にフォルダの表紙ファイル、最後に表紙にする巻の表紙を使います。",
+    coverBook: "表紙にする巻",
+    firstBook: "最初の巻",
+    bookOption: "{n} 巻 {title}",
+    uploadImage: "画像をアップロード",
+    removeUpload: "アップロードした画像を削除",
+    uploadHint: "JPEG、PNG、WebP、20 MB まで",
+    imageType: "JPEG、PNG、WebP の画像を選んでください",
+    imageTooLarge: "画像は 20 MB 以下にしてください",
+    uploaded: "表紙をアップロードしました",
+    uploadRemoved: "アップロードした表紙を削除しました",
   },
   en: {
     dirRtl: "Right to left",
@@ -103,6 +122,22 @@ const m = defineMessages({
     keptOnScan: "Scan won't overwrite this",
     overwrittenOnScan: "Scan can overwrite this",
     lockField: "Lock {name}",
+    tabCover: "Cover",
+    coverCurrent: "Current cover",
+    coverSourceBook: "Thumbnail of the cover book",
+    coverSourceUpload: "Uploaded image",
+    coverSourceLocal: "Cover file in the folder",
+    coverCaption: "An uploaded image comes first, then the cover file in the folder, then the thumbnail of the cover book.",
+    coverBook: "Cover book",
+    firstBook: "First book",
+    bookOption: "Vol. {n} {title}",
+    uploadImage: "Upload image",
+    removeUpload: "Remove uploaded image",
+    uploadHint: "JPEG, PNG or WebP, up to 20 MB",
+    imageType: "Choose a JPEG, PNG or WebP image",
+    imageTooLarge: "Image must be 20 MB or smaller",
+    uploaded: "Cover uploaded",
+    uploadRemoved: "Uploaded cover removed",
   },
 });
 
@@ -157,6 +192,7 @@ type Form = {
   authors: Author[];
   genres: string;
   tags: string;
+  coverBookId: string | null;
 };
 
 function initialForm(s: Series): Form {
@@ -173,6 +209,7 @@ function initialForm(s: Series): Form {
     authors: s.authors.map((a) => ({ ...a })),
     genres: s.genres.join(", "),
     tags: s.tags.join(", "),
+    coverBookId: s.coverBookId ?? null,
   };
 }
 
@@ -223,6 +260,9 @@ function changesOf(form: Form, s: Series, locked: string[]): SeriesUpdate {
   const tags = splitList(form.tags);
   if (!sameList(tags, s.tags)) c.tags = tags;
 
+  // Not a locked field: never added to the lock list below.
+  if (form.coverBookId !== (s.coverBookId ?? null)) c.coverBookId = form.coverBookId;
+
   // Lock list: sent only when the user toggled a lock. It replaces the whole
   // list, so fields the dialog does not show keep their locks, and the fields
   // being saved stay locked (saving a field locks it on the server).
@@ -230,7 +270,8 @@ function changesOf(form: Form, s: Series, locked: string[]): SeriesUpdate {
   if (lockChanged) {
     const shown = Object.keys(fieldLabel());
     const hidden = s.lockedFields.filter((f) => !shown.includes(f));
-    c.lockedFields = [...new Set([...hidden, ...locked, ...Object.keys(c)])];
+    const changed = Object.keys(c).filter((k) => k !== "coverBookId");
+    c.lockedFields = [...new Set([...hidden, ...locked, ...changed])];
   }
   return c;
 }
@@ -254,10 +295,17 @@ export function EditDialog({
   const [locked, setLocked] = useState<string[]>(series.lockedFields);
   const [tab, setTab] = useState(0);
   const [saving, setSaving] = useState(false);
+  // Bumped after an upload or delete so the shown cover reloads its image.
+  const [coverRev, setCoverRev] = useState(0);
   const directionNames = directionLabel();
   const roleNames = roleLabel();
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
+  // Uploads and deletes are saved at once; the new series goes up through onSaved.
+  const coverChanged = (s: Series) => {
+    setCoverRev((r) => r + 1);
+    onSaved(s);
+  };
   const toggleLock = (field: string) =>
     setLocked((l) => (l.includes(field) ? l.filter((x) => x !== field) : [...l, field]));
   const setAuthor = (i: number, patch: Partial<Author>) =>
@@ -304,6 +352,7 @@ export function EditDialog({
           <TabsItem index={0} label={t("tabBasic")} />
           <TabsItem index={1} label={t("tabAuthors")} />
           <TabsItem index={2} label={t("tabTagsGenres")} />
+          <TabsItem index={3} label={t("tabCover")} />
         </Tabs>
 
         <div className="max-h-[60dvh] overflow-y-auto">
@@ -415,6 +464,16 @@ export function EditDialog({
               <Input id="meta-tags" placeholder={t("separate")} value={form.tags} onChange={(e) => set("tags", e.target.value)} />
             </Field>
           </TabsPanel>
+
+          <TabsPanel index={3} selectedIndex={tab} idPrefix="meta" className="grid gap-4">
+            <CoverSection
+              series={series}
+              coverRev={coverRev}
+              coverBookId={form.coverBookId}
+              onCoverBook={(id) => set("coverBookId", id)}
+              onSeries={coverChanged}
+            />
+          </TabsPanel>
         </div>
 
         <DialogFooter>
@@ -427,6 +486,132 @@ export function EditDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const FIRST_BOOK = "first";
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+
+/** The cover: current image and its source, the cover book, and an uploaded
+ *  image. Upload and delete save at once (not with the other fields). */
+function CoverSection({
+  series,
+  coverRev,
+  coverBookId,
+  onCoverBook,
+  onSeries,
+}: {
+  series: Series;
+  coverRev: number;
+  coverBookId: string | null;
+  onCoverBook: (id: string | null) => void;
+  onSeries: (s: Series) => void;
+}) {
+  const t = useT(m);
+  const books = useApi(() => api.booksOfSeries(series.id), [series.id]);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [working, setWorking] = useState(false);
+
+  const base = series.thumbnailUrl;
+  const src = base ? `${base}${base.includes("?") ? "&" : "?"}v=${coverRev}` : "";
+  const sourceText =
+    series.thumbnailSource === "upload"
+      ? t("coverSourceUpload")
+      : series.thumbnailSource === "local"
+        ? t("coverSourceLocal")
+        : t("coverSourceBook");
+
+  const upload = async (file: File | undefined) => {
+    if (!file) return;
+    if (fileRef.current) fileRef.current.value = "";
+    if (!IMAGE_TYPES.includes(file.type)) {
+      toast.error(t("imageType"));
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      toast.error(t("imageTooLarge"));
+      return;
+    }
+    setWorking(true);
+    try {
+      const updated = await api.uploadSeriesThumbnail(series.id, file);
+      toast.success(t("uploaded"));
+      onSeries(updated);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const removeUpload = async () => {
+    setWorking(true);
+    try {
+      const updated = await api.deleteSeriesThumbnail(series.id);
+      toast.success(t("uploadRemoved"));
+      onSeries(updated);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="flex items-start gap-4">
+        <Cover src={src} title={series.title} className="w-28 shrink-0" />
+        <div className="grid min-w-0 gap-2">
+          <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("coverCurrent")}</p>
+          <p className={typeClass("body")}>{sourceText}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" disabled={working} leadingIcon={Upload as IconComponent} onClick={() => fileRef.current?.click()}>
+              {t("uploadImage")}
+            </Button>
+            {series.thumbnailSource === "upload" && (
+              <Button variant="ghost" disabled={working} leadingIcon={X as IconComponent} onClick={removeUpload}>
+                {t("removeUpload")}
+              </Button>
+            )}
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            tabIndex={-1}
+            aria-hidden
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
+          <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("uploadHint")}</p>
+        </div>
+      </div>
+
+      <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("coverCaption")}</p>
+
+      <Field>
+        <FieldLabel htmlFor="meta-cover-book">{t("coverBook")}</FieldLabel>
+        <Select
+          value={coverBookId ?? FIRST_BOOK}
+          onValueChange={(v) => onCoverBook(v === FIRST_BOOK ? null : v)}
+          disabled={!books.data}
+        >
+          <SelectTrigger id="meta-cover-book" />
+          <SelectContent>
+            <SelectItem index={0} value={FIRST_BOOK}>
+              {t("firstBook")}
+            </SelectItem>
+            {(books.data ?? []).map((b, i) => (
+              <SelectItem key={b.id} index={i + 1} value={b.id}>
+                {t("bookOption", { n: String(b.number), title: b.title })}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {books.error && <p className={cn(typeClass("caption"), "text-muted-foreground")}>{books.error}</p>}
+      </Field>
+    </>
   );
 }
 

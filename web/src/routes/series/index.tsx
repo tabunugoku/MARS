@@ -1,7 +1,8 @@
 import type { IconComponent } from "@/lib/icon-context";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
-import { ArrowDown, ArrowUp, ChevronLeft, Play } from "@keyline-icons/react";
+import { AnimatePresence } from "motion/react";
+import { ArrowDown, ArrowUp, ChevronLeft, Circle, CircleCheck, ListChecks, ListPlus, Play, Tag } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, formatDate, seriesFileUrl, startDownload, statusLabel, useApi, type Series } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -12,6 +13,8 @@ import { CountUp } from "@/components/media/count-up";
 import { DotTrack } from "@/components/media/dot-track";
 import { BrandAction } from "@/components/media/brand-action";
 import { CoverGrid, EmptyState, Page } from "@/components/media/layout";
+import { SelectionBar, SelectTile, type BarAction } from "@/components/media/selection";
+import { inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
 import { Block } from "@/components/media/skeletons";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +27,8 @@ import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
 import { EditDialog, directionLabel, fieldLabel, roleLabel } from "./edit-dialog";
 import { AddToCollectionDialog } from "./add-to-collection";
+import { AddToReadListDialog } from "@/routes/readlists/add-to-readlist";
+import { BooksBulkDialog } from "../books-bulk-dialog";
 
 const m = defineMessages({
   ja: {
@@ -64,6 +69,11 @@ const m = defineMessages({
     notSet: "未設定",
     progress: "既読の巻数",
     more: "その他",
+    select: "選択",
+    markedReadN: ({ n }) => `${n} 件を既読にしました`,
+    markedUnreadN: ({ n }) => `${n} 件を未読にしました`,
+    addToReadList: "リーディングリストに追加",
+    editTags: "タグを編集",
   },
   en: {
     notFound: "Series not found",
@@ -103,6 +113,11 @@ const m = defineMessages({
     notSet: "Not set",
     progress: "Books read",
     more: "More",
+    select: "Select",
+    markedReadN: ({ n }) => `Marked ${n} as read`,
+    markedUnreadN: ({ n }) => `Marked ${n} as unread`,
+    addToReadList: "Add to read list",
+    editTags: "Edit tags",
   },
 });
 
@@ -142,6 +157,29 @@ function SeriesPage({ id }: { id: string }) {
   const { data: me } = useApi(() => api.me(), []);
   const isAdmin = me?.role === "admin";
   const canDownload = isAdmin || !!me?.canDownload;
+  const [readListOpen, setReadListOpen] = useState(false);
+  const [listRun, setListRun] = useState(0);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [tagsRun, setTagsRun] = useState(0);
+
+  // Selection of the books in view, in their displayed order; it ends when the order changes.
+  const shownIds = data ? (order === "asc" ? data.books : [...data.books].reverse()).map((b) => b.id) : [];
+  const sel = useSelection(shownIds, `${id}|${order}`);
+  const selecting = sel.active && tab === 0;
+  // After a bulk action the page reloads. A stale `saved` snapshot would hide the new
+  // read counts, so it goes too. The selection clears only when the action worked.
+  const reloadAfter = () => {
+    setSaved(null);
+    reload();
+  };
+  const afterBulk = () => {
+    sel.clear();
+    reloadAfter();
+  };
+  const bulk = useBulkRun((ok) => {
+    if (ok) sel.clear();
+    reloadAfter();
+  });
 
   if (error) {
     return (
@@ -216,6 +254,38 @@ function SeriesPage({ id }: { id: string }) {
       ? { to: `/read/${next.id}`, label: started ? t("continueReading") : t("readFromFirst") }
       : null;
 
+  const readBooks = (read: boolean) =>
+    bulk.run(
+      () => inChunks(sel.ids, (chunk) => api.setBooksReadState(chunk, read).then(() => chunk.length)),
+      (n) => t(read ? "markedReadN" : "markedUnreadN", { n }),
+    );
+  const selectionActions: BarAction[] = [
+    { key: "read", label: t("markRead"), icon: CircleCheck as IconComponent, onSelect: () => readBooks(true) },
+    { key: "unread", label: t("markUnread"), icon: Circle as IconComponent, onSelect: () => readBooks(false) },
+    ...(isAdmin
+      ? [
+          {
+            key: "list",
+            label: t("addToReadList"),
+            icon: ListPlus as IconComponent,
+            onSelect: () => {
+              setListRun((r) => r + 1);
+              setReadListOpen(true);
+            },
+          },
+          {
+            key: "tags",
+            label: t("editTags"),
+            icon: Tag as IconComponent,
+            onSelect: () => {
+              setTagsRun((r) => r + 1);
+              setTagsOpen(true);
+            },
+          },
+        ]
+      : []),
+  ];
+
   const shown = order === "asc" ? books : [...books].reverse();
   const authors = series.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
   const meta: ReactNode[] = [
@@ -224,8 +294,8 @@ function SeriesPage({ id }: { id: string }) {
     <Badge key="status" variant="dot">
       {statusLabel()[series.status]}
     </Badge>,
-    series.language ? <span className="font-mono">{series.language}</span> : null,
-    series.ageRating ? <span className="font-mono">{`${series.ageRating}+`}</span> : null,
+    series.language ? <span key="language" className="font-mono">{series.language}</span> : null,
+    series.ageRating ? <span key="age" className="font-mono">{`${series.ageRating}+`}</span> : null,
   ];
 
   return (
@@ -326,17 +396,24 @@ function SeriesPage({ id }: { id: string }) {
           <TabsItem index={0} label={t("tabBooks", { n: books.length })} className="pointer-coarse:h-11" />
           <TabsItem index={1} label={t("tabInfo")} className="pointer-coarse:h-11" />
         </Tabs>
-        {tab === 0 && books.length > 1 && (
-          <Button
-            variant="ghost"
-            size="compact"
-            className="pointer-coarse:h-11"
-            leadingIcon={(order === "asc" ? ArrowUp : ArrowDown) as IconComponent}
-            onClick={() => setOrder((o) => (o === "asc" ? "desc" : "asc"))}
-          >
-            {order === "asc" ? t("ascending") : t("descending")}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {tab === 0 && books.length > 0 && !selecting && (
+            <Button variant="ghost" size="compact" className="pointer-coarse:h-11" leadingIcon={ListChecks as IconComponent} onClick={sel.enter}>
+              {t("select")}
+            </Button>
+          )}
+          {tab === 0 && books.length > 1 && (
+            <Button
+              variant="ghost"
+              size="compact"
+              className="pointer-coarse:h-11"
+              leadingIcon={(order === "asc" ? ArrowUp : ArrowDown) as IconComponent}
+              onClick={() => setOrder((o) => (o === "asc" ? "desc" : "asc"))}
+            >
+              {order === "asc" ? t("ascending") : t("descending")}
+            </Button>
+          )}
+        </div>
       </div>
 
       <TabsPanel index={0} selectedIndex={tab} idPrefix="series">
@@ -345,7 +422,9 @@ function SeriesPage({ id }: { id: string }) {
         ) : (
           <CoverGrid>
             {shown.map((b) => (
-              <BookCard key={b.id} book={b} />
+              <SelectTile key={b.id} selecting={selecting} selected={sel.has(b.id)} label={b.title} onToggle={(shift) => sel.toggle(b.id, shift)}>
+                <BookCard book={b} />
+              </SelectTile>
             ))}
           </CoverGrid>
         )}
@@ -372,6 +451,25 @@ function SeriesPage({ id }: { id: string }) {
         onSaved={(s) => setSaved(s)}
       />
       {isAdmin && <AddToCollectionDialog seriesId={id} open={addOpen} onOpenChange={setAddOpen} />}
+
+      <AnimatePresence>
+        {selecting && (
+          <SelectionBar
+            key="selection"
+            count={sel.count}
+            busy={bulk.busy}
+            onSelectAll={sel.selectAll}
+            onCancel={sel.exit}
+            actions={selectionActions}
+          />
+        )}
+      </AnimatePresence>
+      {isAdmin && (
+        <AddToReadListDialog key={listRun} bookIds={sel.ids} open={readListOpen} onOpenChange={setReadListOpen} onAdded={afterBulk} />
+      )}
+      {isAdmin && (
+        <BooksBulkDialog key={tagsRun} bookIds={sel.ids} open={tagsOpen} onOpenChange={setTagsOpen} onDone={afterBulk} />
+      )}
     </Page>
   );
 }

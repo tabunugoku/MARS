@@ -137,7 +137,13 @@ paths:
         - { name: libraryId, in: query, schema: { type: string } }
         - { name: search, in: query, description: "Substring of the title, an alternate title or an author", schema: { type: string } }
         - { name: status, in: query, explode: false, schema: { type: array, items: { $ref: "#/components/schemas/SeriesStatus" } } }
-        - { name: genres, in: query, explode: false, description: "Any of these genres", schema: { type: array, items: { type: string } } }
+        - { name: genres, in: query, description: "Any of these genres; repeat the parameter for each value (values may contain commas)", schema: { type: array, items: { type: string } } }
+        - { name: tags, in: query, description: "Any of these tags; repeat the parameter for each value (values may contain commas)", schema: { type: array, items: { type: string } } }
+        - { name: publishers, in: query, description: "Any of these publishers; repeat the parameter for each value (values may contain commas)", schema: { type: array, items: { type: string } } }
+        - { name: languages, in: query, description: "Any of these languages; repeat the parameter for each value (values may contain commas)", schema: { type: array, items: { type: string } } }
+        - { name: authors, in: query, description: "Any of these author names (any role); repeat the parameter for each value (values may contain commas)", schema: { type: array, items: { type: string } } }
+        - { name: ageRatingMax, in: query, description: "Age rating at most this; series without one are included", schema: { type: integer, minimum: 0 } }
+        - { name: complete, in: query, description: "true: series whose total book count is known and reached; false: the others", schema: { type: boolean } }
         - { name: readState, in: query, explode: false, description: "For the caller", schema: { type: array, items: { $ref: "#/components/schemas/ReadState" } } }
         - { name: sort, in: query, schema: { $ref: "#/components/schemas/SeriesSort" } }
         - { name: desc, in: query, schema: { type: boolean } }
@@ -210,9 +216,35 @@ paths:
       - { name: seriesId, in: path, required: true, schema: { type: string } }
     get:
       operationId: getSeriesThumbnail
-      summary: Cover of the series' first book, JPEG
+      summary: "Cover of the series, JPEG: an uploaded image, else the local artwork file, else the cover book's thumbnail (see Series.thumbnailSource)"
       responses:
         "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: uploadSeriesThumbnail
+      summary: Replace the series cover with an uploaded image (administrators only)
+      requestBody:
+        required: true
+        description: "The bytes of a JPEG, PNG or WebP image (the format is detected from the bytes), at most 20 MB; it is resized to the thumbnail size and stored as JPEG"
+        content:
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        "200":
+          description: The series with its new cover
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Series" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: deleteSeriesThumbnail
+      summary: Drop the uploaded series cover; local artwork or the cover book's thumbnail shows again (administrators only)
+      responses:
+        "200":
+          description: The series
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Series" }
         "404": { $ref: "#/components/responses/NotFound" }
   /books/{bookId}:
     parameters:
@@ -250,6 +282,22 @@ paths:
       summary: Cover thumbnail, JPEG
       responses:
         "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      operationId: uploadBookThumbnail
+      summary: Replace the book's thumbnail with an uploaded image until it is regenerated or its cover page is chosen again (administrators only)
+      requestBody:
+        required: true
+        description: "The bytes of a JPEG, PNG or WebP image (the format is detected from the bytes), at most 20 MB; it is resized to the thumbnail size and stored as JPEG"
+        content:
+          application/octet-stream: { schema: { type: string, format: binary } }
+      responses:
+        "200":
+          description: The book with its new thumbnail
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Book" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /books/{bookId}/pages:
     parameters:
@@ -657,6 +705,22 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
         "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: addCollectionSeriesMany
+      summary: Append several members in the given order (ones already there stay where they are); hidden members are kept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesIdList" }
+      responses:
+        "200":
+          description: The collection as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /collections/{collectionId}/series/{seriesId}:
     parameters:
       - { name: collectionId, in: path, required: true, schema: { type: string } }
@@ -771,6 +835,22 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Book" } }
+        "404": { $ref: "#/components/responses/NotFound" }
+    post:
+      operationId: addReadListBooks
+      summary: Append several books in the given order (ones already there stay where they are); hidden members are kept
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookIdList" }
+      responses:
+        "200":
+          description: The read list as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "400": { $ref: "#/components/responses/BadRequest" }
         "404": { $ref: "#/components/responses/NotFound" }
   /read-lists/{readListId}/books/{bookId}:
     parameters:
@@ -1021,6 +1101,102 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Task" }
         "404": { $ref: "#/components/responses/NotFound" }
+  /series/facets:
+    get:
+      operationId: listSeriesFacets
+      summary: Filter options over the series the caller may see
+      parameters:
+        - { name: libraryId, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Distinct values, sorted
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SeriesFacets" }
+  /series/bulk:
+    post:
+      operationId: bulkUpdateSeries
+      summary: Change the same fields on many series in one transaction; every field changed is locked (administrators only)
+      description: Ids the caller cannot see are refused (404) and nothing changes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesBulkUpdate" }
+      responses:
+        "200":
+          description: How many series were changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/bulk:
+    post:
+      operationId: bulkUpdateBooks
+      summary: Add or remove tags on many books in one transaction; tags are locked (administrators only)
+      description: Ids the caller cannot see are refused (404) and nothing changes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BookBulkUpdate" }
+      responses:
+        "200":
+          description: How many books were changed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BulkResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /series/read-state:
+    post:
+      operationId: setSeriesReadState
+      summary: Mark every book of these series read or unread for the caller, in one transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SeriesReadState" }
+      responses:
+        "204": { description: Done }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /books/read-state:
+    post:
+      operationId: setBooksReadState
+      summary: Mark these books read or unread for the caller, in one transaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BooksReadState" }
+      responses:
+        "204": { description: Done }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /read-lists/import:
+    post:
+      operationId: importReadList
+      summary: Create a read list from a ComicRack CBL file, matching its entries to books the caller may see
+      description: >
+        Entries are matched by series title (or an alternate title, ignoring
+        case, width and spacing) and book number. With dryRun nothing is
+        created and readList is null.
+      parameters:
+        - { name: dryRun, in: query, schema: { type: boolean } }
+      requestBody:
+        required: true
+        description: The CBL file (XML), at most 5 MB
+        content:
+          application/xml: { schema: { type: string, format: binary } }
+      responses:
+        "200":
+          description: What matched and what did not
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CblImportResult" }
+        "400": { $ref: "#/components/responses/BadRequest" }
 components:
   securitySchemes:
     session:
@@ -1107,6 +1283,7 @@ components:
         scanInterval: { $ref: "#/components/schemas/ScanInterval" }
         watch: { type: boolean }
         importComicInfo: { type: boolean }
+        importLocalArtwork: { type: boolean, description: "Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover" }
         exclude: { type: array, items: { type: string } }
     LibraryUpdate:
       type: object
@@ -1116,6 +1293,7 @@ components:
         scanInterval: { $ref: "#/components/schemas/ScanInterval" }
         watch: { type: boolean }
         importComicInfo: { type: boolean }
+        importLocalArtwork: { type: boolean, description: "Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover" }
         exclude: { type: array, items: { type: string } }
     ReadingDirection:
       type: string
@@ -1137,7 +1315,7 @@ components:
         role: { type: string, enum: [writer, penciller, colorist, translator, editor, cover] }
     Series:
       type: object
-      required: [id, libraryId, title, titleSort, alternateTitles, status, summary, publisher, readingDirection, ageRating, language, genres, tags, authors, totalBookCount, bookCount, booksRead, booksInProgress, thumbnailUrl, createdAt, updatedAt, lockedFields]
+      required: [id, libraryId, title, titleSort, alternateTitles, status, summary, publisher, readingDirection, ageRating, language, genres, tags, authors, totalBookCount, bookCount, booksRead, booksInProgress, thumbnailUrl, thumbnailSource, coverBookId, createdAt, updatedAt, lockedFields]
       properties:
         id: { type: string }
         libraryId: { type: string }
@@ -1158,9 +1336,14 @@ components:
         booksRead: { type: integer }
         booksInProgress: { type: integer }
         thumbnailUrl: { type: string }
+        thumbnailSource: { $ref: "#/components/schemas/SeriesThumbnailSource" }
+        coverBookId: { type: string, nullable: true, description: "The book whose thumbnail is the series cover when no image is uploaded or found; null means the first book" }
         createdAt: { type: string }
         updatedAt: { type: string }
         lockedFields: { type: array, items: { type: string } }
+    SeriesThumbnailSource:
+      type: string
+      enum: [book, upload, local]
     ReadProgress:
       type: object
       required: [page, completed, readAt]
@@ -1170,7 +1353,7 @@ components:
         readAt: { type: string }
     Book:
       type: object
-      required: [id, seriesId, seriesTitle, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields, coverPage]
+      required: [id, seriesId, seriesTitle, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, thumbnailUploaded, createdAt, lockedFields, coverPage]
       properties:
         id: { type: string }
         seriesId: { type: string }
@@ -1194,6 +1377,7 @@ components:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/ReadProgress" }]
         thumbnailUrl: { type: string }
+        thumbnailUploaded: { type: boolean, description: "The thumbnail is an uploaded image rather than made from the cover page" }
         createdAt: { type: string }
         lockedFields: { type: array, items: { type: string } }
         coverPage: { type: integer, description: "Page the thumbnail is made from (1 unless an administrator chose another)" }
@@ -1412,6 +1596,7 @@ components:
         tags: { type: array, items: { type: string } }
         authors: { type: array, items: { $ref: "#/components/schemas/Author" } }
         totalBookCount: { type: integer, nullable: true, description: "null clears it", x-go-type: "Opt[int]", x-go-type-skip-optional-pointer: true }
+        coverBookId: { type: string, nullable: true, description: "A book of this series; null goes back to the first book. Not a locked field.", x-go-type: "Opt[string]", x-go-type-skip-optional-pointer: true }
         lockedFields: { type: array, items: { type: string } }
     BookUpdate:
       type: object
@@ -1470,6 +1655,89 @@ components:
         books: { type: array, items: { $ref: "#/components/schemas/Book" } }
         collections: { type: array, items: { $ref: "#/components/schemas/Collection" } }
         readLists: { type: array, items: { $ref: "#/components/schemas/ReadList" } }
+    SeriesIdList:
+      type: object
+      required: [seriesIds]
+      properties:
+        seriesIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+    BookIdList:
+      type: object
+      required: [bookIds]
+      properties:
+        bookIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+    SeriesFacets:
+      type: object
+      required: [genres, tags, publishers, languages, authors, ageRatings]
+      properties:
+        genres: { type: array, items: { type: string } }
+        tags: { type: array, items: { type: string } }
+        publishers: { type: array, items: { type: string } }
+        languages: { type: array, items: { type: string } }
+        authors: { type: array, items: { type: string } }
+        ageRatings: { type: array, items: { type: integer } }
+    SeriesBulkUpdate:
+      type: object
+      required: [seriesIds]
+      description: Fields left out are not changed. Genres and tags are added and removed, not replaced.
+      properties:
+        seriesIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+        status: { $ref: "#/components/schemas/SeriesStatus" }
+        publisher: { type: string }
+        readingDirection: { $ref: "#/components/schemas/ReadingDirection" }
+        ageRating: { type: integer, nullable: true, description: "null clears it", x-go-type: "Opt[int]", x-go-type-skip-optional-pointer: true }
+        language: { type: string }
+        addGenres: { type: array, items: { type: string } }
+        removeGenres: { type: array, items: { type: string } }
+        addTags: { type: array, items: { type: string } }
+        removeTags: { type: array, items: { type: string } }
+    BookBulkUpdate:
+      type: object
+      required: [bookIds]
+      properties:
+        bookIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+        addTags: { type: array, items: { type: string } }
+        removeTags: { type: array, items: { type: string } }
+    BulkResult:
+      type: object
+      required: [updated]
+      properties:
+        updated: { type: integer }
+    SeriesReadState:
+      type: object
+      required: [seriesIds, read]
+      properties:
+        seriesIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+        read: { type: boolean }
+    BooksReadState:
+      type: object
+      required: [bookIds, read]
+      properties:
+        bookIds: { type: array, minItems: 1, maxItems: 1000, items: { type: string } }
+        read: { type: boolean }
+    CblEntry:
+      type: object
+      required: [series, number, volume, year]
+      properties:
+        series: { type: string }
+        number: { type: string }
+        volume: { type: string }
+        year: { type: string }
+    CblMatch:
+      type: object
+      required: [entry, book]
+      properties:
+        entry: { $ref: "#/components/schemas/CblEntry" }
+        book: { $ref: "#/components/schemas/Book" }
+    CblImportResult:
+      type: object
+      required: [name, readList, matched, unmatched]
+      properties:
+        name: { type: string, description: "The list's name from the file (Name element), or the default name" }
+        readList:
+          nullable: true
+          allOf: [{ $ref: "#/components/schemas/ReadList" }]
+        matched: { type: array, items: { $ref: "#/components/schemas/CblMatch" } }
+        unmatched: { type: array, items: { $ref: "#/components/schemas/CblEntry" } }
     Collection:
       type: object
       required: [id, name, ordered, seriesIds]

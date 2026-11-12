@@ -25,19 +25,27 @@ export function retryCovers(): void {
 const revisions = new Map<string, number>();
 const watchers = new Map<string, Set<() => void>>();
 
+/** The key revisions are kept under: the URL's path, without the query
+ *  (thumbnail URLs carry ?v=<hash>, bumps use the bare path). */
+function coverKey(src: string): string {
+  const cut = src.search(/[?#]/);
+  return cut === -1 ? src : src.slice(0, cut);
+}
+
 /** The revision of a thumbnail URL: 0 until it changed in this tab. */
 export function coverRevision(src: string): number {
-  return revisions.get(src) ?? 0;
+  return revisions.get(coverKey(src)) ?? 0;
 }
 
 /** Calls f whenever src's revision changes; returns an unsubscribe. */
 export function onCoverRevision(src: string, f: () => void): () => void {
-  let set = watchers.get(src);
-  if (!set) watchers.set(src, (set = new Set()));
+  const key = coverKey(src);
+  let set = watchers.get(key);
+  if (!set) watchers.set(key, (set = new Set()));
   set.add(f);
   return () => {
     set.delete(f);
-    if (set.size === 0) watchers.delete(src);
+    if (set.size === 0) watchers.delete(key);
   };
 }
 

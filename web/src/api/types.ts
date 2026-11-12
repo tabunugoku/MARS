@@ -49,12 +49,27 @@ export type TrashResult = S["TrashResult"];
 export type ReaderPrefsAll = S["ReaderPrefsAll"];
 export type SeriesSort = S["SeriesSort"];
 export type ReadState = S["ReadState"];
+export type SeriesFacets = S["SeriesFacets"];
+export type SeriesBulkUpdate = S["SeriesBulkUpdate"];
+export type BookBulkUpdate = S["BookBulkUpdate"];
+export type BulkResult = S["BulkResult"];
+export type CblEntry = S["CblEntry"];
+export type CblImportResult = S["CblImportResult"];
+export type SeriesThumbnailSource = S["SeriesThumbnailSource"];
 
 export interface SeriesQuery {
   libraryId?: string;
   search?: string;
   status?: SeriesStatus[];
   genres?: string[];
+  tags?: string[];
+  publishers?: string[];
+  languages?: string[];
+  authors?: string[];
+  /** Age rating at most this; series without one are included. */
+  ageRatingMax?: number;
+  /** true: total book count known and reached; false: the others. */
+  complete?: boolean;
   readState?: ReadState[];
   sort?: SeriesSort;
   desc?: boolean;

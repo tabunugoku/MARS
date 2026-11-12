@@ -3,6 +3,7 @@ import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { defineMessages, useT } from "@/i18n";
 import { ListCard, ListGrid, ListGridSkeleton, NewListDialog, ViewSwitch } from "../collections/_parts";
+import { ImportCblDialog } from "./import-dialog";
 
 const m = defineMessages({
   ja: {
@@ -36,7 +37,14 @@ export default function Screen() {
       <PageHeader
         title={t("title")}
         meta={data ? t("count", { n: data.lists.length }) : undefined}
-        actions={data?.isAdmin ? <NewListDialog kind="readlist" /> : undefined}
+        actions={
+          data?.isAdmin ? (
+            <div className="flex flex-wrap gap-2">
+              <ImportCblDialog />
+              <NewListDialog kind="readlist" />
+            </div>
+          ) : undefined
+        }
       />
       <ViewSwitch current="readlists" />
 

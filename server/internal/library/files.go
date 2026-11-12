@@ -21,14 +21,15 @@ var ErrNotReady = errors.New("library: book not analysed")
 // ErrBadPage means a cover page outside 1..page count.
 var ErrBadPage = errors.New("library: no such page")
 
-// writeThumb stores jpg as the book's thumbnail file and returns its name.
-// The temporary file is unique, so an analysis and a regeneration of the
-// same book can run at once; the last rename wins.
-func (s *Service) writeThumb(bookID string, jpg []byte) (string, error) {
+// writeThumb stores jpg as a new thumbnail file named after prefix and
+// returns its name. Every write gets a fresh name, so a thumbnail URL that
+// carries the name changes with the image; the caller removes the file the
+// row used to name.
+func (s *Service) writeThumb(prefix string, jpg []byte) (string, error) {
 	if err := os.MkdirAll(s.ThumbDir, 0o755); err != nil {
 		return "", err
 	}
-	name := bookID + ".jpg"
+	name := newThumbName(prefix)
 	f, err := os.CreateTemp(s.ThumbDir, name+".*.tmp")
 	if err != nil {
 		return "", err
@@ -83,11 +84,11 @@ func (s *Service) SetCover(ctx context.Context, bookID string, n int) error {
 }
 
 func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error {
-	var root, rel, status string
+	var root, rel, status, oldThumb string
 	var count int
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT l.root, b.path, b.media_status, b.page_count FROM books b JOIN libraries l ON l.id = b.library_id
-		WHERE b.id = ? AND b.deleted_at IS NULL`, bookID).Scan(&root, &rel, &status, &count)
+		SELECT l.root, b.path, b.media_status, b.page_count, b.thumbnail FROM books b JOIN libraries l ON l.id = b.library_id
+		WHERE b.id = ? AND b.deleted_at IS NULL`, bookID).Scan(&root, &rel, &status, &count, &oldThumb)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrNotFound
 	}
@@ -123,9 +124,12 @@ func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error
 	if err != nil {
 		return err
 	}
-	if _, err = s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ? WHERE id = ? AND thumbnail != ?`, name, bookID, name); err != nil {
+	// A page thumbnail replaces an uploaded one: the upload flag goes too.
+	if _, err = s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ?, thumbnail_uploaded = 0 WHERE id = ? AND deleted_at IS NULL`, name, bookID); err != nil {
+		s.removeThumb(name)
 		return err
 	}
+	s.removeThumb(oldThumb)
 	// The file may be new under the same name: tell open screens either way.
 	var libID, seriesID string
 	if err := s.DB.QueryRowContext(ctx, `SELECT library_id, series_id FROM books WHERE id = ?`, bookID).Scan(&libID, &seriesID); err == nil {

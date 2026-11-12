@@ -209,6 +209,16 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	if inv := checkSeriesUpdate(b); inv.code != "" {
 		return UpdateSeries400JSONResponse{badRequest(ctx, inv.code, inv.args...)}, nil
 	}
+	if b.CoverBookId.Set && b.CoverBookId.Value != nil {
+		// The cover must be a visible book of this series (not a locked field).
+		bk, ok, err := s.oneBook(ctx, *b.CoverBookId.Value)
+		if err != nil {
+			return nil, err
+		}
+		if !ok || bk.SeriesId != req.SeriesId {
+			return UpdateSeries400JSONResponse{badRequest(ctx, "bad_request.cover_book")}, nil
+		}
+	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
@@ -273,6 +283,9 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	}
 	if b.TotalBookCount.Set {
 		field("totalBookCount", "total_book_count", b.TotalBookCount.Value)
+	}
+	if b.CoverBookId.Set {
+		set, args = append(set, "cover_book_id = ?"), append(args, b.CoverBookId.Value)
 	}
 	set = append(set, "locked_fields = ?", "updated_at = ?")
 	args = append(args, lockJSON(locks, edited, b.LockedFields), time.Now().UTC().Format(time.RFC3339Nano), req.SeriesId)
@@ -486,6 +499,23 @@ func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (Emp
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Uploaded or local-artwork covers of series that go.
+	srows, err := tx.QueryContext(ctx, `SELECT thumbnail FROM series WHERE thumbnail != '' AND deleted_at IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+	for srows.Next() {
+		var name string
+		if err := srows.Scan(&name); err != nil {
+			srows.Close()
+			return nil, err
+		}
+		thumbs = append(thumbs, name)
+	}
+	srows.Close()
+	if err := srows.Err(); err != nil {
 		return nil, err
 	}
 

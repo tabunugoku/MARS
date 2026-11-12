@@ -204,9 +204,7 @@ export default function Screen() {
             <DropdownMenu>
               <Tooltip content={t("moreActions")}>
                 <span className="inline-flex">
-                  <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")} />}>
-                    <MoreHorizontal size={16} />
-                  </DropdownTrigger>
+                  <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")}><MoreHorizontal size={16} /></Button>} />
                 </span>
               </Tooltip>
               <DropdownContent align="end">

@@ -76,6 +76,7 @@ func (s *Service) scanLock(id string) ctxMutex {
 type lib struct {
 	id, name, root, kind, interval string
 	importComicInfo                bool
+	importArtwork                  bool
 	exclude                        []string
 	lastScan                       sql.NullString
 }
@@ -84,8 +85,8 @@ func (s *Service) load(ctx context.Context, id string) (lib, error) {
 	var l lib
 	var excl string
 	err := s.DB.QueryRowContext(ctx,
-		`SELECT id, name, root, kind, scan_interval, import_comicinfo, exclude, last_scan FROM libraries WHERE id = ?`, id).
-		Scan(&l.id, &l.name, &l.root, &l.kind, &l.interval, &l.importComicInfo, &excl, &l.lastScan)
+		`SELECT id, name, root, kind, scan_interval, import_comicinfo, import_local_artwork, exclude, last_scan FROM libraries WHERE id = ?`, id).
+		Scan(&l.id, &l.name, &l.root, &l.kind, &l.interval, &l.importComicInfo, &l.importArtwork, &excl, &l.lastScan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return l, ErrNotFound
 	}
@@ -150,7 +151,13 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
-		if st != (scan.Stats{}) {
+		artChanged, err := s.syncArtwork(ctx, l)
+		if err != nil {
+			return err
+		}
+		// An artwork-only change (a cover file added, replaced or removed)
+		// is announced too, so open screens refetch the series covers.
+		if st != (scan.Stats{}) || artChanged {
 			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
 				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
 				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
@@ -306,17 +313,21 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		return "", nil, err
 	}
 	defer mu.Unlock()
-	var nowCover int
-	if err := s.DB.QueryRowContext(ctx, `SELECT cover_page FROM books WHERE id = ?`, bookID).Scan(&nowCover); err != nil {
+	var nowCover, uploaded int
+	var oldThumb string
+	if err := s.DB.QueryRowContext(ctx, `SELECT cover_page, thumbnail, thumbnail_uploaded FROM books WHERE id = ?`, bookID).
+		Scan(&nowCover, &oldThumb, &uploaded); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return seriesID, nil, nil
 		}
 		return "", nil, err
 	}
 	coverChanged := nowCover != coverPage && nowCover >= 1 && nowCover <= len(a.Pages)
+	// A changed cover and an uploaded thumbnail both keep their image.
+	keep := coverChanged || uploaded == 1
 
 	thumb := ""
-	if !coverChanged {
+	if !keep {
 		w, h := s.thumbBounds(ctx)
 		if jpg, err := media.Thumbnail(a.Cover, w, h); err == nil {
 			if thumb, err = s.writeThumb(bookID, jpg); err != nil {
@@ -339,11 +350,13 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 			thumbnail = CASE WHEN ? THEN thumbnail ELSE ? END,
 			cover_page = CASE WHEN ? THEN cover_page ELSE ? END, updated_at = ?
 		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
-		len(a.Pages), coverChanged, thumb, coverChanged, a.CoverPage, ts, bookID, v.size, v.mtime)
+		len(a.Pages), keep, thumb, coverChanged, a.CoverPage, ts, bookID, v.size, v.mtime)
 	if err != nil {
+		s.removeThumb(thumb)
 		return "", nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
+		s.removeThumb(thumb)
 		return seriesID, nil, nil // rescanned meanwhile; the next analysis takes it
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
@@ -368,7 +381,11 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		}
 	}
 	if err := tx.Commit(); err != nil {
+		s.removeThumb(thumb)
 		return "", nil, err
+	}
+	if !keep {
+		s.removeThumb(oldThumb) // replaced by thumb (or cleared when none was made)
 	}
 	s.bookChanged(l.id, seriesID, bookID, "ready")
 	return seriesID, ci, nil
@@ -641,7 +658,7 @@ func hash(s string) uint32 {
 func (s *Service) ThumbnailPath(ctx context.Context, kind, id string) (string, error) {
 	q := `SELECT thumbnail FROM books WHERE id = ? AND deleted_at IS NULL`
 	if kind == "series" {
-		q = `SELECT thumbnail FROM books WHERE series_id = ? AND deleted_at IS NULL AND thumbnail != '' ORDER BY number_sort, path LIMIT 1`
+		q = `SELECT ` + SeriesCoverSQL + ` FROM series s WHERE s.id = ?`
 	}
 	var name string
 	err := s.DB.QueryRowContext(ctx, q, id).Scan(&name)

@@ -57,9 +57,10 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     keepalive: opts.keepalive,
     headers: {
       "Accept-Language": getLocale(),
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(body === undefined ? {} : { "Content-Type": body instanceof Blob ? "application/octet-stream" : "application/json" }),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    // A Blob (an uploaded file) goes as it is; anything else as JSON.
+    body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
   });
   if (res.ok) {
     opts.onHeaders?.(res.headers);
@@ -92,12 +93,18 @@ export async function requestPage<T>(path: string): Promise<{ items: T[]; total:
   return { items, total: total ?? items.length };
 }
 
-/** Builds a query string; arrays are comma-joined (the contract uses explode: false). */
+/** Free-text list filters the contract sends as repeated parameters
+ *  (explode: true), since their values may contain commas. */
+const REPEATED = new Set(["genres", "tags", "publishers", "languages", "authors"]);
+
+/** Builds a query string. Arrays are comma-joined (explode: false), except
+ *  the keys in REPEATED, which repeat the parameter once per value. */
 export function query(params: Record<string, string | number | boolean | string[] | undefined>): string {
   const q = new URLSearchParams();
   for (const [k, v] of Object.entries(params)) {
     if (v === undefined || (Array.isArray(v) && v.length === 0)) continue;
-    q.set(k, Array.isArray(v) ? v.join(",") : String(v));
+    if (Array.isArray(v) && REPEATED.has(k)) for (const x of v) q.append(k, x);
+    else q.set(k, Array.isArray(v) ? v.join(",") : String(v));
   }
   const s = q.toString();
   return s ? `?${s}` : "";

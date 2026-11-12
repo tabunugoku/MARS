@@ -32,10 +32,11 @@ var opAccess = map[string]access{
 
 	// Reading (always within libScope)
 	"ListLibraries": anyone, "GetLibrary": anyone,
-	"ListSeries": anyone, "ListGenres": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
+	"ListSeries": anyone, "ListGenres": anyone, "ListSeriesFacets": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
 	"GetBook": anyone, "GetBookThumbnail": anyone, "ListBookPages": anyone, "GetBookPage": anyone, "GetBookPageThumbnail": anyone,
 	"GetAdjacentBooks": anyone, "GetDashboard": anyone, "Search": anyone,
 	"SetBookProgress": anyone, "MarkLibraryRead": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,
+	"SetSeriesReadState": anyone, "SetBooksReadState": anyone,
 	"ListCollections": anyone, "GetCollection": anyone, "ListCollectionSeries": anyone,
 	"ListReadLists": anyone, "GetReadList": anyone, "ListReadListBooks": anyone,
 	// Hand-routed downloads: the handlers check canDownload after visibility.
@@ -53,6 +54,9 @@ var opAccess = map[string]access{
 	"CreateReadList": adminOnly, "UpdateReadList": adminOnly, "DeleteReadList": adminOnly,
 	"AddCollectionSeries": adminOnly, "RemoveCollectionSeries": adminOnly, "ReorderCollection": adminOnly,
 	"AddReadListBook": adminOnly, "RemoveReadListBook": adminOnly, "ReorderReadList": adminOnly,
+	"AddCollectionSeriesMany": adminOnly, "AddReadListBooks": adminOnly, "ImportReadList": adminOnly,
+	"BulkUpdateSeries": adminOnly, "BulkUpdateBooks": adminOnly,
+	"UploadBookThumbnail": adminOnly, "UploadSeriesThumbnail": adminOnly, "DeleteSeriesThumbnail": adminOnly,
 }
 
 func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {

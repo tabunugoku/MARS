@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { chunked } from "@/components/media/selection-state";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import type { IconComponent } from "@/lib/icon-context";
@@ -21,6 +22,7 @@ const m = defineMessages({
     newName: "新しいリーディングリスト",
     create: "作成",
     close: "閉じる",
+    addedMany: ({ n }) => `${n} 件を追加しました`,
   },
   en: {
     created: "Read list created",
@@ -30,22 +32,161 @@ const m = defineMessages({
     newName: "New read list",
     create: "Create",
     close: "Close",
+    addedMany: ({ n }) => `Added ${n}`,
   },
 });
 
-/** Adds one book to read lists. Admin only (the server refuses other users'
- *  list writes). Mounted fresh on each open (parent uses a key), so the lists
- *  are fetched once per open. Each checkbox saves at once; a failed save is
- *  rolled back and reported with a toast. */
+/** Adds books to read lists. Admin only (the server refuses other users'
+ *  list writes). With `bookId` (one book) each checkbox saves at once and a
+ *  failed save is rolled back with a toast. With `bookIds` (a selection) each
+ *  row appends all of them to that list. Mounted fresh on each open (parent
+ *  uses a key), so the lists are fetched once per open. */
 export function AddToReadListDialog({
   bookId,
+  bookIds,
   open,
   onOpenChange,
+  onAdded,
 }: {
-  bookId: string;
+  bookId?: string;
+  bookIds?: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Many mode: runs after the books were added; the dialog then closes. */
+  onAdded?: () => void;
 }) {
+  const t = useT(m);
+  if (bookIds) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>{t("title")}</DialogTitle>
+          </DialogHeader>
+          <ReadListAddMany
+            ids={bookIds}
+            open={open}
+            onDone={() => {
+              onAdded?.();
+              onOpenChange(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
+    );
+  }
+  return <ReadListChecks bookId={bookId ?? ""} open={open} onOpenChange={onOpenChange} />;
+}
+
+/** Many books: a row click appends them all to that list; a new name creates a list holding them. */
+function ReadListAddMany({ ids, open, onDone }: { ids: string[]; open: boolean; onDone: () => void }) {
+  const t = useT(m);
+  const [lists, setLists] = useState<ReadList[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    api
+      .readLists()
+      .then((ls) => {
+        if (live) setLists(ls);
+      })
+      .catch((err: unknown) => live && setError(errorMessage(err)));
+    return () => {
+      live = false;
+    };
+  }, [open]);
+
+  // The server takes at most 1000 ids per call; the chunks go one after another.
+  const addTo = async (l: ReadList) => {
+    setBusy(true);
+    try {
+      for (const chunk of chunked(ids)) await api.addReadListBooks(l.id, chunk);
+      toast.success(t("addedMany", { n: ids.length }));
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async () => {
+    const n = name.trim();
+    if (!n || busy) return;
+    setBusy(true);
+    try {
+      const [first = [], ...rest] = chunked(ids);
+      const created = await api.createReadList({ name: n, bookIds: first });
+      for (const chunk of rest) await api.addReadListBooks(created.id, chunk);
+      toast.success(t("created"));
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      {error ? (
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{error}</p>
+      ) : !lists ? (
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("loading")}</p>
+      ) : lists.length === 0 ? (
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("empty")}</p>
+      ) : (
+        <ul className="max-h-[50dvh] divide-y divide-border overflow-y-auto">
+          {lists.map((l) => (
+            <li key={l.id}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => addTo(l)}
+                className="flex min-h-11 w-full cursor-pointer items-center gap-3 py-2 text-left outline-none ring-[var(--focus-ring)] focus-visible:ring-2 disabled:cursor-progress"
+              >
+                <span className={cn(typeClass("body"), "min-w-0 flex-1 truncate text-foreground")}>{l.name}</span>
+                <span className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{l.bookIds.length}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="space-y-2 border-t border-border pt-4">
+        <Field>
+          <FieldLabel htmlFor="new-readlist-name">{t("newName")}</FieldLabel>
+          <div className="flex items-center gap-2">
+            <Input
+              id="new-readlist-name"
+              className="flex-1"
+              value={name}
+              disabled={!lists || busy}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) create();
+              }}
+            />
+            <Button variant="secondary" leadingIcon={Plus as IconComponent} disabled={!name.trim() || !lists || busy} onClick={create}>
+              {t("create")}
+            </Button>
+          </div>
+        </Field>
+      </div>
+
+      <DialogFooter>
+        <DialogClose render={<Button variant="ghost">{t("close")}</Button>} />
+      </DialogFooter>
+    </>
+  );
+}
+
+/** One book: each checkbox saves at once. */
+function ReadListChecks({ bookId, open, onOpenChange }: { bookId: string; open: boolean; onOpenChange: (open: boolean) => void }) {
   const t = useT(m);
   const [lists, setLists] = useState<ReadList[] | null>(null);
   const [error, setError] = useState<string | null>(null);

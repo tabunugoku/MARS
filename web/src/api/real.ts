@@ -5,6 +5,7 @@ import type {
   AdjacentBooks, ApiKey, ApiKeyCreated, Book, BookUpdate, Collection, CollectionCreate, CollectionUpdate,
   Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
   ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
+  SeriesFacets, SeriesBulkUpdate, BookBulkUpdate, BulkResult, CblImportResult,
   SeriesUpdate, ServerSettings, SetupRequest, Task, TrashResult, User, UserCreate, UserUpdate,
 } from "./types";
 import type { GlobalReaderPrefs, ReaderPrefs, ReaderProfile } from "./reader-prefs";
@@ -62,6 +63,22 @@ export const realApi = {
     requestPage<Series>("/series" + query({ ...q })),
   /** Genres of the visible series (the genre filter's options). */
   genres: (libraryId?: string) => get<string[]>("/genres" + query({ libraryId })),
+  /** Every filter's options over the visible series (optionally one library). */
+  seriesFacets: (libraryId?: string) => get<SeriesFacets>("/series/facets" + query({ libraryId })),
+  /** Same changes on many series, one transaction; changed fields lock (admin). */
+  bulkUpdateSeries: (body: SeriesBulkUpdate) => request<BulkResult>("POST", "/series/bulk", body),
+  /** Add or remove tags on many books, one transaction (admin). */
+  bulkUpdateBooks: (body: BookBulkUpdate) => request<BulkResult>("POST", "/books/bulk", body),
+  /** Mark every book of these series read or unread for the caller. */
+  setSeriesReadState: (seriesIds: string[], read: boolean) => request<void>("POST", "/series/read-state", { seriesIds, read }),
+  /** Mark these books read or unread for the caller. */
+  setBooksReadState: (bookIds: string[], read: boolean) => request<void>("POST", "/books/read-state", { bookIds, read }),
+  /** Replace the series cover with an image file (JPEG, PNG or WebP, ≤ 20 MB; admin). */
+  uploadSeriesThumbnail: (id: string, file: Blob) => request<Series>("PUT", `/series/${enc(id)}/thumbnail`, file),
+  /** Drop the uploaded series cover (admin). */
+  deleteSeriesThumbnail: (id: string) => request<Series>("DELETE", `/series/${enc(id)}/thumbnail`),
+  /** Replace the book's thumbnail with an image file (admin). */
+  uploadBookThumbnail: (id: string, file: Blob) => request<Book>("PUT", `/books/${enc(id)}/thumbnail`, file),
   seriesById: (id: string) => byId<Series>(`/series/${enc(id)}`),
   seriesByIds: async (ids: string[]) => notNull(await Promise.all(ids.map((id) => realApi.seriesById(id)))),
   updateSeries: (id: string, changes: SeriesUpdate) => request<Series>("PATCH", `/series/${enc(id)}`, changes),
@@ -94,6 +111,9 @@ export const realApi = {
   updateCollection: (id: string, body: CollectionUpdate) => request<Collection>("PATCH", `/collections/${enc(id)}`, body),
   deleteCollection: (id: string) => request<void>("DELETE", `/collections/${enc(id)}`),
   /** One member at a time; each returns the list as the caller now sees it. */
+  /** Append several series in order (admin). */
+  addCollectionSeriesMany: (id: string, seriesIds: string[]) =>
+    request<Collection>("POST", `/collections/${enc(id)}/series`, { seriesIds }),
   addCollectionSeries: (id: string, seriesId: string) =>
     request<Collection>("POST", `/collections/${enc(id)}/series/${enc(seriesId)}`),
   removeCollectionSeries: (id: string, seriesId: string) =>
@@ -105,6 +125,11 @@ export const realApi = {
   readList: (id: string) => byId<ReadList>(`/read-lists/${enc(id)}`),
   readListBooks: (id: string) => get<Book[]>(`/read-lists/${enc(id)}/books`),
   createReadList: (body: ReadListCreate) => request<ReadList>("POST", "/read-lists", body),
+  /** Read a ComicRack CBL file into a new read list; dryRun only reports the matches (admin). */
+  importReadList: (file: Blob, dryRun: boolean) =>
+    request<CblImportResult>("POST", "/read-lists/import" + query({ dryRun: dryRun || undefined }), file),
+  /** Append several books in order (admin). */
+  addReadListBooks: (id: string, bookIds: string[]) => request<ReadList>("POST", `/read-lists/${enc(id)}/books`, { bookIds }),
   updateReadList: (id: string, body: ReadListUpdate) => request<ReadList>("PATCH", `/read-lists/${enc(id)}`, body),
   deleteReadList: (id: string) => request<void>("DELETE", `/read-lists/${enc(id)}`),
   /** One book at a time; each returns the list as the caller now sees it. */
