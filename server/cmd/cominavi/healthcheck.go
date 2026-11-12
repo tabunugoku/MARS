@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -15,11 +16,17 @@ import (
 func healthcheck(ctx context.Context, addr string) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+probeAddr(addr)+"/api/v1/healthz", nil)
+	// url.URL escapes an IPv6 zone ("fe80::1%eth0" becomes "%25eth0"), which
+	// a concatenated string would leave for the URL parser to reject.
+	u := url.URL{Scheme: "http", Host: probeAddr(addr), Path: "/api/v1/healthz"}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return err
 	}
-	res, err := http.DefaultClient.Do(req)
+	// The probe is local: never route it through HTTP_PROXY.
+	client := &http.Client{Transport: &http.Transport{Proxy: nil}}
+	defer client.CloseIdleConnections()
+	res, err := client.Do(req)
 	if err != nil {
 		return err
 	}

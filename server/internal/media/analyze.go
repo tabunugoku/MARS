@@ -220,7 +220,11 @@ func ReadEntry(ctx context.Context, path archive.Path, name string) ([]byte, err
 			return nil, err
 		}
 		defer rc.Close()
-		return read(rc)
+		data, err := read(ctxReader{ctx, rc})
+		if err == nil {
+			err = ctx.Err()
+		}
+		return data, err
 	}
 	var data []byte
 	found := false
@@ -243,4 +247,19 @@ func ReadEntry(ctx context.Context, path archive.Path, name string) ([]byte, err
 		return nil, archive.ErrNotExist
 	}
 	return data, nil
+}
+
+// ctxReader stops a read once ctx is done, so a cancelled task or the
+// extraction timeout also ends a direct (random-access) entry read, which
+// otherwise runs to the end of the entry.
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }
