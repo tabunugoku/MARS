@@ -66,7 +66,6 @@ const m = defineMessages({
     scanStarted: "スキャンを開始しました",
     deepScanStarted: "詳細スキャンを開始しました",
     regenerateStarted: "表紙の作り直しを開始しました",
-    watchFailed: "ファイルの監視を開始できませんでした: {error}",
     notScanned: "未スキャン",
     scan: "スキャン",
     edit: "編集",
@@ -120,7 +119,6 @@ const m = defineMessages({
     scanStarted: "Scan started",
     deepScanStarted: "Deep scan started",
     regenerateStarted: "Cover regeneration started",
-    watchFailed: "Could not start watching files: {error}",
     notScanned: "Not scanned",
     scan: "Scan",
     edit: "Edit",
@@ -337,7 +335,7 @@ export default function Screen() {
                       </div>
                       {l.watchError && (
                         <p className={cn(typeClass("caption"), "mt-1 min-w-[200px] max-w-[260px] text-muted-foreground")}>
-                          {t("watchFailed", { error: l.watchError })}
+                          {l.watchError /* the server sends the whole sentence, in the request's language */}
                         </p>
                       )}
                     </TableCell>
