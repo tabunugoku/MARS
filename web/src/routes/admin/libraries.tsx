@@ -33,6 +33,7 @@ type LibForm = {
   kind: Kind;
   scanInterval: Interval;
   importComicInfo: boolean;
+  watch: boolean;
   exclude: string;
 };
 
@@ -47,6 +48,7 @@ const BLANK: LibForm = {
   kind: "manga",
   scanInterval: "daily",
   importComicInfo: true,
+  watch: false,
   exclude: "",
 };
 
@@ -56,6 +58,7 @@ const toForm = (l: Library): LibForm => ({
   kind: l.kind,
   scanInterval: l.scanInterval,
   importComicInfo: l.importComicInfo,
+  watch: l.watch,
   exclude: l.exclude.join("\n"),
 });
 
@@ -93,6 +96,7 @@ export default function Screen() {
           if (form.kind !== original.kind) changes.kind = form.kind;
           if (form.scanInterval !== original.scanInterval) changes.scanInterval = form.scanInterval;
           if (form.importComicInfo !== original.importComicInfo) changes.importComicInfo = form.importComicInfo;
+          if (form.watch !== original.watch) changes.watch = form.watch;
           if (!sameList(exclude, original.exclude)) changes.exclude = exclude;
         }
         if (Object.keys(changes).length > 0) {
@@ -106,6 +110,7 @@ export default function Screen() {
           kind: form.kind,
           scanInterval: form.scanInterval,
           importComicInfo: form.importComicInfo,
+          watch: form.watch,
           exclude,
         };
         await api.createLibrary(body);
@@ -200,6 +205,11 @@ export default function Screen() {
                           {l.name}
                         </span>
                       </div>
+                      {l.watchError && (
+                        <p className={cn(typeClass("caption"), "mt-1 max-w-[260px] text-muted-foreground")}>
+                          ファイルの監視を開始できませんでした: {l.watchError}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell className={cn(typeClass("caption"), "max-w-[260px] truncate font-mono")}>{l.root}</TableCell>
                     <TableCell className="text-right tabular-nums">{l.seriesCount}</TableCell>
@@ -286,6 +296,12 @@ export default function Screen() {
                 checked={form.importComicInfo}
                 onToggle={() => set({ importComicInfo: !form.importComicInfo })}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Switch label="ファイルの変更を監視して自動でスキャンする" checked={form.watch} onToggle={() => set({ watch: !form.watch })} />
+              <FieldDescription>
+                ネットワーク共有（SMB/NFS）のフォルダでは変更を検知できないことがあります。定期スキャンと併用してください。
+              </FieldDescription>
             </div>
             <Field>
               <FieldLabel htmlFor="lib-exclude">除外パターン</FieldLabel>

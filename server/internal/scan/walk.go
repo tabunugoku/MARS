@@ -35,6 +35,26 @@ var skipDirs = map[string]bool{
 	"System Volume Information": true, "lost+found": true, "__MACOSX": true,
 }
 
+// Skip reports whether Walk leaves out the entry at rel (relative to the
+// library root, '/' separated): a hidden name, a system folder (isDir only),
+// or a match of an exclude glob (path.Match against the relative path or the
+// base name). The file watcher uses it too, so both agree on what is a book.
+func Skip(rel string, isDir bool, exclude []string) bool {
+	base := path.Base(rel)
+	if strings.HasPrefix(base, ".") || (isDir && skipDirs[base]) {
+		return true
+	}
+	for _, pat := range exclude {
+		if ok, _ := path.Match(pat, rel); ok {
+			return true
+		}
+		if ok, _ := path.Match(pat, base); ok {
+			return true
+		}
+	}
+	return false
+}
+
 // Listing is what Walk saw. Unreadable holds paths (relative, '/'
 // separated) that could not be read completely: books under them must not
 // be treated as deleted, since they may only be out of reach for a moment.
@@ -53,20 +73,7 @@ func Walk(ctx context.Context, root string, exclude []string) (Listing, error) {
 	var oneshots []FoundSeries
 	var unreadable []string
 
-	excluded := func(rel string) bool {
-		base := path.Base(rel)
-		for _, pat := range exclude {
-			if ok, _ := path.Match(pat, rel); ok {
-				return true
-			}
-			if ok, _ := path.Match(pat, base); ok {
-				return true
-			}
-		}
-		return false
-	}
-
-	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+	err :=filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -88,23 +95,19 @@ func Walk(ctx context.Context, root string, exclude []string) (Listing, error) {
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
-		name := d.Name()
-		if strings.HasPrefix(name, ".") || excluded(rel) {
+		if Skip(rel, d.IsDir(), exclude) {
 			if d.IsDir() {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if d.IsDir() {
-			if skipDirs[name] {
-				return filepath.SkipDir
-			}
 			return nil
 		}
 		if !d.Type().IsRegular() {
 			return nil
 		}
-		f, ok := archive.FormatOf(name)
+		f, ok := archive.FormatOf(d.Name())
 		if !ok {
 			return nil
 		}

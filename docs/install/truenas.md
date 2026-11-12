@@ -178,6 +178,22 @@ Choose **Install**.
 3. In the server settings, add a library with the folder `/comics` (or a
    folder below it).
 
+### Watching a library for changes
+
+A library can have **Watch for changes** switched on. ComiNavi then rescans
+it about 30 seconds after files in it are added, changed or removed, in
+addition to the scheduled scans.
+
+- It works with folders the container sees as local paths, such as the
+  `/comics` mount from a local dataset.
+- SMB or NFS shares mounted inside the container usually deliver no change
+  events, and ComiNavi cannot detect that. Keep a scheduled scan on such
+  libraries; it picks up changes anyway.
+- Each folder takes one watch. A large library may need a higher limit:
+  **System > Advanced > Sysctl**, add `fs.inotify.max_user_watches` with a
+  value such as `524288`. If the limit is hit, the server logs a warning and
+  the scheduled scans keep working.
+
 ## 7. Updates and backups
 
 - The tag `0.1` follows every `0.1.x` fix release. When a new image is

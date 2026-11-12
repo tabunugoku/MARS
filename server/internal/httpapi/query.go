@@ -88,7 +88,7 @@ func (s *server) oneSeries(ctx context.Context, id string) (x Series, ok bool, e
 }
 
 const bookCols = `b.id, b.series_id, b.library_id, b.title, b.number, b.number_sort, b.summary, b.release_date, b.isbn,
-	b.authors, b.tags, b.format, b.path, b.size_bytes, b.page_count, b.media_status, b.created_at, b.locked_fields, b.cover_page,
+	b.authors, b.tags, b.format, b.path, b.size_bytes, b.page_count, b.media_status, b.created_at, b.locked_fields, b.cover_page, b.media_error,
 	(SELECT title FROM series WHERE id = b.series_id)`
 
 // bookQuery returns "SELECT ... FROM books b LEFT JOIN read_progress rp ...
@@ -107,12 +107,13 @@ func scanBook(r scanner) (Book, error) {
 	var release, readAt sql.NullString
 	var page sql.NullInt64
 	var completed sql.NullBool
-	var au, tags, format, status, locked string
+	var au, tags, format, status, locked, mediaErr string
 	err := r.Scan(&x.Id, &x.SeriesId, &x.LibraryId, &x.Title, &x.Number, &x.NumberSort, &x.Summary, &release, &x.Isbn,
-		&au, &tags, &format, &x.Path, &x.SizeBytes, &x.PageCount, &status, &x.CreatedAt, &locked, &x.CoverPage, &x.SeriesTitle,
+		&au, &tags, &format, &x.Path, &x.SizeBytes, &x.PageCount, &status, &x.CreatedAt, &locked, &x.CoverPage, &mediaErr, &x.SeriesTitle,
 		&page, &completed, &readAt)
 	x.Authors, x.Tags, x.Format, x.MediaStatus = authors(au), strs(tags), BookFormat(format), MediaStatus(status)
 	x.LockedFields = strs(locked)
+	x.MediaError = &mediaErr
 	if release.Valid {
 		x.ReleaseDate = &release.String
 	}

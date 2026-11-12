@@ -330,3 +330,57 @@ func TestThumbBounds(t *testing.T) {
 		}
 	}
 }
+
+// TestBookMediaErrorAndWatch covers the fields added to books and libraries
+// for the web app, and that a failed analysis hides its stale pages.
+func TestBookMediaErrorAndWatch(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	red := pngBytes(t, 20, 30, color.RGBA{200, 0, 0, 255})
+	writeCBZ(t, filepath.Join(root, "A", "A v01.cbz"), map[string][]byte{"1.png": red})
+	l := e.libraryWith("A", root)
+	if l.Watch || l.WatchError == nil || *l.WatchError != "" {
+		t.Fatalf("new library: watch %v, watchError %v", l.Watch, l.WatchError)
+	}
+	_, books := e.onlySeries(l.Id)
+	b := books[0]
+	if b.MediaError == nil || *b.MediaError != "" {
+		t.Fatalf("ready book mediaError: %v", b.MediaError)
+	}
+	var pages []Page
+	e.admin.json("GET", "/api/v1/books/"+b.Id+"/pages", nil, 200, &pages)
+	if len(pages) != 1 {
+		t.Fatalf("pages of a ready book: %+v", pages)
+	}
+
+	// Watch round-trips through PATCH, and on create.
+	var up Library
+	e.admin.json("PATCH", "/api/v1/libraries/"+l.Id, map[string]any{"watch": true}, 200, &up)
+	if !up.Watch {
+		t.Fatalf("patch watch: %+v", up)
+	}
+	var got Library
+	e.admin.json("GET", "/api/v1/libraries/"+l.Id, nil, 200, &got)
+	if !got.Watch || got.WatchError == nil {
+		t.Fatalf("get after patch: %+v", got)
+	}
+	var created Library
+	e.admin.json("POST", "/api/v1/libraries", map[string]any{"name": "B", "root": t.TempDir(), "kind": "manga", "watch": true}, 201, &created)
+	if !created.Watch {
+		t.Fatalf("create watch: %+v", created)
+	}
+
+	// A failed analysis: the error shows, and the stale pages do not.
+	if _, err := e.db.Exec(`UPDATE books SET media_status = 'error', media_error = 'broken archive' WHERE id = ?`, b.Id); err != nil {
+		t.Fatal(err)
+	}
+	var failed Book
+	e.admin.json("GET", "/api/v1/books/"+b.Id, nil, 200, &failed)
+	if failed.MediaError == nil || *failed.MediaError != "broken archive" {
+		t.Fatalf("mediaError after failure: %v", failed.MediaError)
+	}
+	e.admin.json("GET", "/api/v1/books/"+b.Id+"/pages", nil, 200, &pages)
+	if len(pages) != 0 {
+		t.Fatalf("pages of an errored book: %+v", pages)
+	}
+}

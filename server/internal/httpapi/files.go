@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 
 	"github.com/tabunugoku/cominavi/server/internal/library"
@@ -30,8 +31,21 @@ const noDownload = "このアカウントではファイルをダウンロード
 // serveBookFile sends a book's original file. Visibility is checked before
 // the permission, as for pages, so a book outside the caller's libraries
 // answers 404 whatever their permissions.
+//
+// With inline=true the file is shown in the browser instead of saved: only
+// PDFs, under the streaming permission (as for reading a page) rather than
+// the download one.
 func (s *server) serveBookFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	inline := false
+	if q := r.URL.Query().Get("inline"); q != "" {
+		v, err := strconv.ParseBool(q)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "inline が正しくありません")
+			return
+		}
+		inline = v
+	}
 	b, ok, err := s.oneBook(ctx, r.PathValue("bookId"))
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "ファイルを読めませんでした")
@@ -41,7 +55,16 @@ func (s *server) serveBookFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "本が見つかりません")
 		return
 	}
-	if !canDownload(ctx) {
+	if inline {
+		if !canStream(ctx) {
+			writeError(w, http.StatusForbidden, "このアカウントでは本を読めません")
+			return
+		}
+		if string(b.Format) != "pdf" {
+			writeError(w, http.StatusBadRequest, "PDF だけをブラウザで開けます")
+			return
+		}
+	} else if !canDownload(ctx) {
 		writeError(w, http.StatusForbidden, noDownload)
 		return
 	}
@@ -57,8 +80,13 @@ func (s *server) serveBookFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 	h := w.Header()
-	h.Set("Content-Disposition", attachment(path.Base(b.Path)))
-	h.Set("Content-Type", "application/octet-stream")
+	if inline {
+		h.Set("Content-Disposition", inlineDisposition(path.Base(b.Path)))
+		h.Set("Content-Type", "application/pdf")
+	} else {
+		h.Set("Content-Disposition", attachment(path.Base(b.Path)))
+		h.Set("Content-Type", "application/octet-stream")
+	}
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Cache-Control", "private, no-cache")
 	// ServeContent answers Range and HEAD, so a broken download resumes.
@@ -171,7 +199,12 @@ func zipNames(books []Book) []string {
 // attachment builds a Content-Disposition header for name: an ASCII
 // fallback for old clients, and the real name as RFC 5987 UTF-8
 // (filename*), which every current browser prefers.
-func attachment(name string) string {
+func attachment(name string) string { return disposition("attachment", name) }
+
+// inlineDisposition is attachment for a file shown in the browser.
+func inlineDisposition(name string) string { return disposition("inline", name) }
+
+func disposition(kind, name string) string {
 	name = strings.Map(func(r rune) rune {
 		switch {
 		case r == '/' || r == '\\':
@@ -185,7 +218,7 @@ func attachment(name string) string {
 	if name == "" || name == "." || name == ".." {
 		name = "download"
 	}
-	return `attachment; filename="` + asciiFallback(name) + `"; filename*=UTF-8''` + rfc5987(name)
+	return kind + `; filename="` + asciiFallback(name) + `"; filename*=UTF-8''` + rfc5987(name)
 }
 
 func asciiFallback(name string) string {

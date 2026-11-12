@@ -56,6 +56,8 @@ func OpenPath(p Path) (Archive, Format, error) {
 		a, err = withFile(root, p.Rel, openZip)
 	case CB7:
 		a, err = withFile(root, p.Rel, openSevenZip)
+	case PDF:
+		a, err = withFile(root, p.Rel, openPDF)
 	}
 	root.Close() // an open file outlives its root
 	return a, f, err

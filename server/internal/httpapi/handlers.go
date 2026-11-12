@@ -72,14 +72,20 @@ func scanLibrary(r scanner) (Library, error) {
 func (s *server) getLibrary(ctx context.Context, id string) (Library, error) {
 	cond, args := libScope(ctx, "l.id")
 	l, err := scanLibrary(s.DB.QueryRowContext(ctx, `SELECT `+libraryCols+` FROM libraries l WHERE l.id = ? AND `+cond, append([]any{id}, args...)...))
-	return redactLibrary(ctx, l), err
+	return s.libraryView(ctx, l), err
 }
 
-// redactLibrary hides where the files live from users who cannot manage them.
-func redactLibrary(ctx context.Context, l Library) Library {
-	if !currentUser(ctx).IsAdmin() {
+// libraryView adds the watcher's state and hides where the files live from
+// users who cannot manage them.
+func (s *server) libraryView(ctx context.Context, l Library) Library {
+	// Root, exclusions and watcher state are administrators' business.
+	watchErr := ""
+	if currentUser(ctx).IsAdmin() {
+		watchErr = s.Library.WatchError(l.Id)
+	} else {
 		l.Root, l.Exclude = "", []string{}
 	}
+	l.WatchError = &watchErr
 	return l
 }
 
@@ -96,7 +102,7 @@ func (s *server) ListLibraries(ctx context.Context, _ ListLibrariesRequestObject
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, redactLibrary(ctx, l))
+		out = append(out, s.libraryView(ctx, l))
 	}
 	return out, rows.Err()
 }
@@ -174,11 +180,15 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 	if b.ImportComicInfo != nil {
 		importCI = *b.ImportComicInfo
 	}
+	watch := false
+	if b.Watch != nil {
+		watch = *b.Watch
+	}
 	id := ids.New()
 	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO libraries (id, name, root, kind, scan_interval, import_comicinfo, exclude, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, name, root, string(b.Kind), string(interval), importCI, jsonText(exclude), time.Now().UTC().Format(time.RFC3339Nano))
+		INSERT INTO libraries (id, name, root, kind, scan_interval, watch, import_comicinfo, exclude, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, name, root, string(b.Kind), string(interval), watch, importCI, jsonText(exclude), time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return CreateLibrary400JSONResponse{badRequest("このフォルダは別のライブラリに登録済みです")}, nil
@@ -224,6 +234,9 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 			return UpdateLibrary400JSONResponse{badRequest("スキャン間隔が正しくありません")}, nil
 		}
 		set, args = append(set, "scan_interval = ?"), append(args, string(*b.ScanInterval))
+	}
+	if b.Watch != nil {
+		set, args = append(set, "watch = ?"), append(args, *b.Watch)
 	}
 	if b.ImportComicInfo != nil {
 		set, args = append(set, "import_comicinfo = ?"), append(args, *b.ImportComicInfo)
@@ -317,13 +330,16 @@ func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBook
 
 func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObject) (ListBookPagesResponseObject, error) {
 	var size int64
-	var mtime string
+	var mtime, status string
 	cond, args := libScope(ctx, "b.library_id")
-	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
-		append([]any{req.BookId}, args...)...).Scan(&size, &mtime); errors.Is(err, sql.ErrNoRows) {
+	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime, media_status FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
+		append([]any{req.BookId}, args...)...).Scan(&size, &mtime, &status); errors.Is(err, sql.ErrNoRows) {
 		return ListBookPages404JSONResponse{notFound("本が見つかりません")}, nil
 	} else if err != nil {
 		return nil, err
+	}
+	if status != "ready" { // pages of a failed or outdated analysis are stale
+		return ListBookPages200JSONResponse{}, nil
 	}
 	v := library.Version(size, mtime)
 	rows, err := s.DB.QueryContext(ctx, `SELECT number, width, height, media_type FROM pages WHERE book_id = ? ORDER BY number`, req.BookId)

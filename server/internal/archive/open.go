@@ -16,6 +16,8 @@ func formatOf(name string) (Format, bool) {
 		return CBR, true
 	case ".cb7", ".7z":
 		return CB7, true
+	case ".pdf":
+		return PDF, true
 	}
 	return "", false
 }

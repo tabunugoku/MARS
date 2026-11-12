@@ -29,7 +29,7 @@ const daysAgo = (d: number) => new Date(Date.UTC(2026, 10, 10) - d * 86400000).t
 
 export const libraries: Library[] = [
   { id: "lib-manga", name: "マンガ", root: "/comics/manga", kind: "manga", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(0.1), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: true, exclude: ["@eaDir", "#recycle"] },
-  { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: false, exclude: [] },
+  { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, watchError: "監視を開始できませんでした（inotify の上限に達しています）", importComicInfo: true, importLocalArtwork: false, exclude: [] },
   { id: "lib-comics", name: "海外コミック", root: "/comics/western", kind: "comics", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(6), scanInterval: "weekly", watch: false, importComicInfo: true, importLocalArtwork: true, exclude: [] },
 ];
 
@@ -117,6 +117,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
       sizeBytes: Math.floor((webtoon ? 18 : 60 + r() * 80) * 1024 * 1024),
       pageCount,
       mediaStatus: r() > 0.985 ? "error" : "ready",
+      mediaError: "",
       progress,
       coverSeed: s.coverSeed + n * 7,
       thumbnailUrl: "",
@@ -124,6 +125,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
       coverPage: 1,
       createdAt: daysAgo(updated + (bookCount - n) * 3),
     };
+    if (b.mediaStatus === "error") b.mediaError = "アーカイブを開けません（CRC エラー）";
     books.push(b);
     if (progress?.completed) s.booksRead++;
     else if (progress) s.booksInProgress++;

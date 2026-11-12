@@ -933,6 +933,12 @@ paths:
     get:
       operationId: downloadBook
       summary: The book's original file (needs the download permission; Range supported)
+      description: >-
+        With inline=true a PDF is sent for the browser's own viewer instead
+        (Content-Disposition inline, application/pdf). That needs only the
+        streaming permission, and is refused for other formats.
+      parameters:
+        - { name: inline, in: query, required: false, schema: { type: boolean, default: false } }
       responses:
         "200":
           description: File bytes, Content-Disposition attachment with an RFC 5987 UTF-8 filename
@@ -1080,7 +1086,8 @@ components:
         sizeBytes: { type: integer, format: int64 }
         lastScan: { type: string, nullable: true, description: "RFC 3339; null before the first scan" }
         scanInterval: { $ref: "#/components/schemas/ScanInterval" }
-        watch: { type: boolean }
+        watch: { type: boolean, description: "Scan when files change (file system events)" }
+        watchError: { type: string, description: "Why watching is not working (empty when it works or is off); interval scans still run" }
         importComicInfo: { type: boolean }
         importLocalArtwork: { type: boolean }
         exclude: { type: array, items: { type: string } }
@@ -1092,6 +1099,7 @@ components:
         root: { type: string, description: Absolute folder path on the server }
         kind: { $ref: "#/components/schemas/LibraryKind" }
         scanInterval: { $ref: "#/components/schemas/ScanInterval" }
+        watch: { type: boolean }
         importComicInfo: { type: boolean }
         exclude: { type: array, items: { type: string } }
     LibraryUpdate:
@@ -1100,6 +1108,7 @@ components:
         name: { type: string }
         kind: { $ref: "#/components/schemas/LibraryKind" }
         scanInterval: { $ref: "#/components/schemas/ScanInterval" }
+        watch: { type: boolean }
         importComicInfo: { type: boolean }
         exclude: { type: array, items: { type: string } }
     ReadingDirection:
@@ -1174,6 +1183,7 @@ components:
         sizeBytes: { type: integer, format: int64 }
         pageCount: { type: integer }
         mediaStatus: { $ref: "#/components/schemas/MediaStatus" }
+        mediaError: { type: string, description: "Why the book is not readable (empty when ready)" }
         progress:
           nullable: true
           allOf: [{ $ref: "#/components/schemas/ReadProgress" }]
