@@ -10,7 +10,6 @@ import { LoadError } from "@/components/shell/load-error";
 import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
-import { KindIcon } from "@/components/media/kind-icon";
 import { SelectionBar, SelectTile, type BarAction } from "@/components/media/selection";
 import { BULK_LIMIT, inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
 import { CoverSkeleton, GridSkeleton } from "@/components/media/skeletons";
@@ -437,7 +436,6 @@ export default function Screen() {
 
   const header = (
     <PageHeader
-      icon={library ? <KindIcon kind={library.kind} size={52} /> : undefined}
       title={title}
       meta={meta}
       actions={
