@@ -3,7 +3,7 @@ import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { ArrowDown, ArrowUp, ChevronLeft, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, errorMessage, formatDate, statusLabel, useApi, type Series } from "@/api";
+import { api, errorMessage, formatDate, seriesFileUrl, startDownload, statusLabel, useApi, type Series } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
 import { BookCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
@@ -44,6 +44,9 @@ function SeriesPage({ id }: { id: string }) {
   // The series as last saved from the edit dialog; cleared when the page reloads.
   const [saved, setSaved] = useState<Series | null>(null);
   const [busy, setBusy] = useState(false);
+  const { data: me } = useApi(() => api.me(), []);
+  const isAdmin = me?.role === "admin";
+  const canDownload = isAdmin || !!me?.canDownload;
 
   if (error) {
     return (
@@ -97,6 +100,14 @@ function SeriesPage({ id }: { id: string }) {
       toast.error(errorMessage(err));
     } finally {
       setBusy(false);
+    }
+  };
+  const regenerate = async () => {
+    try {
+      await api.regenerateSeriesThumbnails(id);
+      toast.success("表紙の作り直しを開始しました");
+    } catch (err) {
+      toast.error(errorMessage(err));
     }
   };
   const started = books.some((b) => b.progress);
@@ -173,6 +184,10 @@ function SeriesPage({ id }: { id: string }) {
               <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="メタデータを編集" onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
+                {canDownload && books.length > 0 && (
+                  <MenuItem index={1} label="まとめてダウンロード（ZIP）" onSelect={() => startDownload(seriesFileUrl(id))} />
+                )}
+                {isAdmin && <MenuItem index={canDownload && books.length > 0 ? 2 : 1} label="表紙を作り直す" onSelect={regenerate} />}
               </DropdownContent>
             </DropdownMenu>
           </div>

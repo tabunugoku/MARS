@@ -262,7 +262,11 @@ func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObje
 }
 
 func (s *server) ScanLibrary(ctx context.Context, req ScanLibraryRequestObject) (ScanLibraryResponseObject, error) {
-	t, err := s.Library.QueueScan(ctx, req.LibraryId)
+	queue := s.Library.QueueScan
+	if req.Params.Deep != nil && *req.Params.Deep {
+		queue = s.Library.QueueDeepScan
+	}
+	t, err := queue(ctx, req.LibraryId)
 	if errors.Is(err, library.ErrNotFound) {
 		return ScanLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
 	}

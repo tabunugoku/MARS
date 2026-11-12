@@ -55,6 +55,8 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
 	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
 	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
+	mux.HandleFunc("GET /books/{bookId}/file", s.serveBookFile)
+	mux.HandleFunc("GET /series/{seriesId}/file", s.serveSeriesZip)
 	mux.HandleFunc("GET /public/covers/{seriesId}", s.servePublicCover)
 	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
 	return s.authenticate(mux)

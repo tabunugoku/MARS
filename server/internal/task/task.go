@@ -38,6 +38,7 @@ var ErrNotFound = errors.New("task: not found")
 type job struct {
 	id     string
 	kind   string
+	key    string // what Submit deduplicates on, with libID
 	libID  string
 	fn     Func
 	ctx    context.Context
@@ -85,9 +86,16 @@ func (q *Queue) Run(ctx context.Context) error {
 // still queued (not yet running), that task is returned instead, so repeated
 // scan requests do not pile up.
 func (q *Queue) Submit(ctx context.Context, kind, label, libraryID string, fn Func) (Task, error) {
+	return q.SubmitKey(ctx, kind, kind, label, libraryID, fn)
+}
+
+// SubmitKey is Submit that deduplicates on key instead of kind, for work of
+// one kind that must not be folded into another queued task of that kind
+// (a deep analysis into a normal one, one series' thumbnails into another's).
+func (q *Queue) SubmitKey(ctx context.Context, kind, key, label, libraryID string, fn Func) (Task, error) {
 	q.mu.Lock()
 	for _, j := range q.live {
-		if j.kind == kind && j.libID == libraryID && libraryID != "" {
+		if j.key == key && j.libID == libraryID && libraryID != "" {
 			if t, err := q.get(ctx, j.id); err == nil && t.State == "queued" {
 				q.mu.Unlock()
 				return t, nil
@@ -95,7 +103,7 @@ func (q *Queue) Submit(ctx context.Context, kind, label, libraryID string, fn Fu
 		}
 	}
 	jctx, cancel := context.WithCancel(context.Background())
-	j := &job{id: ids.New(), kind: kind, libID: libraryID, fn: fn, ctx: jctx, cancel: cancel}
+	j := &job{id: ids.New(), kind: kind, key: key, libID: libraryID, fn: fn, ctx: jctx, cancel: cancel}
 	var lib any
 	if libraryID != "" {
 		lib = libraryID
