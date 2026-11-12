@@ -249,7 +249,7 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	if _, err := tx.ExecContext(ctx, `UPDATE series SET `+strings.Join(set, ", ")+` WHERE id = ?`, args...); err != nil {
 		return nil, err
 	}
-	if err := scan.RebuildSearch(ctx, tx, libraryID); err != nil {
+	if err := scan.IndexSeries(ctx, tx, req.SeriesId); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -338,7 +338,7 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 	if _, err := tx.ExecContext(ctx, `UPDATE books SET `+strings.Join(set, ", ")+` WHERE id = ?`, args...); err != nil {
 		return nil, err
 	}
-	if err := scan.RebuildSearch(ctx, tx, libraryID); err != nil {
+	if err := scan.IndexBook(ctx, tx, req.BookId); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -460,7 +460,7 @@ func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (Emp
 		return nil, err
 	}
 	// Search rows for the removed rows (the sync keeps the rest current).
-	if _, err := tx.ExecContext(ctx, `DELETE FROM search_index
+	if _, err := tx.ExecContext(ctx, `DELETE FROM search_rows
 		WHERE (kind = 'book' AND ref NOT IN (SELECT id FROM books))
 		   OR (kind = 'series' AND ref NOT IN (SELECT id FROM series))`); err != nil {
 		return nil, err

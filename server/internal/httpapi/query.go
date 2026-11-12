@@ -10,6 +10,13 @@ import (
 // seriesQuery or bookQuery. Both already apply the caller's library scope
 // (libScope), leave out the trash, and fill in the caller's own reading
 // progress, so no handler can forget one of the three.
+//
+// Per-series counts over the caller's progress join books CROSS JOIN
+// read_progress: SQLite keeps a CROSS JOIN's order, so the count walks the
+// series' few books (books_series) and looks each up in read_progress by
+// primary key. With a plain JOIN and no statistics the planner started from
+// all of the user's progress rows instead, once per series: about 30 s for
+// /series at 2,500 series and 4,700 books read (docs/perf-large-library.md).
 
 const seriesCols = `s.id, s.library_id, s.title, s.title_sort, s.alternate_titles, s.status, s.summary, s.publisher,
 	s.reading_direction, s.age_rating, s.language, s.genres, s.tags, s.authors, s.total_book_count, s.locked_fields,
@@ -22,9 +29,9 @@ func seriesQuery(ctx context.Context) (string, []any) {
 	uid := currentUser(ctx).ID
 	cond, args := libScope(ctx, "s.library_id")
 	return `SELECT ` + seriesCols + `,
-	(SELECT count(*) FROM books b JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 1),
-	(SELECT count(*) FROM books b JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 0)
 	FROM series s WHERE s.deleted_at IS NULL AND ` + cond, append([]any{uid, uid}, args...)
 }

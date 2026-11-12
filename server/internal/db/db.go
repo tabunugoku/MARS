@@ -52,7 +52,11 @@ func Open(ctx context.Context, path string) (*sql.DB, error) {
 //
 // 0001_init.sql was edited during development, before any release; it is
 // frozen from milestone M1 on. Schema changes from now on go in new files.
-func Migrate(ctx context.Context, d *sql.DB) error {
+func Migrate(ctx context.Context, d *sql.DB) error { return migrateTo(ctx, d, 1<<30) }
+
+// migrateTo applies the migrations up to version last (tests start from an
+// older schema with it).
+func migrateTo(ctx context.Context, d *sql.DB, last int) error {
 	var current int
 	if err := d.QueryRowContext(ctx, "PRAGMA user_version").Scan(&current); err != nil {
 		return err
@@ -67,7 +71,7 @@ func Migrate(ctx context.Context, d *sql.DB) error {
 		if err != nil {
 			return fmt.Errorf("migration %s: bad version prefix", f)
 		}
-		if v <= current {
+		if v <= current || v > last {
 			continue
 		}
 		body, err := migrations.ReadFile(f)
