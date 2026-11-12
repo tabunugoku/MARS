@@ -111,7 +111,9 @@ if (typeof document !== "undefined") {
   });
 }
 
-function subscribe(l: Listener): () => void {
+/** Calls l for every live event until the returned function is called.
+ *  For code outside React components; components use the hooks below. */
+export function subscribeLive(l: Listener): () => void {
   listeners.add(l);
   clearTimeout(closeTimer);
   open();
@@ -130,7 +132,7 @@ export function useLiveEvents(handler: Listener): void {
   useEffect(() => {
     ref.current = handler;
   });
-  useEffect(() => subscribe((e) => ref.current(e)), []);
+  useEffect(() => subscribeLive((e) => ref.current(e)), []);
 }
 
 /** Whether the stream is open now. */
@@ -161,21 +163,29 @@ export function useLiveReload(
     reloadRef.current = reload;
     matchRef.current = match;
   });
-  const timer = useRef<{ t?: ReturnType<typeof setTimeout>; first?: number }>({});
-  useEffect(() => () => clearTimeout(timer.current.t), []);
+  const [later] = useState(() => debounce(() => reloadRef.current(), quiet, maxWait));
+  useEffect(() => later.cancel, [later]);
   useLiveEvents((e) => {
-    if (e.type !== "reconnect" && !matchRef.current(e)) return;
-    const s = timer.current;
-    const now = Date.now();
-    s.first ??= now;
-    clearTimeout(s.t);
-    s.t = setTimeout(
-      () => {
-        s.first = undefined;
-        s.t = undefined;
-        reloadRef.current();
-      },
-      Math.max(0, Math.min(quiet, s.first + maxWait - now)),
-    );
+    if (e.type === "reconnect" || matchRef.current(e)) later();
   });
+}
+
+/** A debounced call: runs fn once no call came for `quiet` ms, but at most
+ *  `maxWait` ms after the first call of a burst. */
+export function debounce(fn: () => void, quiet: number, maxWait: number): (() => void) & { cancel: () => void } {
+  let t: ReturnType<typeof setTimeout> | undefined;
+  let first: number | undefined;
+  const call = () => {
+    const now = Date.now();
+    first ??= now;
+    clearTimeout(t);
+    t = setTimeout(
+      () => {
+        first = t = undefined;
+        fn();
+      },
+      Math.max(0, Math.min(quiet, first + maxWait - now)),
+    );
+  };
+  return Object.assign(call, { cancel: () => clearTimeout(t) });
 }
