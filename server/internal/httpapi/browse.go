@@ -118,6 +118,31 @@ func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (L
 	return ListSeries200JSONResponse{Body: out, Headers: ListSeries200ResponseHeaders{XTotalCount: &total}}, nil
 }
 
+// ListGenres lists the distinct genres of the series the caller may see:
+// the genre filter's options, without sending every series to the client.
+func (s *server) ListGenres(ctx context.Context, req ListGenresRequestObject) (ListGenresResponseObject, error) {
+	scope, args := libScope(ctx, "s.library_id")
+	q := `SELECT DISTINCT g.value FROM series s, json_each(s.genres) g WHERE s.deleted_at IS NULL AND ` + scope
+	if req.Params.LibraryId != nil {
+		q += ` AND s.library_id = ?`
+		args = append(args, *req.Params.LibraryId)
+	}
+	rows, err := s.DB.QueryContext(ctx, q+` ORDER BY g.value`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := ListGenres200JSONResponse{}
+	for rows.Next() {
+		var g string
+		if err := rows.Scan(&g); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
 func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksRequestObject) (GetAdjacentBooksResponseObject, error) {
 	cur, ok, err := s.oneBook(ctx, req.BookId)
 	if err != nil {

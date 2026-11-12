@@ -1,6 +1,6 @@
 // Every call the screens make, against the Go server. The mock in mock.ts
 // implements the same Api interface for `VITE_API=mock`.
-import { query, request } from "./http";
+import { query, request, requestPage } from "./http";
 import type {
   AdjacentBooks, ApiKey, ApiKeyCreated, Book, BookUpdate, Collection, CollectionCreate, CollectionUpdate,
   Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
@@ -46,7 +46,13 @@ export const realApi = {
     request<void>("PUT", `/libraries/${enc(id)}/read-progress`, { completed }),
 
   // Series and books
-  series: (q: SeriesQuery = {}) => get<Series[]>("/series" + query({ ...q })),
+  /** One page of series (limit/offset) and the count of all that match.
+   *  There is deliberately no call for every series at once: a big library
+   *  has tens of thousands. */
+  seriesPage: (q: SeriesQuery & { limit: number; offset: number }) =>
+    requestPage<Series>("/series" + query({ ...q })),
+  /** Genres of the visible series (the genre filter's options). */
+  genres: (libraryId?: string) => get<string[]>("/genres" + query({ libraryId })),
   seriesById: (id: string) => byId<Series>(`/series/${enc(id)}`),
   seriesByIds: async (ids: string[]) => notNull(await Promise.all(ids.map((id) => realApi.seriesById(id)))),
   updateSeries: (id: string, changes: SeriesUpdate) => request<Series>("PATCH", `/series/${enc(id)}`, changes),

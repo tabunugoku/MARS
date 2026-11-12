@@ -19,8 +19,12 @@ let nextId = 1;
 const newId = (p: string) => `${p}-new-${nextId++}`;
 
 const series = (s: db.MockSeries): Series => ({ ...s, thumbnailUrl: coverArt(s.coverSeed, s.title) });
-const book = (b: db.MockBook): Book => ({ ...b, thumbnailUrl: coverArt(b.coverSeed, b.title, String(b.number)) });
 const findSeries = (id: string) => db.series.find((s) => s.id === id);
+const book = (b: db.MockBook): Book => ({
+  ...b,
+  seriesTitle: findSeries(b.seriesId)?.title ?? b.seriesTitle,
+  thumbnailUrl: coverArt(b.coverSeed, b.title, String(b.number)),
+});
 const findBook = (id: string) => db.books.find((b) => b.id === id);
 const seriesBooks = (id: string) => db.books.filter((b) => b.seriesId === id).sort((a, b) => a.numberSort - b.numberSort);
 
@@ -155,7 +159,13 @@ export const mockApi: Api = {
     return delay(undefined);
   },
 
-  series: (q = {}) => delay(filterSeries(q).map(series)),
+  seriesPage: (q) =>
+    delay({
+      items: filterSeries(q).map(series),
+      total: filterSeries({ ...q, limit: undefined, offset: undefined }).length,
+    }),
+  genres: (libraryId) =>
+    delay([...new Set(db.series.filter((s) => !libraryId || s.libraryId === libraryId).flatMap((s) => s.genres))].sort()),
   seriesById: (id) => {
     const s = findSeries(id);
     return delay(s ? series(s) : null);

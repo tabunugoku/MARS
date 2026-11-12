@@ -152,6 +152,19 @@ paths:
           content:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
+  /genres:
+    get:
+      operationId: listGenres
+      summary: Genre names of the series the caller may see, sorted
+      description: The options for the genre filter, without loading every series.
+      parameters:
+        - { name: libraryId, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Distinct genre names
+          content:
+            application/json:
+              schema: { type: array, items: { type: string } }
   /series/{seriesId}:
     parameters:
       - { name: seriesId, in: path, required: true, schema: { type: string } }
@@ -1005,10 +1018,11 @@ components:
         readAt: { type: string }
     Book:
       type: object
-      required: [id, seriesId, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields, coverPage]
+      required: [id, seriesId, seriesTitle, libraryId, title, number, numberSort, summary, releaseDate, isbn, authors, tags, format, path, sizeBytes, pageCount, mediaStatus, progress, thumbnailUrl, createdAt, lockedFields, coverPage]
       properties:
         id: { type: string }
         seriesId: { type: string }
+        seriesTitle: { type: string, description: "Title of the book's series, so a list of books needs no series list" }
         libraryId: { type: string }
         title: { type: string }
         number: { type: number, format: double }

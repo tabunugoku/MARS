@@ -1,7 +1,7 @@
 // The only module screens talk to for data: the API (Go server, or the mock
 // with VITE_API=mock), its types, reader settings and small formatters.
 // Keep screens free of direct "@/mock" imports.
-import { useEffect, useRef, useState, type DependencyList } from "react";
+import { useCallback, useEffect, useRef, useState, type DependencyList } from "react";
 import { ApiError } from "./http";
 import type { Series } from "./types";
 
@@ -66,6 +66,104 @@ export function useApi<T>(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
   return { ...state, reload: () => setTick((t) => t + 1) };
+}
+
+/** One page of a list and the length of the whole list (from the server). */
+export interface Paged<T> {
+  items: T[];
+  total: number;
+}
+
+/** Loads a long list a page at a time. A new deps list starts over from the
+ *  first page; loadMore() appends the next one (ignored while a page is
+ *  loading, after an error, or at the end). total is the server's count, not
+ *  items.length. reload() fetches the pages already shown again in one call,
+ *  keeping them on screen meanwhile; retry() repeats the call that failed. */
+export function usePagedApi<T extends { id: string }>(
+  fetchPage: (offset: number, limit: number) => Promise<Paged<T>>,
+  deps: DependencyList,
+  pageSize = 60,
+): {
+  items: T[] | undefined;
+  total: number;
+  loading: boolean;
+  error: string | null;
+  hasMore: boolean;
+  loadMore: () => void;
+  reload: () => void;
+  retry: () => void;
+} {
+  const [state, setState] = useState<{ items: T[] | undefined; total: number; loading: boolean; error: string | null }>({
+    items: undefined,
+    total: 0,
+    loading: true,
+    error: null,
+  });
+  // The latest fetchPage (it closes over the current filters); the list as
+  // it stands, kept in refs so loadMore never asks for the same page twice;
+  // a generation that drops answers meant for an older list.
+  const fetchRef = useRef(fetchPage);
+  useEffect(() => {
+    fetchRef.current = fetchPage;
+  });
+  const list = useRef<{ items: T[] | undefined; total: number; busy: boolean; failed: boolean }>({
+    items: undefined,
+    total: 0,
+    busy: false,
+    failed: false,
+  });
+  const gen = useRef(0);
+
+  const load = useCallback((offset: number, limit: number, replace: boolean) => {
+    const g = gen.current;
+    Object.assign(list.current, { busy: true, failed: false });
+    setState((s) => ({ ...s, loading: true, error: null }));
+    fetchRef.current(offset, limit).then(
+      (page) => {
+        if (g !== gen.current) return;
+        let items = page.items;
+        const prev = list.current.items;
+        if (!replace && prev) {
+          // Offsets shift when series come and go between pages: keep the first copy.
+          const seen = new Set(prev.map((x) => x.id));
+          items = [...prev, ...page.items.filter((x) => !seen.has(x.id))];
+        }
+        list.current = { items, total: page.total, busy: false, failed: false };
+        setState({ items, total: page.total, loading: false, error: null });
+      },
+      (err: unknown) => {
+        if (g !== gen.current) return;
+        Object.assign(list.current, { busy: false, failed: true });
+        setState((s) => ({ ...s, loading: false, error: errorMessage(err) }));
+      },
+    );
+  }, []);
+
+  useEffect(() => {
+    gen.current++;
+    list.current = { items: undefined, total: 0, busy: false, failed: false };
+    setState({ items: undefined, total: 0, loading: true, error: null });
+    load(0, pageSize, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [...deps, pageSize]);
+
+  const loadMore = () => {
+    const l = list.current;
+    if (l.busy || l.failed || !l.items || l.items.length >= l.total) return;
+    load(l.items.length, pageSize, false);
+  };
+  const reload = () => {
+    gen.current++;
+    const n = list.current.items?.length ?? 0;
+    load(0, Math.min(Math.max(n, pageSize), 1000), true);
+  };
+  const retry = () => {
+    const l = list.current;
+    if (l.items && !l.busy) load(l.items.length, pageSize, false);
+    else if (!l.items) reload();
+  };
+  const hasMore = state.items !== undefined && state.items.length < state.total;
+  return { ...state, hasMore, loadMore, reload, retry };
 }
 
 export const formatBytes = (n: number) => {

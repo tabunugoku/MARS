@@ -72,14 +72,13 @@ export default function Screen() {
   const [recent, setRecent] = useState<string[]>(readRecent);
   const [tab, setTab] = useState<TabKey>("all");
 
-  // Series list: genre chips and series titles for book cards.
-  const library = useApi(() => api.series(), []);
+  // Genre chips (book cards carry their series title).
+  const genreList = useApi(() => api.genres(), []);
   const results = useApi(() => api.search(term), [term]);
 
-  const titles = useMemo(() => new Map((library.data ?? []).map((s) => [s.id, s.title])), [library.data]);
   const genres = useMemo(
-    () => [...new Set((library.data ?? []).flatMap((s) => s.genres))].sort((a, b) => a.localeCompare(b, "ja")),
-    [library.data],
+    () => [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, "ja")),
+    [genreList.data],
   );
 
   // External ?q= change (sidebar search, back/forward): adopt it and drop any
@@ -152,7 +151,7 @@ export default function Screen() {
   let body: ReactNode;
   const r = results.data;
   if (!term) {
-    body = library.data ? (
+    body = genreList.data ? (
       <>
         {recent.length > 0 && (
           <section className="mb-10">
@@ -247,7 +246,7 @@ export default function Screen() {
       const booksGrid = (
         <CoverGrid>
           {r.books.map((b) => (
-            <BookCard key={b.id} book={b} seriesTitle={titles.get(b.seriesId)} />
+            <BookCard key={b.id} book={b} seriesTitle={b.seriesTitle} />
           ))}
         </CoverGrid>
       );
@@ -273,7 +272,7 @@ export default function Screen() {
               <Shelf title="巻">
                 {r.books.map((b) => (
                   <ShelfItem key={b.id}>
-                    <BookCard book={b} seriesTitle={titles.get(b.seriesId)} />
+                    <BookCard book={b} seriesTitle={b.seriesTitle} />
                   </ShelfItem>
                 ))}
               </Shelf>
