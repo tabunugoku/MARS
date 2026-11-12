@@ -15,6 +15,8 @@ export { ApiError, safeNext } from "./http";
  *  browser streams the file straight to disk, which a series ZIP of many GB
  *  needs. The session cookie goes along with a same-origin link. */
 export const bookFileUrl = (bookId: string) => `/api/v1/books/${encodeURIComponent(bookId)}/file`;
+/** A PDF for the browser's own viewer (ブラウザで開く). The server refuses non-PDF books. */
+export const bookInlineUrl = (bookId: string) => `/api/v1/books/${encodeURIComponent(bookId)}/file?inline=true`;
 export const seriesFileUrl = (seriesId: string) => `/api/v1/series/${encodeURIComponent(seriesId)}/file`;
 
 /** Starts a download without leaving the page. If the server refuses, the

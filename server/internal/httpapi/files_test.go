@@ -337,3 +337,61 @@ func TestThumbnailTasksPerSeries(t *testing.T) {
 	}
 	e.waitTasks()
 }
+
+// TestInlinePDF covers serveBookFile's inline mode: PDFs only, under the
+// streaming permission, not the download one.
+func TestInlinePDF(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	red := pngBytes(t, 20, 30, color.RGBA{200, 0, 0, 255})
+	writeCBZ(t, filepath.Join(root, "A", "A v01.cbz"), map[string][]byte{"1.png": red})
+	writeCBZ(t, filepath.Join(root, "A", "A v02.cbz"), map[string][]byte{"1.png": red})
+	l := e.libraryWith("A", root)
+	_, books := e.onlySeries(l.Id)
+	if len(books) != 2 {
+		t.Fatalf("books %+v", books)
+	}
+	pdf, cbz := books[0], books[1]
+	// The file on disk is a CBZ; only the format is changed, which is all
+	// the headers and permissions depend on.
+	if _, err := e.db.Exec(`UPDATE books SET format = 'pdf' WHERE id = ?`, pdf.Id); err != nil {
+		t.Fatal(err)
+	}
+
+	if rec := e.admin.do("GET", "/api/v1/books/"+cbz.Id+"/file?inline=true", nil); rec.Code != 400 {
+		t.Fatalf("inline on a non-PDF: %d, want 400", rec.Code)
+	}
+	if rec := e.admin.do("GET", "/api/v1/books/"+pdf.Id+"/file?inline=yes", nil); rec.Code != 400 {
+		t.Fatalf("inline=yes: %d, want 400", rec.Code)
+	}
+
+	var u User
+	e.admin.json("POST", "/api/v1/users", map[string]any{"name": "読書", "email": "s@example.com", "password": "reader pass",
+		"role": "user", "canDownload": false, "canStream": true, "allLibraries": true}, 201, &u)
+	s := e.login("読書", "reader pass")
+	if rec := s.do("GET", "/api/v1/books/"+pdf.Id+"/file", nil); rec.Code != 403 {
+		t.Fatalf("download without canDownload: %d, want 403", rec.Code)
+	}
+	rec := s.do("GET", "/api/v1/books/"+pdf.Id+"/file?inline=true", nil)
+	if rec.Code != 200 {
+		t.Fatalf("inline with canStream only: %d %s", rec.Code, rec.Body)
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "application/pdf" {
+		t.Errorf("content-type %q", ct)
+	}
+	if cd := rec.Header().Get("Content-Disposition"); cd != `inline; filename="A v01.cbz"; filename*=UTF-8''A%20v01.cbz` {
+		t.Errorf("content-disposition %q", cd)
+	}
+	if nosniff := rec.Header().Get("X-Content-Type-Options"); nosniff != "nosniff" {
+		t.Errorf("nosniff %q", nosniff)
+	}
+	if rec := s.do("GET", "/api/v1/books/"+pdf.Id+"/file?inline=true", nil, "Range", "bytes=0-3"); rec.Code != 206 {
+		t.Errorf("range inline: %d", rec.Code)
+	}
+
+	// Without canStream, inline is refused.
+	e.admin.json("PATCH", "/api/v1/users/"+u.Id, map[string]any{"canStream": false}, 200, nil)
+	if rec := s.do("GET", "/api/v1/books/"+pdf.Id+"/file?inline=true", nil); rec.Code != 403 {
+		t.Errorf("inline without canStream: %d, want 403", rec.Code)
+	}
+}

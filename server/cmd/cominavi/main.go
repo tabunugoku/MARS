@@ -96,6 +96,7 @@ func run() error {
 		},
 	}
 	go lib.Schedule(ctx)
+	go lib.Watch(ctx)
 
 	gate, err := httpapi.NewSetupGate(ctx, database, cfg.DataDir)
 	if err != nil {

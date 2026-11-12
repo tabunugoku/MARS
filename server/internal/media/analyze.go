@@ -72,7 +72,7 @@ func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
 func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analysis, error) {
 	ctx, cancel := context.WithTimeout(ctx, AnalyzeTimeout)
 	defer cancel()
-	a, format, err := archive.OpenPath(path)
+	a, format, err := archive.OpenPathContext(ctx, path)
 	if err != nil {
 		return Analysis{}, err
 	}
@@ -202,7 +202,7 @@ func readPageConfig(e archive.Entry, r io.Reader, cover *bytes.Buffer) (int, int
 func ReadEntry(ctx context.Context, path archive.Path, name string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
 	defer cancel()
-	a, _, err := archive.OpenPath(path)
+	a, _, err := archive.OpenPathContext(ctx, path)
 	if err != nil {
 		return nil, err
 	}

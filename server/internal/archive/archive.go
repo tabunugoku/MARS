@@ -1,5 +1,5 @@
-// Package archive reads comic book archives: CBZ (zip), CBR (RAR4/RAR5) and
-// CB7 (7z), all in pure Go.
+// Package archive reads comic books: CBZ (zip), CBR (RAR4/RAR5), CB7 (7z)
+// and PDF (one image per page), all in pure Go.
 //
 // Names returned by Entries are the archive's own entry names. They are data
 // from the file, not trusted paths: callers must never join them onto a
@@ -18,6 +18,7 @@ const (
 	CBZ Format = "cbz"
 	CBR Format = "cbr"
 	CB7 Format = "cb7"
+	PDF Format = "pdf"
 )
 
 // Entry is one regular file in an archive (directories are left out).

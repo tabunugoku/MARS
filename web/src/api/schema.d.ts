@@ -964,7 +964,10 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** The book's original file (needs the download permission; Range supported) */
+        /**
+         * The book's original file (needs the download permission; Range supported)
+         * @description With inline=true a PDF is sent for the browser's own viewer instead (Content-Disposition inline, application/pdf). That needs only the streaming permission, and is refused for other formats.
+         */
         get: operations["downloadBook"];
         put?: never;
         post?: never;
@@ -1092,7 +1095,10 @@ export interface components {
             /** @description RFC 3339; null before the first scan */
             lastScan: string | null;
             scanInterval: components["schemas"]["ScanInterval"];
+            /** @description Scan when files change (file system events) */
             watch: boolean;
+            /** @description Why watching is not working (empty when it works or is off); interval scans still run */
+            watchError?: string;
             importComicInfo: boolean;
             importLocalArtwork: boolean;
             exclude: string[];
@@ -1103,6 +1109,7 @@ export interface components {
             root: string;
             kind: components["schemas"]["LibraryKind"];
             scanInterval?: components["schemas"]["ScanInterval"];
+            watch?: boolean;
             importComicInfo?: boolean;
             exclude?: string[];
         };
@@ -1110,6 +1117,7 @@ export interface components {
             name?: string;
             kind?: components["schemas"]["LibraryKind"];
             scanInterval?: components["schemas"]["ScanInterval"];
+            watch?: boolean;
             importComicInfo?: boolean;
             exclude?: string[];
         };
@@ -1177,6 +1185,8 @@ export interface components {
             sizeBytes: number;
             pageCount: number;
             mediaStatus: components["schemas"]["MediaStatus"];
+            /** @description Why the book is not readable (empty when ready) */
+            mediaError?: string;
             progress: components["schemas"]["ReadProgress"] | null;
             thumbnailUrl: string;
             createdAt: string;
@@ -3278,7 +3288,9 @@ export interface operations {
     };
     downloadBook: {
         parameters: {
-            query?: never;
+            query?: {
+                inline?: boolean;
+            };
             header?: never;
             path: {
                 bookId: string;

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, bookFileUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
+import { api, bookFileUrl, bookInlineUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
 import { bumpCover } from "@/lib/cover-retry";
 import { LoadError } from "@/components/shell/load-error";
@@ -68,6 +68,7 @@ function BookPage({ id }: { id: string }) {
   const { data: me } = useApi(() => api.me(), []);
   const isAdmin = me?.role === "admin";
   const canDownload = isAdmin || !!me?.canDownload;
+  const canStream = isAdmin || !!me?.canStream;
   const [picking, setPicking] = useState(false);
   // The read-list dialog is remounted per open so its lists are fetched fresh.
   const [addOpen, setAddOpen] = useState(false);
@@ -115,6 +116,9 @@ function BookPage({ id }: { id: string }) {
   const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
   // Marking read needs the page count and a readable archive.
   const canMarkRead = book.pageCount > 0 && book.mediaStatus === "ready";
+  // A PDF whose pages are not single images cannot go to the reader: offer the
+  // browser's own PDF viewer instead (streaming permission only).
+  const pdfInBrowser = book.format === "pdf" && book.mediaStatus === "unsupported";
 
   const regenerate = async () => {
     try {
@@ -246,12 +250,24 @@ function BookPage({ id }: { id: string }) {
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <BrandAction to={`/read/${book.id}`} icon={Play}>
-              {book.progress && !completed ? "続きから読む" : "読む"}
-            </BrandAction>
-            <Button variant="secondary" asChild>
-              <Link to={`/read/${book.id}?page=1`}>最初から読む</Link>
-            </Button>
+            {pdfInBrowser ? (
+              canStream && (
+                <Button variant="primary" asChild>
+                  <a href={bookInlineUrl(book.id)} target="_blank" rel="noopener">
+                    ブラウザで開く
+                  </a>
+                </Button>
+              )
+            ) : (
+              <>
+                <BrandAction to={`/read/${book.id}`} icon={Play}>
+                  {book.progress && !completed ? "続きから読む" : "読む"}
+                </BrandAction>
+                <Button variant="secondary" asChild>
+                  <Link to={`/read/${book.id}?page=1`}>最初から読む</Link>
+                </Button>
+              </>
+            )}
             <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead}>
               {completed ? "未読にする" : "既読にする"}
             </Button>
@@ -265,7 +281,9 @@ function BookPage({ id }: { id: string }) {
             </DropdownMenu>
           </div>
           {isAdmin && <AddToReadListDialog key={addKey} bookId={book.id} open={addOpen} onOpenChange={setAddOpen} />}
-          {!canMarkRead && <p className={cn(typeClass("caption"), "text-muted-foreground")}>解析が終わっていません</p>}
+          {!canMarkRead && book.mediaStatus === "outdated" && (
+            <p className={cn(typeClass("caption"), "text-muted-foreground")}>解析が終わっていません</p>
+          )}
 
           <dl className="mt-4 max-w-2xl divide-y divide-border">
             <Fact label="発売日">{book.releaseDate ? formatDate(book.releaseDate) : "未設定"}</Fact>
@@ -325,15 +343,21 @@ function BookPage({ id }: { id: string }) {
           <Fact label="形式">{book.format.toUpperCase()}</Fact>
           <Fact label="サイズ">{formatBytes(book.sizeBytes)}</Fact>
           <Fact label="メディア状態">
-            <div className="flex flex-wrap items-center gap-2">
-              {book.mediaStatus === "error" ? (
-                <Badge variant="solid" color="red">
-                  {mediaLabel[book.mediaStatus]}
-                </Badge>
-              ) : (
-                <Badge variant="dot">{mediaLabel[book.mediaStatus]}</Badge>
+            <div className="flex flex-col gap-1">
+              <div className="flex flex-wrap items-center gap-2">
+                {book.mediaStatus === "error" ? (
+                  <Badge variant="solid" color="red">
+                    {mediaLabel[book.mediaStatus]}
+                  </Badge>
+                ) : (
+                  <Badge variant="dot">{mediaLabel[book.mediaStatus]}</Badge>
+                )}
+                {book.mediaStatus === "error" && <span className="text-muted-foreground">アーカイブを開けません</span>}
+                {book.mediaStatus === "unsupported" && <span className="text-muted-foreground">この形式は読めません</span>}
+              </div>
+              {(book.mediaStatus === "error" || book.mediaStatus === "unsupported") && book.mediaError && (
+                <p className={cn(typeClass("caption"), "text-muted-foreground break-words")}>{book.mediaError}</p>
               )}
-              {book.mediaStatus === "error" && <span className="text-muted-foreground">アーカイブを開けません</span>}
             </div>
           </Fact>
         </dl>
