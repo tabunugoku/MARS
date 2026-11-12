@@ -337,3 +337,29 @@ func TestSearch(t *testing.T) {
 	sameSet(t, "admin read lists", idsOf(r.ReadLists, func(l ReadList) string { return l.Id }), "rl-night", "rl-star")
 	sameIDs(t, "admin read list books", r.ReadLists[0].BookIds, g[0].Id, f.mapBooks[0].Id)
 }
+
+// Genres list only series the caller may see (and that are live), and books
+// carry their series title.
+func TestGenresAndSeriesTitle(t *testing.T) {
+	f := newBrowseFix(t)
+	f.exec(`UPDATE series SET genres = '["SF","冒険"]' WHERE id = ?`, f.galaxySeries.Id)
+	f.exec(`UPDATE series SET genres = '["冒険","日常"]' WHERE id = ?`, f.dawnSeries.Id)
+	f.exec(`UPDATE series SET genres = '["秘密"]' WHERE id = ?`, f.mapSeries.Id)
+
+	var got []string
+	f.e.admin.json("GET", "/api/v1/genres", nil, 200, &got)
+	sameIDs(t, "admin genres", got, "SF", "冒険", "日常", "秘密")
+	f.reader.json("GET", "/api/v1/genres", nil, 200, &got)
+	sameIDs(t, "reader genres (library B hidden)", got, "SF", "冒険", "日常")
+	f.e.admin.json("GET", "/api/v1/genres?libraryId="+f.libB.Id, nil, 200, &got)
+	sameIDs(t, "library B genres", got, "秘密")
+	f.exec(`UPDATE series SET deleted_at = 'x' WHERE id = ?`, f.dawnSeries.Id)
+	f.e.admin.json("GET", "/api/v1/genres?libraryId="+f.libA.Id, nil, 200, &got)
+	sameIDs(t, "trashed series' genres", got, "SF", "冒険")
+
+	var b Book
+	f.reader.json("GET", "/api/v1/books/"+f.galaxy[0].Id, nil, 200, &b)
+	if b.SeriesTitle != "銀河の灯台" {
+		t.Fatalf("seriesTitle %q", b.SeriesTitle)
+	}
+}

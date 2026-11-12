@@ -130,6 +130,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Genre names of the series the caller may see, sorted
+         * @description The options for the genre filter, without loading every series.
+         */
+        get: operations["listGenres"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/series/{seriesId}": {
         parameters: {
             query?: never;
@@ -1017,6 +1037,8 @@ export interface components {
         Book: {
             id: string;
             seriesId: string;
+            /** @description Title of the book's series, so a list of books needs no series list */
+            seriesTitle: string;
             libraryId: string;
             title: string;
             /** Format: double */
@@ -1638,6 +1660,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Series"][];
+                };
+            };
+        };
+    };
+    listGenres: {
+        parameters: {
+            query?: {
+                libraryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Distinct genre names */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
         };

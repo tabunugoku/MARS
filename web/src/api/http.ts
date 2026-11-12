@@ -32,6 +32,8 @@ export interface RequestOptions {
   nullOn404?: boolean;
   /** Survive page unload (progress saved on pagehide). */
   keepalive?: boolean;
+  /** Sees the response headers of a successful call. */
+  onHeaders?: (headers: Headers) => void;
 }
 
 export async function request<T>(method: string, path: string, body?: unknown, opts: RequestOptions = {}): Promise<T> {
@@ -43,6 +45,7 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.ok) {
+    opts.onHeaders?.(res.headers);
     const text = await res.text();
     return (text ? JSON.parse(text) : undefined) as T;
   }
@@ -56,6 +59,18 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     /* not JSON: keep the generic message */
   }
   throw new ApiError(res.status, message);
+}
+
+/** GETs one page of a list; X-Total-Count is the length of the whole list. */
+export async function requestPage<T>(path: string): Promise<{ items: T[]; total: number }> {
+  let total: number | undefined;
+  const items = await request<T[]>("GET", path, undefined, {
+    onHeaders: (h) => {
+      const n = Number(h.get("X-Total-Count"));
+      if (h.has("X-Total-Count") && Number.isFinite(n)) total = n;
+    },
+  });
+  return { items, total: total ?? items.length };
 }
 
 /** Builds a query string; arrays are comma-joined (the contract uses explode: false). */

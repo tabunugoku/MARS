@@ -30,7 +30,7 @@ var opAccess = map[string]access{
 
 	// Reading (always within libScope)
 	"ListLibraries": anyone, "GetLibrary": anyone,
-	"ListSeries": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
+	"ListSeries": anyone, "ListGenres": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
 	"GetBook": anyone, "GetBookThumbnail": anyone, "ListBookPages": anyone, "GetBookPage": anyone,
 	"GetAdjacentBooks": anyone, "GetDashboard": anyone, "Search": anyone,
 	"SetBookProgress": anyone, "MarkLibraryRead": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,

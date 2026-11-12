@@ -206,6 +206,45 @@ followed from the other conditions and was dropped.
   (2.3 s → 7.5 s, once per library), and the longest wait dropped to 80 ms.
 - Page rows are inserted with one prepared statement per book.
 
+### Web app: the library screen pages its series
+
+Before, the web app loaded every series at once. It called `GET /series`
+without `limit` twice on the library screen, which rendered all 2,500
+cards. The dashboard, search and media-issues screens called it once more,
+only for series titles and genre names. Now:
+
+- The library screen asks for 60 series at a time (`limit`/`offset`). It
+  loads the next 60 when the end of the grid comes within 800 px of view.
+  A new scope, sort or filter starts again from the first page.
+- The count above the grid is the server's `X-Total-Count`, not the
+  length of the list.
+- Genre options come from a new `GET /genres`.
+- Books carry `seriesTitle`, so the other screens need no series list.
+  The client no longer has a call that fetches every series.
+
+Measured in Chrome (the app's browser pane) on production builds
+(`vite build` + `vite preview`) of `main` and of this change. Both ran
+against the same server on the same 37,000-book database, signed in as
+the user `perf-reader`. "Grid shown" counts from an in-app navigation to
+すべてのライブラリ until the cards and the count are on screen. It is the
+median of three runs.
+
+| Library screen (すべて) | Before | After |
+|---|---|---|
+| Series requests on first load | 2 × 1,621 KB | 1 × 40 KB, plus `/genres` < 1 KB |
+| `/series` response end, full page load | 558–565 ms | 402 ms |
+| Grid shown, in-app navigation | 324 ms | 38 ms |
+| Longest frame while it renders | 338 ms | 21 ms |
+| Cards in the DOM | 2,500 | 60, then +60 per scroll |
+| JS heap after load | 70 MB | 16 MB |
+| Each further page (scrolling) | n/a | 17–44 ms per request |
+| Filter 読みかけ (559 series), first page | n/a | 151 ms |
+
+The home screen no longer fetches the series list. It makes one
+`/dashboard` call (178 ms, 140 KB) and nothing else. These numbers come
+from a fast machine. The 1.6 MB responses and the 2,500-card render cost
+more on a phone or a slow link.
+
 ## Left as they are
 
 - **`cache_size` / `mmap_size`.** Measured on the main queries with
@@ -231,13 +270,6 @@ followed from the other conditions and was dropped.
   sequential). That time is reading the archives, not the database: each
   book commits its own short transaction. On a NAS it will be longer, and
   it is limited by disk throughput.
-- **The web app loads every series at once.** `GET /series` without
-  `limit` is called by the dashboard, search and media-issues screens (for
-  series titles and genre names), and twice by the library screen, which
-  renders all 2,500 cards. Each response is 1.6 MB of JSON, now built in
-  about 120 ms. Paging the library grid, and giving books their series
-  title so the other screens need no series list, are follow-ups: they
-  change the API contract and the UI.
 
 ## Not measured
 
