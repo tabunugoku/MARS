@@ -61,6 +61,10 @@ export default defineConfig({
           })
         },
       },
+      // The OPDS catalog and the Komga-compatible API (read-only apps; no
+      // cookie writes from this page), so their addresses work in dev too.
+      '/opds': { target: API_TARGET, changeOrigin: true },
+      '/komga': { target: API_TARGET, changeOrigin: true },
     },
   },
 })

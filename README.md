@@ -82,6 +82,14 @@ The token is deleted once the administrator has been created.
 | `COMINAVI_TRUSTED_PROXIES` | none | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For` is trusted |
 | `COMINAVI_DEV` | unset | `1` serves the API only (the Vite dev server serves the UI) |
 
+## OPDS and Mihon
+
+Reader apps that speak OPDS (Panels, Chunky, KyBook) use
+`http://HOST:25600/opds/v1.2/catalog`. The Mihon Komga extension and tracker
+use `http://HOST:25600/komga`. Both are off by default: turn them on in
+設定 > サーバー, under 連携. Sign in with a ComiNavi user name and password,
+or an API key. Details are in [docs/opds-komga.md](docs/opds-komga.md).
+
 ## Installing on a phone or tablet (PWA)
 
 ComiNavi is an installable web app: *Add to Home Screen* (iOS Safari) or

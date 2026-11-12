@@ -1696,7 +1696,10 @@ export interface components {
             thumbnailFormat: "webp" | "jpeg" | "avif";
             rememberMeDays: number;
             deleteEmptyCollections: boolean;
+            /** @description Serves the OPDS 1.2 catalog at /opds/v1.2/catalog */
             opdsEnabled: boolean;
+            /** @description Serves a Komga-compatible API at /komga (for the Mihon/Tachiyomi Komga extension) */
+            komgaApiEnabled: boolean;
             koboSyncEnabled: boolean;
             loginBackdrop: components["schemas"]["LoginBackdrop"];
         };
@@ -1710,6 +1713,7 @@ export interface components {
             rememberMeDays?: number;
             deleteEmptyCollections?: boolean;
             opdsEnabled?: boolean;
+            komgaApiEnabled?: boolean;
             koboSyncEnabled?: boolean;
             loginBackdrop?: components["schemas"]["LoginBackdrop"];
         };

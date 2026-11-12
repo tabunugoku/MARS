@@ -105,12 +105,18 @@ func run() error {
 	store := auth.Store{DB: database}
 	go purgeSessions(ctx, store)
 
-	mux := http.NewServeMux()
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{
+	deps := httpapi.Deps{
 		DB: database, Version: version, Library: lib, Tasks: queue,
 		Auth: store, Limiter: &auth.Limiter{}, Gate: gate, TrustedProxies: cfg.TrustedProxies,
 		Events: hub,
-	})))
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(deps)))
+	// OPDS and the Komga-shaped API: full paths, no prefix stripping. Longer
+	// than "/", so they win over the web UI.
+	compat := httpapi.NewCompat(deps)
+	mux.Handle("/opds/", compat)
+	mux.Handle("/komga/", compat)
 	if !cfg.Dev {
 		mux.Handle("/", webui.Handler())
 	}

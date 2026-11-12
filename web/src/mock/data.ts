@@ -187,6 +187,7 @@ export const settings: ServerSettings = {
   rememberMeDays: 30,
   deleteEmptyCollections: true,
   opdsEnabled: true,
+  komgaApiEnabled: false,
   koboSyncEnabled: false,
   loginBackdrop: "compass",
 };

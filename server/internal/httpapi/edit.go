@@ -431,6 +431,9 @@ func (s *server) UpdateSettings(ctx context.Context, req UpdateSettingsRequestOb
 	if b.LoginBackdrop != nil {
 		cur.LoginBackdrop = *b.LoginBackdrop
 	}
+	if b.KomgaApiEnabled != nil {
+		cur.KomgaApiEnabled = *b.KomgaApiEnabled
+	}
 	if b.OpdsEnabled != nil {
 		cur.OpdsEnabled = *b.OpdsEnabled
 	}
