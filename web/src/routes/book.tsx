@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, bookFileUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -50,6 +51,15 @@ function BookPage({ id }: { id: string }) {
     const [series, adjacent, pages] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id), api.pages(id).catch(() => [])]);
     return { book, series, adjacent, pages };
   }, [id]);
+  // Analysis or a new cover of this book, and reading on another tab or device.
+  const shown = data?.book;
+  useLiveReload(reload, (e) => {
+    if (e.type === "book") return e.data.bookId === id;
+    if (e.type !== "progress" || !shown) return false;
+    if (e.data.bookId) return e.data.bookId === id;
+    if (e.data.seriesId) return e.data.seriesId === shown.seriesId;
+    return e.data.libraryId === shown.libraryId;
+  });
 
   const [allPages, setAllPages] = useState(false);
   const [busy, setBusy] = useState(false);

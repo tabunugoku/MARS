@@ -282,6 +282,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live changes as server-sent events (text/event-stream)
+         * @description One long-lived stream per app. Each message has an event name and a JSON data line: `task` (TaskEvent, administrators only), `library` (LibraryEvent), `book` (BookEvent) and `progress` (ProgressEvent, the caller's own reading progress). Library, book and progress events are sent only for libraries the caller may see. A comment line is sent about every 25 seconds as a heartbeat. When the client falls behind the stream is closed; on reconnecting, refetch what is shown.
+         */
+        get: operations["streamEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tasks": {
         parameters: {
             query?: never;
@@ -1088,6 +1108,31 @@ export interface components {
             startedAt: string | null;
             error: string;
         };
+        /** @description Data of a `task` event; the task as listTasks returns it */
+        TaskEvent: components["schemas"]["Task"];
+        /** @description Data of a `library` event, sent when a scan or analysis changed the library's series or books */
+        LibraryEvent: {
+            libraryId: string;
+            seriesAdded: number;
+            seriesRemoved: number;
+            booksAdded: number;
+            booksChanged: number;
+            booksRemoved: number;
+        };
+        /** @description Data of a `book` event, sent when a book was analysed (pages, thumbnail, metadata) */
+        BookEvent: {
+            bookId: string;
+            seriesId: string;
+            libraryId: string;
+            mediaStatus: components["schemas"]["MediaStatus"];
+        };
+        /** @description Data of a `progress` event: the caller's reading progress changed on one book (bookId), a whole series (seriesId) or a library. writer is the writer the change came from, when it had one. */
+        ProgressEvent: {
+            libraryId: string;
+            seriesId?: string;
+            bookId?: string;
+            writer?: string;
+        };
         /** @enum {string} */
         Role: "admin" | "user";
         User: {
@@ -1885,6 +1930,26 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
         };
     };
     listTasks: {

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { api, errorMessage, useApi, type TaskKind } from "@/api";
+import { api, errorMessage, useApi, type Task, type TaskKind } from "@/api";
+import { useLiveConnected, useLiveEvents, useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { CountUp } from "@/components/media/count-up";
@@ -32,23 +33,44 @@ export default function Screen() {
   const [aborting, setAborting] = useState(false);
   const [emptying, setEmptying] = useState(false);
 
-  const tasks = data?.[0];
+  // Live task rows by id, laid over the last loaded list until the next load.
+  const [patch, setPatch] = useState<{ base: unknown; rows: Map<string, Task> }>({ base: undefined, rows: new Map() });
+  const loaded = data?.[0];
+  const rows = patch.base === loaded ? patch.rows : undefined;
+  const tasks = loaded?.map((t) => rows?.get(t.id) ?? t);
   const libNames = new Map((data?.[1] ?? []).map((l) => [l.id, l.name]));
   const active = tasks?.filter((t) => t.state === "running" || t.state === "queued") ?? [];
   const history = tasks?.filter((t) => t.state === "done" || t.state === "failed" || t.state === "cancelled") ?? [];
   const hasActive = active.length > 0;
 
-  // Refresh while anything runs or waits. The ref keeps the interval from
-  // restarting on every render, since reload is a new function each time.
+  // Progress arrives over the event stream and is patched in place. A task
+  // the list does not have yet, or one that just ended (it moves to the
+  // history), loads the list again.
+  const known = useRef(new Set<string>());
+  known.current = new Set(loaded?.map((t) => t.id));
+  useLiveEvents((e) => {
+    if (e.type !== "task" || !known.current.has(e.data.id)) return;
+    setPatch((p) => ({ base: loaded, rows: new Map(p.base === loaded ? p.rows : undefined).set(e.data.id, e.data) }));
+  });
+  useLiveReload(
+    reload,
+    (e) => e.type === "task" && (!known.current.has(e.data.id) || !(e.data.state === "running" || e.data.state === "queued")),
+    { quiet: 300, maxWait: 2000 },
+  );
+
+  // Without the stream, poll while anything runs or waits. The ref keeps the
+  // interval from restarting on every render, since reload is a new function
+  // each time.
+  const live = useLiveConnected();
   const reloadRef = useRef(reload);
   useEffect(() => {
     reloadRef.current = reload;
   });
   useEffect(() => {
-    if (!hasActive) return;
+    if (!hasActive || live) return;
     const id = setInterval(() => reloadRef.current(), POLL_MS);
     return () => clearInterval(id);
-  }, [hasActive]);
+  }, [hasActive, live]);
 
   const cancel = async (id: string) => {
     setBusyIds((s) => new Set(s).add(id));

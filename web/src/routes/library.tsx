@@ -4,6 +4,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
 import { ArrowUpDown, Circle, CircleCheck, MoreHorizontal, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
 import { api, errorMessage, formatBytes, statusLabel, useApi, usePagedApi, type SeriesSort, type SeriesStatus } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
 import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
@@ -95,6 +96,18 @@ export default function Screen() {
     [scope, sort, desc, read.join(), status.join(), genre.join()],
   );
   const series = seriesList.items;
+
+  // Scans, analysis and reading elsewhere change what this list shows.
+  useLiveReload(
+    () => {
+      seriesList.reload();
+      genreList.reload();
+      if (isAll) libs.reload();
+      else one.reload();
+    },
+    (e) => e.type !== "task" && (isAll || e.data.libraryId === libraryId),
+    { quiet: 1500, maxWait: 8000 },
+  );
 
   const library = isAll ? undefined : (one.data ?? undefined);
   const libraryList = libs.data ?? [];
