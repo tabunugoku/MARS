@@ -10,7 +10,7 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "localize:fluid": "node scripts/localize-fluid.mjs",
-    "budget": "vite build && node scripts/check-budget.mjs",
+    "budget": "vite build && node scripts/check-budget.mjs && node scripts/check-sw.mjs",
     "build:embed": "npm run build && node scripts/copy-dist.mjs",
     "api:types": "npx -y -p openapi-typescript@7.13.0 -p typescript@5.9.3 openapi-typescript ../api/openapi.yaml -o src/api/schema.d.ts"
   },

@@ -103,7 +103,8 @@ expected, not an error. To install it, put HTTPS in front:
   `https://<machine>.<tailnet>.ts.net` on the phone and install from there.
 - **A reverse proxy** (Caddy, Traefik, nginx …) with a certificate. It must
   pass the original `Host` header and set `X-Forwarded-Proto: https`; with
-  nginx that means `proxy_set_header Host $host;` and
+  nginx that means `proxy_set_header Host $http_host;` (not `$host`, which
+  drops a non-standard port such as `:8443` and makes sign-in fail) and
   `proxy_set_header X-Forwarded-Proto $scheme;`. For the event stream
   (`/api/v1/events`) turn response buffering off (`proxy_buffering off;`).
   Set `COMINAVI_TRUSTED_PROXIES` to the proxy's address.

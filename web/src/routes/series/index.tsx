@@ -212,7 +212,7 @@ function SeriesPage({ id }: { id: string }) {
           )}
 
           {(series.genres.length > 0 || series.tags.length > 0) && (
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5 pointer-coarse:gap-y-5">
               {series.genres.map((g) => (
                 <Link
                   key={g}
