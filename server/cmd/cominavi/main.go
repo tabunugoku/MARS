@@ -64,8 +64,19 @@ func run() error {
 	}
 	defer database.Close()
 
+	// Settings read at startup: the task thread count (restart applies it)
+	// and the port unless COMINAVI_PORT is set.
+	settings := httpapi.LoadServerSettings(ctx, database)
+	if !cfg.PortSet {
+		cfg.Addr = cfg.AddrWithPort(settings.Port)
+	}
+	threads := settings.TaskThreads
+	if threads < 1 {
+		threads = runtime.NumCPU()/2 + 1
+	}
+
 	hub := events.New()
-	queue := task.New(database, runtime.NumCPU()/2+1)
+	queue := task.New(database, threads)
 	queue.Events = hub
 	if err := queue.Run(ctx); err != nil {
 		return err
@@ -77,6 +88,10 @@ func run() error {
 		Pages:        &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
 		PageThumbDir: cfg.PageThumbDir(),
 		Events:       hub,
+		// Read per thumbnail, so a new size applies without a restart.
+		ThumbSize: func(ctx context.Context) (int, int) {
+			return httpapi.ThumbBounds(string(httpapi.LoadServerSettings(ctx, database).ThumbnailSize))
+		},
 	}
 	go lib.Schedule(ctx)
 

@@ -26,11 +26,16 @@ import (
 	"github.com/tabunugoku/cominavi/server/internal/task"
 )
 
-// Thumbnail bounds. Fixed for now; the thumbnailSize setting arrives with
-// the settings API (M3).
-const thumbW, thumbH = 400, 600
-
 var ErrNotFound = errors.New("library: not found")
+
+// thumbBounds returns the box a new thumbnail is fitted into: ThumbSize when
+// set, otherwise 400x600.
+func (s *Service) thumbBounds(ctx context.Context) (int, int) {
+	if s.ThumbSize != nil {
+		return s.ThumbSize(ctx)
+	}
+	return 400, 600
+}
 
 type Service struct {
 	DB       *sql.DB
@@ -42,7 +47,10 @@ type Service struct {
 	PageThumbDir string
 	PageThumbMax int64
 	pageThumbs   pageThumbs
-	Events   *events.Hub // may be nil
+	Events       *events.Hub // may be nil
+	// ThumbSize gives the thumbnail box (width, height) for thumbnails made
+	// from now on; nil means 400x600.
+	ThumbSize func(ctx context.Context) (w, h int)
 
 	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library
 	coverLocks sync.Map // book id -> ctxMutex; see coverLock
@@ -308,7 +316,8 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 
 	thumb := ""
 	if !coverChanged {
-		if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
+		w, h := s.thumbBounds(ctx)
+		if jpg, err := media.Thumbnail(a.Cover, w, h); err == nil {
 			if thumb, err = s.writeThumb(bookID, jpg); err != nil {
 				return "", nil, err
 			}

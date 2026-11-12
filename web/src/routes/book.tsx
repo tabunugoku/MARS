@@ -11,6 +11,7 @@ import { BrandAction } from "@/components/media/brand-action";
 import { DotTrack } from "@/components/media/dot-track";
 import { EmptyState, Page, SectionTitle } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
+import { AddToReadListDialog } from "@/routes/readlists/add-to-readlist";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
@@ -68,6 +69,9 @@ function BookPage({ id }: { id: string }) {
   const isAdmin = me?.role === "admin";
   const canDownload = isAdmin || !!me?.canDownload;
   const [picking, setPicking] = useState(false);
+  // The read-list dialog is remounted per open so its lists are fetched fresh.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addKey, setAddKey] = useState(0);
 
   if (error) {
     return (
@@ -142,6 +146,16 @@ function BookPage({ id }: { id: string }) {
     { label: "シークレットモードで読む", onSelect: () => navigate(`/read/${book.id}?incognito=1`) },
   ];
   if (canDownload) menu.push({ label: "ファイルをダウンロード", onSelect: () => startDownload(bookFileUrl(book.id)) });
+  // Same rule as editing read lists (server: UpdateReadList is admin only).
+  if (isAdmin) {
+    menu.push({
+      label: "リーディングリストに追加",
+      onSelect: () => {
+        setAddKey((k) => k + 1);
+        setAddOpen(true);
+      },
+    });
+  }
   if (isAdmin && book.mediaStatus === "ready") {
     menu.push({ label: "表紙を作り直す", onSelect: regenerate });
     menu.push({
@@ -250,6 +264,7 @@ function BookPage({ id }: { id: string }) {
               </DropdownContent>
             </DropdownMenu>
           </div>
+          {isAdmin && <AddToReadListDialog key={addKey} bookId={book.id} open={addOpen} onOpenChange={setAddOpen} />}
           {!canMarkRead && <p className={cn(typeClass("caption"), "text-muted-foreground")}>解析が終わっていません</p>}
 
           <dl className="mt-4 max-w-2xl divide-y divide-border">

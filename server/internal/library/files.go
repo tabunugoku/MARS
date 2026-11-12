@@ -114,7 +114,8 @@ func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error
 	if err != nil {
 		return err
 	}
-	jpg, err := media.Thumbnail(img, thumbW, thumbH)
+	w, h := s.thumbBounds(ctx)
+	jpg, err := media.Thumbnail(img, w, h)
 	if err != nil {
 		return err
 	}

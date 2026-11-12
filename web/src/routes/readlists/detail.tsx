@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { DotTrack } from "@/components/media/dot-track";
 import { Link, useNavigate, useParams } from "react-router";
-import { MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, ListMinus, MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, useApi, type Book } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
@@ -105,6 +105,28 @@ export default function Screen() {
       .finally(() => setBusy(false));
   };
 
+  // Saves a new member list (a reorder or a removal), then reloads the list.
+  const saveBooks = (bookIds: string[]) => {
+    setBusy(true);
+    api
+      .updateReadList(rl.id, { bookIds })
+      .then(() => reload())
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const moveBook = (index: number, direction: -1 | 1) => {
+    const ids = books.map((b) => b.id);
+    const to = index + direction;
+    if (to < 0 || to >= ids.length) return;
+    [ids[index], ids[to]] = [ids[to], ids[index]];
+    saveBooks(ids);
+  };
+
+  const removeBook = (bookId: string) => {
+    saveBooks(books.filter((b) => b.id !== bookId).map((b) => b.id));
+  };
+
   return (
     <Page>
       <PageHeader
@@ -171,15 +193,32 @@ export default function Screen() {
       </Dialog>
 
       {books.length === 0 ? (
-        <EmptyState title="巻がありません" body="巻の詳細からこのリーディングリストに追加できます" />
+        <EmptyState
+          title="巻がありません"
+          body={isAdmin ? "巻の「その他」メニューの「リーディングリストに追加」から追加できます。" : undefined}
+        />
       ) : (
-        <BookRows books={books} titles={titles} />
+        <BookRows books={books} titles={titles} editable={isAdmin} busy={busy} onMove={moveBook} onRemove={removeBook} />
       )}
     </Page>
   );
 }
 
-function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string> }) {
+function BookRows({
+  books,
+  titles,
+  editable,
+  busy,
+  onMove,
+  onRemove,
+}: {
+  books: Book[];
+  titles: Map<string, string>;
+  editable: boolean;
+  busy: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: (bookId: string) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const hover = useFluidHover(ref);
   return (
@@ -187,7 +226,18 @@ function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string
       <FluidHoverHighlight hover={hover} className="rounded-[8px]" />
       <ol>
         {books.map((b, i) => (
-          <BookRow key={b.id} book={b} index={i} seriesTitle={titles.get(b.seriesId)} register={hover.registerItem} />
+          <BookRow
+            key={b.id}
+            book={b}
+            index={i}
+            count={books.length}
+            seriesTitle={titles.get(b.seriesId)}
+            register={hover.registerItem}
+            editable={editable}
+            busy={busy}
+            onMove={onMove}
+            onRemove={onRemove}
+          />
         ))}
       </ol>
     </div>
@@ -197,13 +247,23 @@ function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string
 function BookRow({
   book,
   index,
+  count,
   seriesTitle,
   register,
+  editable,
+  busy,
+  onMove,
+  onRemove,
 }: {
   book: Book;
   index: number;
+  count: number;
   seriesTitle?: string;
   register: (index: number, element: HTMLElement | null) => void;
+  editable: boolean;
+  busy: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: (bookId: string) => void;
 }) {
   const ref = useRef<HTMLAnchorElement>(null);
   useRegisterFluidHoverItem(register, index, ref);
@@ -211,11 +271,11 @@ function BookRow({
   const pct = p ? Math.min(100, Math.round((p.page / book.pageCount) * 100)) : 0;
 
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <Link
         ref={ref}
         to={`/books/${book.id}`}
-        className="relative z-10 flex items-center gap-3 rounded-[8px] px-2 py-2 outline-none focus-visible:ring-2 ring-[var(--focus-ring)]"
+        className="relative z-10 flex min-w-0 flex-1 items-center gap-3 rounded-[8px] px-2 py-2 outline-none focus-visible:ring-2 ring-[var(--focus-ring)]"
       >
         <span className={cn(typeClass("body"), "w-6 shrink-0 text-right text-muted-foreground tabular-nums")}>{index + 1}</span>
         <div className="w-10 shrink-0">
@@ -240,6 +300,46 @@ function BookRow({
           )}
         </div>
       </Link>
+      {editable && (
+        <div className="relative z-10 flex shrink-0 items-center">
+          <Tooltip content="上へ">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="上へ"
+              disabled={busy || index === 0}
+              onClick={() => onMove(index, -1)}
+            >
+              <ArrowUp size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip content="下へ">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="下へ"
+              disabled={busy || index === count - 1}
+              onClick={() => onMove(index, 1)}
+            >
+              <ArrowDown size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip content="リストから外す">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="リストから外す"
+              disabled={busy}
+              onClick={() => onRemove(book.id)}
+            >
+              <ListMinus size={16} />
+            </Button>
+          </Tooltip>
+        </div>
+      )}
     </li>
   );
 }

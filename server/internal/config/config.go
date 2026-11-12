@@ -22,6 +22,16 @@ type Config struct {
 	// TrustedProxies are reverse proxies (COMINAVI_TRUSTED_PROXIES, comma-
 	// separated IPs or CIDRs) whose X-Forwarded-For names the real client.
 	TrustedProxies []netip.Prefix
+	// PortSet reports whether COMINAVI_PORT chose the port. When false the
+	// port comes from the stored server setting (see AddrWithPort).
+	PortSet bool
+
+	host string
+}
+
+// AddrWithPort returns the listen address on the configured host with port.
+func (c Config) AddrWithPort(port int) string {
+	return net.JoinHostPort(c.host, strconv.Itoa(port))
 }
 
 const defaultPort = 25600
@@ -45,14 +55,12 @@ func Load() (Config, error) {
 			return c, fmt.Errorf("COMINAVI_PORT %q is not a port number", p)
 		}
 		port = n
+		c.PortSet = true
 	}
 	// Listen on all interfaces unless COMINAVI_HOST narrows it; every API
 	// route except sign-in, setup and the login screen needs a session.
-	host := os.Getenv("COMINAVI_HOST")
-	if host == "" {
-		host = "" // all interfaces; sign-in protects the API
-	}
-	c.Addr = net.JoinHostPort(host, strconv.Itoa(port))
+	c.host = os.Getenv("COMINAVI_HOST") // "" means all interfaces; sign-in protects the API
+	c.Addr = c.AddrWithPort(port)
 	for _, f := range strings.Split(os.Getenv("COMINAVI_TRUSTED_PROXIES"), ",") {
 		if f = strings.TrimSpace(f); f == "" {
 			continue

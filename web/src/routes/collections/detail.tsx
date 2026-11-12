@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
-import { MoreHorizontal, SquarePen } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, MoreHorizontal, SquarePen, X } from "@keyline-icons/react";
 import { api, errorMessage, useApi, type Series } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
@@ -87,6 +87,36 @@ export default function Screen() {
       .finally(() => setBusy(false));
   };
 
+  // Saves a new member list. Both reorder and removal go through here.
+  const saveIds = (seriesIds: string[], done: string) => {
+    setBusy(true);
+    api
+      .updateCollection(c.id, { seriesIds })
+      .then(() => {
+        toast.success(done);
+        reload();
+      })
+      .catch((err: unknown) => toast.error(errorMessage(err)))
+      .finally(() => setBusy(false));
+  };
+
+  const move = (seriesId: string, by: -1 | 1) => {
+    const ids = [...c.seriesIds];
+    const index = ids.indexOf(seriesId);
+    const target = index + by;
+    if (index < 0) return;
+    if (target < 0 || target >= ids.length) return;
+    [ids[index], ids[target]] = [ids[target], ids[index]];
+    saveIds(ids, "並び順を保存しました");
+  };
+
+  const removeFromCollection = (seriesId: string) => {
+    saveIds(
+      c.seriesIds.filter((id) => id !== seriesId),
+      "コレクションから外しました",
+    );
+  };
+
   return (
     <Page>
       <PageHeader
@@ -150,11 +180,63 @@ export default function Screen() {
       </Dialog>
 
       {series.length === 0 ? (
-        <EmptyState title="シリーズがありません" body="シリーズの詳細からこのコレクションに追加できます" />
+        <EmptyState
+          title="シリーズがありません"
+          body={isAdmin ? "シリーズの「その他」メニューの「コレクションに追加」から追加できます。" : "管理者がシリーズを追加すると、ここに表示されます"}
+        />
       ) : (
         <CoverGrid>
           {series.map((s, i) => (
-            <SeriesCard key={s.id} series={s} priority={i < 8} />
+            <div key={s.id} className="flex flex-col gap-2">
+              <SeriesCard series={s} priority={i < 8} />
+              {isAdmin && (
+                <div className="flex items-center gap-1">
+                  {c.ordered && (
+                    <>
+                      <Tooltip content="上へ">
+                        <span className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="上へ"
+                            disabled={busy || i === 0}
+                            onClick={() => move(s.id, -1)}
+                          >
+                            <ArrowUp size={16} />
+                          </Button>
+                        </span>
+                      </Tooltip>
+                      <Tooltip content="下へ">
+                        <span className="inline-flex">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            aria-label="下へ"
+                            disabled={busy || i === series.length - 1}
+                            onClick={() => move(s.id, 1)}
+                          >
+                            <ArrowDown size={16} />
+                          </Button>
+                        </span>
+                      </Tooltip>
+                    </>
+                  )}
+                  <Tooltip content="コレクションから外す">
+                    <span className="inline-flex">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label="コレクションから外す"
+                        disabled={busy}
+                        onClick={() => removeFromCollection(s.id)}
+                      >
+                        <X size={16} />
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </div>
+              )}
+            </div>
           ))}
         </CoverGrid>
       )}

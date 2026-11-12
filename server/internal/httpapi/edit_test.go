@@ -314,3 +314,19 @@ func TestUpdateNullClears(t *testing.T) {
 	}
 	e.admin.json("PATCH", "/api/v1/books/"+books[0].Id, map[string]any{"releaseDate": "May 2024"}, 400, nil)
 }
+
+func TestThumbBounds(t *testing.T) {
+	cases := map[string][2]int{
+		"small":  {300, 450},
+		"medium": {400, 600},
+		"large":  {600, 900},
+		"xlarge": {800, 1200},
+		"bogus":  {400, 600},
+		"":       {400, 600},
+	}
+	for size, want := range cases {
+		if w, h := ThumbBounds(size); w != want[0] || h != want[1] {
+			t.Errorf("ThumbBounds(%q) = %dx%d, want %dx%d", size, w, h, want[0], want[1])
+		}
+	}
+}
