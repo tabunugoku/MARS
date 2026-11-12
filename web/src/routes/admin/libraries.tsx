@@ -132,6 +132,19 @@ export default function Screen() {
     }
   };
 
+  // Maintenance from the edit dialog: both run as background tasks.
+  const runTask = async (id: string, run: (id: string) => Promise<unknown>, done: string) => {
+    setBusyId(id);
+    try {
+      await run(id);
+      toast.success(done);
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const remove = async (l: Library) => {
     setBusyId(l.id);
     try {
@@ -285,6 +298,30 @@ export default function Screen() {
               />
               <FieldDescription>1行に1パターン。例: @eaDir</FieldDescription>
             </Field>
+            {dlg.id && (
+              <Field>
+                <FieldLabel>メンテナンス</FieldLabel>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="secondary"
+                    disabled={busyId === dlg.id}
+                    onClick={() => dlg.id && runTask(dlg.id, (id) => api.scanLibrary(id, true), "詳細スキャンを開始しました")}
+                  >
+                    詳細スキャン
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={busyId === dlg.id}
+                    onClick={() => dlg.id && runTask(dlg.id, api.regenerateLibraryThumbnails, "表紙の作り直しを開始しました")}
+                  >
+                    表紙を作り直す
+                  </Button>
+                </div>
+                <FieldDescription>
+                  詳細スキャンは、変更のないファイルも含めてすべての本を解析し直します。冊数が多いと時間がかかります
+                </FieldDescription>
+              </Field>
+            )}
           </FieldGroup>
           <DialogFooter>
             <DialogClose render={<Button variant="ghost">キャンセル</Button>} />

@@ -39,7 +39,9 @@ export const realApi = {
   createLibrary: (body: LibraryCreate) => request<Library>("POST", "/libraries", body),
   updateLibrary: (id: string, body: LibraryUpdate) => request<Library>("PATCH", `/libraries/${enc(id)}`, body),
   deleteLibrary: (id: string) => request<void>("DELETE", `/libraries/${enc(id)}`),
-  scanLibrary: (id: string) => request<Task>("POST", `/libraries/${enc(id)}/scan`),
+  /** deep: analyse every book again, even unchanged ones (詳細スキャン). */
+  scanLibrary: (id: string, deep = false) => request<Task>("POST", `/libraries/${enc(id)}/scan` + query({ deep: deep || undefined })),
+  regenerateLibraryThumbnails: (id: string) => request<Task>("POST", `/libraries/${enc(id)}/regenerate-thumbnails`),
   markLibraryRead: (id: string, completed: boolean) =>
     request<void>("PUT", `/libraries/${enc(id)}/read-progress`, { completed }),
 
@@ -62,6 +64,9 @@ export const realApi = {
     request<ReadProgress>("PUT", `/books/${enc(bookId)}/progress`, { page, completed, writer: opts.writer, seq: opts.seq }, { keepalive: opts.keepalive }),
   clearProgress: (bookId: string) => request<void>("DELETE", `/books/${enc(bookId)}/progress`),
   analyzeBook: (bookId: string) => request<Task>("POST", `/books/${enc(bookId)}/analyze`),
+  regenerateBookThumbnail: (bookId: string) => request<void>("POST", `/books/${enc(bookId)}/regenerate-thumbnail`),
+  setBookCover: (bookId: string, page: number) => request<Book>("PUT", `/books/${enc(bookId)}/cover`, { page }),
+  regenerateSeriesThumbnails: (seriesId: string) => request<Task>("POST", `/series/${enc(seriesId)}/regenerate-thumbnails`),
 
   dashboard: (libraryId?: string) => get<Dashboard>("/dashboard" + query({ libraryId })),
   search: (q: string) => get<SearchResult>("/search" + query({ q: q.trim() })),
