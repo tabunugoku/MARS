@@ -82,6 +82,36 @@ The token is deleted once the administrator has been created.
 | `COMINAVI_TRUSTED_PROXIES` | none | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For` is trusted |
 | `COMINAVI_DEV` | unset | `1` serves the API only (the Vite dev server serves the UI) |
 
+## Installing on a phone or tablet (PWA)
+
+ComiNavi is an installable web app: *Add to Home Screen* (iOS Safari) or
+*Install app* (Chrome, Edge, Android) opens it full screen with its own icon.
+The service worker caches only the app shell (scripts, styles, icons). It
+never stores book data, page images or reading progress, and it is not an
+offline mode.
+
+Browsers allow installation and service workers only on **HTTPS** (or on
+`localhost`). Over plain HTTP on the LAN, such as `http://192.168.1.10:25600`,
+ComiNavi works the same in the browser but offers no installation; that is
+expected, not an error. To install it, put HTTPS in front:
+
+- **Tailscale** (simplest when the readers are already on your tailnet): in
+  the admin console enable *MagicDNS* and *HTTPS Certificates*, then on the
+  machine running Tailscale run
+  `tailscale serve --bg http://127.0.0.1:25600` (use the server's LAN
+  address instead if Tailscale runs in its own network namespace). Open
+  `https://<machine>.<tailnet>.ts.net` on the phone and install from there.
+- **A reverse proxy** (Caddy, Traefik, nginx …) with a certificate. It must
+  pass the original `Host` header and set `X-Forwarded-Proto: https`; with
+  nginx that means `proxy_set_header Host $host;` and
+  `proxy_set_header X-Forwarded-Proto $scheme;`. For the event stream
+  (`/api/v1/events`) turn response buffering off (`proxy_buffering off;`).
+  Set `COMINAVI_TRUSTED_PROXIES` to the proxy's address.
+
+After an upgrade, the installed app picks up the new version on its next
+launch: page loads always go to the server first, and only a server that
+cannot be reached falls back to the cached shell.
+
 ## Footprint
 
 Measured in CI (`.github/scripts/smoke-image.sh`): first-run setup, then a

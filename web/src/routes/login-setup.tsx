@@ -63,6 +63,7 @@ export function SetupForm() {
         <Field data-invalid={errors.token || undefined}>
           <FieldLabel htmlFor="setup-token">セットアップトークン</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="setup-token"
             name="setupToken"
             autoComplete="off"
@@ -77,6 +78,7 @@ export function SetupForm() {
         <Field data-invalid={errors.name || undefined}>
           <FieldLabel htmlFor="setup-name">名前</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="setup-name"
             name="name"
             autoComplete="name"
@@ -90,6 +92,7 @@ export function SetupForm() {
         <Field data-invalid={errors.email || undefined}>
           <FieldLabel htmlFor="setup-email">メールアドレス</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="setup-email"
             name="email"
             type="email"
@@ -104,6 +107,7 @@ export function SetupForm() {
         <Field data-invalid={errors.pass || undefined}>
           <FieldLabel htmlFor="setup-pass">パスワード</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="setup-pass"
             name="password"
             type="password"
@@ -119,6 +123,7 @@ export function SetupForm() {
         <Field data-invalid={errors.confirm || undefined}>
           <FieldLabel htmlFor="setup-confirm">パスワード（確認）</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="setup-confirm"
             name="passwordConfirm"
             type="password"

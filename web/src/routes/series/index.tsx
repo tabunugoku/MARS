@@ -144,7 +144,7 @@ function SeriesPage({ id }: { id: string }) {
     <Page>
       <Link
         to={`/libraries/${series.libraryId}`}
-        className={cn(typeClass("caption"), "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3", "mb-4 pointer-coarse:mb-1")}
+        className={cn(typeClass("caption"), "inline-flex w-fit items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3.5 pointer-coarse:py-3.5", "mb-4 pointer-coarse:mb-1")}
       >
         <ChevronLeft size={14} />
         {library?.name ?? "ライブラリ"}
@@ -212,12 +212,12 @@ function SeriesPage({ id }: { id: string }) {
           )}
 
           {(series.genres.length > 0 || series.tags.length > 0) && (
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               {series.genres.map((g) => (
                 <Link
                   key={g}
                   to={`/libraries/${series.libraryId}?genre=${encodeURIComponent(g)}`}
-                  className="rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] pointer-coarse:py-2"
+                  className="touch-hit relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                 >
                   <Badge variant="dot">{g}</Badge>
                 </Link>
@@ -234,8 +234,8 @@ function SeriesPage({ id }: { id: string }) {
 
       <div className="mt-10 mb-4 flex flex-wrap items-center justify-between gap-2">
         <Tabs selectedIndex={tab} onSelect={setTab} idPrefix="series">
-          <TabsItem index={0} label={`巻（${books.length}）`} />
-          <TabsItem index={1} label="情報" />
+          <TabsItem index={0} label={`巻（${books.length}）`} className="pointer-coarse:h-11" />
+          <TabsItem index={1} label="情報" className="pointer-coarse:h-11" />
         </Tabs>
         {tab === 0 && books.length > 1 && (
           <Button

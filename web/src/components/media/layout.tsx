@@ -69,7 +69,8 @@ export function Shelf({ title, to, children }: { title: ReactNode; to?: string; 
       <SectionTitle
         to={to}
         action={
-          <div className="hidden gap-1 md:flex">
+          // Paging arrows are for a mouse; on touch the shelf scrolls under the finger.
+          <div className="hidden gap-1 md:pointer-fine:flex">
             <Button variant="ghost" size="icon-compact" aria-label="前へ" onClick={() => page(-1)}>
               <ChevronLeft />
             </Button>

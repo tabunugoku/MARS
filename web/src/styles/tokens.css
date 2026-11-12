@@ -84,6 +84,21 @@ body { -webkit-font-smoothing: antialiased; }
 .tone { background-image: radial-gradient(var(--dot) 1px, transparent 1.4px); background-size: 12px 12px; }
 .tone-strong { background-image: radial-gradient(var(--dot-strong) 1.1px, transparent 1.5px); background-size: 8px 8px; }
 
+/* Touch targets: on a touch screen every control answers to at least
+   44 × 44 px without changing how it looks. An invisible ::after grows the
+   hit area out from the control's centre to 44px (never shrinks it); 36px
+   Fluid buttons in a row with gap-2 meet without overlapping. Fluid's
+   Button is the one element with `isolate` (and `relative`); anything else
+   opts in with .touch-hit and must be positioned (`relative`). */
+@media (pointer: coarse) {
+  :is(button, a).isolate::after,
+  .touch-hit::after {
+    content: "";
+    position: absolute;
+    inset: min(0px, calc(50% - 22px));
+  }
+}
+
 /* Horizontal shelves: hide the scrollbar, keep the scroll. */
 .shelf-scroll { scrollbar-width: none; scroll-snap-type: x proximity; }
 .shelf-scroll::-webkit-scrollbar { display: none; }

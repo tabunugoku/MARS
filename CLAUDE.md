@@ -16,7 +16,10 @@ start prints a one-time setup token and writes it to `DATA/setup-token`;
 the web app's /login page shows the setup form until an admin exists.
 Reader progress writes carry a per-reader `writer` and `seq`; the server
 ignores a stale one. `web/` talks to the Go API through
-`web/src/api/real.ts`; the invented sample data in `web/src/mock/` loads only
+`web/src/api/real.ts`. The app is an installable PWA
+(`web/public/manifest.webmanifest`, `web/public/sw.js`): the worker caches the
+app shell only and must never touch `/api`. On touch screens every control
+answers to 44 px (`.touch-hit` in `styles/tokens.css`). The invented sample data in `web/src/mock/` loads only
 when `VITE_API=mock` (`npm run dev:mock`) and never ships in a normal build.
 
 ## Working agreement

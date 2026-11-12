@@ -16,13 +16,15 @@ import { motion } from "motion/react";
 /** Desktop: inset sidebar + content card. Mobile (<768px): bottom tabs, and
  *  the sidebar becomes a drawer opened from the "ライブラリ" tab. */
 export function AppShell() {
+  // viewport-fit=cover (index.html): keep clear of the notch and rounded
+  // corners in landscape, and of the status bar if it overlays.
   return (
-    <SidebarProvider peek="hover" className="h-svh">
+    <SidebarProvider peek="hover" className="h-svh pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
       <AppSidebar />
       <SidebarInset className="overflow-hidden">
         <CompassBackdrop />
         <Topbar />
-        <div className="relative min-h-0 flex-1 overflow-y-auto pb-20 md:pb-0" id="cn-scroll">
+        <div className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-[env(safe-area-inset-bottom)]" id="cn-scroll">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
           </Suspense>
@@ -94,7 +96,7 @@ function BottomTabs() {
   return (
     <nav
       aria-label="メインナビゲーション"
-      className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
     >
       <Tab to="/" label="ホーム" icon={<House size={18} />} active={pathname === "/"} />
       <Tab label="ライブラリ" icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} onClick={() => setOpenMobile(true)} />
