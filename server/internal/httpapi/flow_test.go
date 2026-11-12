@@ -20,6 +20,7 @@ import (
 
 	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/library"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -128,6 +129,7 @@ type env struct {
 	h     http.Handler
 	db    *sql.DB
 	gate  *SetupGate
+	hub   *events.Hub
 	admin client
 }
 
@@ -143,7 +145,10 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { d.Close() })
+	hub := events.New()
+	t.Cleanup(hub.Close)
 	q := task.New(d, 2)
+	q.Events = hub
 	if err := q.Run(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -151,10 +156,10 @@ func newEnv(t *testing.T) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib := &library.Service{DB: d, Queue: q, ThumbDir: filepath.Join(data, "thumbs"), Pages: &media.PageCache{Dir: filepath.Join(data, "pages"), MaxBytes: 1 << 30}}
+	lib := &library.Service{DB: d, Queue: q, ThumbDir: filepath.Join(data, "thumbs"), Pages: &media.PageCache{Dir: filepath.Join(data, "pages"), MaxBytes: 1 << 30}, Events: hub}
 	h := http.StripPrefix("/api/v1", New(Deps{DB: d, Version: "test", Library: lib, Tasks: q,
-		Auth: auth.Store{DB: d}, Limiter: &auth.Limiter{}, Gate: gate}))
-	e := &env{t: t, h: h, db: d, gate: gate}
+		Auth: auth.Store{DB: d}, Limiter: &auth.Limiter{}, Gate: gate, Events: hub, Heartbeat: 50 * time.Millisecond}))
+	e := &env{t: t, h: h, db: d, gate: gate, hub: hub}
 	anon := e.anon()
 	rec := anon.do("POST", "/api/v1/setup", map[string]any{"token": gate.token, "name": "管理人", "email": "admin@example.com", "password": "correct horse"})
 	if rec.Code != 201 {

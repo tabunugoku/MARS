@@ -27,6 +27,8 @@ var opAccess = map[string]access{
 	"GetReaderPrefs": anyone, "SetGlobalReaderPrefs": anyone,
 	"SetSeriesReaderPrefs": anyone, "DeleteSeriesReaderPrefs": anyone,
 	"SetBookReaderPrefs": anyone, "DeleteBookReaderPrefs": anyone,
+	// Live changes; each event is filtered per user in serveEvents (eventFor).
+	"StreamEvents": anyone,
 
 	// Reading (always within libScope)
 	"ListLibraries": anyone, "GetLibrary": anyone,

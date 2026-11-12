@@ -16,6 +16,7 @@ import (
 	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"github.com/tabunugoku/cominavi/server/internal/config"
 	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/httpapi"
 	"github.com/tabunugoku/cominavi/server/internal/library"
 	"github.com/tabunugoku/cominavi/server/internal/media"
@@ -63,7 +64,9 @@ func run() error {
 	}
 	defer database.Close()
 
+	hub := events.New()
 	queue := task.New(database, runtime.NumCPU()/2+1)
+	queue.Events = hub
 	if err := queue.Run(ctx); err != nil {
 		return err
 	}
@@ -72,6 +75,7 @@ func run() error {
 		Queue:    queue,
 		ThumbDir: cfg.ThumbnailDir(),
 		Pages:    &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
+		Events:   hub,
 	}
 	go lib.Schedule(ctx)
 
@@ -86,6 +90,7 @@ func run() error {
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{
 		DB: database, Version: version, Library: lib, Tasks: queue,
 		Auth: store, Limiter: &auth.Limiter{}, Gate: gate, TrustedProxies: cfg.TrustedProxies,
+		Events: hub,
 	})))
 	if !cfg.Dev {
 		mux.Handle("/", webui.Handler())
@@ -98,7 +103,11 @@ func run() error {
 		ReadTimeout:       time.Minute,
 		IdleTimeout:       2 * time.Minute,
 		MaxHeaderBytes:    64 << 10,
+		// No WriteTimeout: /events streams for hours and sets its own
+		// per-write deadline (ReadTimeout it clears for itself).
 	}
+	// Shutdown waits for connections to go idle, which a stream never does.
+	srv.RegisterOnShutdown(hub.Close)
 	errc := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", cfg.Addr, "data", cfg.DataDir, "version", version)

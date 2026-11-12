@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"time"
+
+	"github.com/tabunugoku/cominavi/server/internal/events"
 )
 
 const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at) VALUES (?, ?, ?, ?, ?)
@@ -59,6 +61,7 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 		if _, err := s.DB.ExecContext(ctx, upsertProgress, uid, book.Id, p.Page, p.Completed, p.ReadAt); err != nil {
 			return nil, err
 		}
+		s.progressChanged(ctx, events.Progress{LibraryID: book.LibraryId, SeriesID: book.SeriesId, BookID: book.Id})
 		return SetBookProgress200JSONResponse(p), nil
 	}
 
@@ -98,11 +101,12 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	s.progressChanged(ctx, events.Progress{LibraryID: book.LibraryId, SeriesID: book.SeriesId, BookID: book.Id, Writer: writer})
 	return SetBookProgress200JSONResponse(p), nil
 }
 
 func (s *server) ClearBookProgress(ctx context.Context, req ClearBookProgressRequestObject) (ClearBookProgressResponseObject, error) {
-	ok, err := s.visible(ctx, "books", req.BookId)
+	book, ok, err := s.oneBook(ctx, req.BookId)
 	if err != nil {
 		return nil, err
 	}
@@ -113,6 +117,7 @@ func (s *server) ClearBookProgress(ctx context.Context, req ClearBookProgressReq
 		currentUser(ctx).ID, req.BookId); err != nil {
 		return nil, err
 	}
+	s.progressChanged(ctx, events.Progress{LibraryID: book.LibraryId, SeriesID: book.SeriesId, BookID: book.Id})
 	return ClearBookProgress204Response{}, nil
 }
 
@@ -126,6 +131,10 @@ func (s *server) MarkSeriesRead(ctx context.Context, req MarkSeriesReadRequestOb
 	}
 	if err := s.markRead(ctx, "series_id", req.SeriesId, req.Body != nil && req.Body.Completed); err != nil {
 		return nil, err
+	}
+	var libID string
+	if err := s.DB.QueryRowContext(ctx, `SELECT library_id FROM series WHERE id = ?`, req.SeriesId).Scan(&libID); err == nil {
+		s.progressChanged(ctx, events.Progress{LibraryID: libID, SeriesID: req.SeriesId})
 	}
 	return MarkSeriesRead204Response{}, nil
 }
@@ -143,6 +152,7 @@ func (s *server) MarkLibraryRead(ctx context.Context, req MarkLibraryReadRequest
 	if err := s.markRead(ctx, "library_id", req.LibraryId, req.Body != nil && req.Body.Completed); err != nil {
 		return nil, err
 	}
+	s.progressChanged(ctx, events.Progress{LibraryID: req.LibraryId})
 	return MarkLibraryRead204Response{}, nil
 }
 

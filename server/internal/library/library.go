@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 	"github.com/tabunugoku/cominavi/server/internal/scan"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -36,6 +37,7 @@ type Service struct {
 	Queue    *task.Queue
 	ThumbDir string
 	Pages    *media.PageCache
+	Events   *events.Hub // may be nil
 
 	scanLocks sync.Map // library id -> *sync.Mutex; one walk+sync at a time per library
 }
@@ -98,6 +100,12 @@ func (s *Service) QueueScan(ctx context.Context, libraryID string) (task.Task, e
 			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
+		if st != (scan.Stats{}) {
+			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
+				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
+				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
+			}})
+		}
 		_, err = s.QueueAnalyze(context.WithoutCancel(ctx), l.id)
 		return err
 	})
@@ -134,9 +142,14 @@ func (s *Service) QueueAnalyze(ctx context.Context, libraryID string) (task.Task
 			if err := ctx.Err(); err != nil {
 				return err
 			}
-			seriesID, ci, err := s.analyzeBook(ctx, l, id)
+			seriesID, ci, status, err := s.analyzeBook(ctx, l, id)
 			if err != nil {
 				return err // only database errors stop the task; bad files are recorded per book
+			}
+			if status != "" {
+				s.Events.Publish(events.Event{Type: "book", LibraryID: l.id, Data: events.Book{
+					BookID: id, SeriesID: seriesID, LibraryID: l.id, MediaStatus: status,
+				}})
 			}
 			if ci != nil {
 				if infos[seriesID] == nil {
@@ -165,7 +178,12 @@ func (s *Service) QueueAnalyze(ctx context.Context, libraryID string) (task.Task
 		if err := scan.RebuildSearch(ctx, tx, l.id); err != nil {
 			return err
 		}
-		return tx.Commit()
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		// Series titles and fields may have changed from ComicInfo.
+		s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{LibraryID: l.id, BooksChanged: len(todo)}})
+		return nil
 	})
 }
 
@@ -178,40 +196,41 @@ type version struct {
 }
 
 // analyzeBook reads one book and stores pages, thumbnail and book metadata.
-// It returns the book's series and its ComicInfo (nil when absent or the
-// result was discarded). A broken or unsupported file is recorded on the
+// It returns the book's series, its ComicInfo (nil when absent or the
+// result was discarded) and the media status it stored ("" when it stored
+// nothing). A broken or unsupported file is recorded on the
 // book, not returned as an error.
-func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string, *scan.ComicInfo, error) {
+func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string, *scan.ComicInfo, string, error) {
 	var rel, seriesID, lockedJSON string
 	var v version
 	if err := s.DB.QueryRowContext(ctx, `SELECT path, series_id, locked_fields, size_bytes, mtime FROM books WHERE id = ?`, bookID).
 		Scan(&rel, &seriesID, &lockedJSON, &v.size, &v.mtime); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	full, err := resolve(l.root, rel)
 	if err != nil {
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
+		return s.marked(ctx, seriesID, bookID, v, "error", err.Error())
 	}
 	a, err := media.AnalyzeContext(ctx, full)
 	switch {
 	case errors.Is(err, archive.ErrUnsupported):
-		return seriesID, nil, s.markBook(ctx, bookID, v, "unsupported", err.Error())
+		return s.marked(ctx, seriesID, bookID, v, "unsupported", err.Error())
 	case err != nil:
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
+		return s.marked(ctx, seriesID, bookID, v, "error", err.Error())
 	}
 
 	thumb := ""
 	if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
 		if err := os.MkdirAll(s.ThumbDir, 0o755); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 		name := bookID + ".jpg"
 		tmp := filepath.Join(s.ThumbDir, name+".tmp")
 		if err := os.WriteFile(tmp, jpg, 0o644); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 		if err := os.Rename(tmp, filepath.Join(s.ThumbDir, name)); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 		thumb = name
 	} else {
@@ -229,7 +248,7 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	defer tx.Rollback()
 	ts := time.Now().UTC().Format(time.RFC3339Nano)
@@ -238,27 +257,39 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
 		len(a.Pages), thumb, ts, bookID, v.size, v.mtime)
 	if err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return seriesID, nil, nil // rescanned meanwhile; the next analysis takes it
+		return seriesID, nil, "", nil // rescanned meanwhile; the next analysis takes it
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
-		return "", nil, err
+		return "", nil, "", err
 	}
 	for _, p := range a.Pages {
 		if _, err := tx.ExecContext(ctx,
 			`INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`,
 			bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 	}
 	if ci != nil {
 		if err := applyBookInfo(ctx, tx, bookID, lockedJSON, *ci, ts); err != nil {
-			return "", nil, err
+			return "", nil, "", err
 		}
 	}
-	return seriesID, ci, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return "", nil, "", err
+	}
+	return seriesID, ci, "ready", nil
+}
+
+// marked records a broken or unsupported book (see markBook) in
+// analyzeBook's return shape.
+func (s *Service) marked(ctx context.Context, seriesID, bookID string, v version, status, msg string) (string, *scan.ComicInfo, string, error) {
+	if err := s.markBook(ctx, bookID, v, status, msg); err != nil {
+		return "", nil, "", err
+	}
+	return seriesID, nil, status, nil
 }
 
 func (s *Service) markBook(ctx context.Context, bookID string, v version, status, msg string) error {

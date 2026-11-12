@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/ids"
 )
 
@@ -52,6 +53,24 @@ type Queue struct {
 
 	mu   sync.Mutex
 	live map[string]*job // queued or running, by task id
+
+	// Events, when set (before Run), receives a "task" event with the Task
+	// as Data whenever a task is queued, starts, progresses or ends.
+	Events *events.Hub
+}
+
+// publish sends the task's current row as an event.
+func (q *Queue) publish(ctx context.Context, id string) {
+	if q.Events == nil {
+		return
+	}
+	if t, err := q.get(ctx, id); err == nil {
+		q.publishTask(t)
+	}
+}
+
+func (q *Queue) publishTask(t Task) {
+	q.Events.Publish(events.Event{Type: "task", AdminOnly: true, LibraryID: t.LibraryID, Data: t})
 }
 
 // New makes a queue with the given number of workers (at least 1).
@@ -109,6 +128,7 @@ func (q *Queue) Submit(ctx context.Context, kind, label, libraryID string, fn Fu
 	}
 	q.live[j.id] = j
 	q.mu.Unlock()
+	q.publish(ctx, j.id)
 
 	select {
 	case q.jobs <- j:
@@ -134,9 +154,15 @@ func (q *Queue) Cancel(ctx context.Context, id string) error {
 	j.cancel()
 	// A queued task never reaches a worker's run; mark it here. A running
 	// task is marked by its worker when fn returns.
-	_, err := q.db.ExecContext(ctx,
+	res, err := q.db.ExecContext(ctx,
 		`UPDATE tasks SET state = 'cancelled', finished_at = ? WHERE id = ? AND state = 'queued'`, now(), id)
-	return err
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n > 0 {
+		q.publish(ctx, id)
+	}
+	return nil
 }
 
 func (q *Queue) worker(ctx context.Context) {
@@ -167,10 +193,16 @@ func (q *Queue) run(parent context.Context, j *job) {
 		// The row stays 'queued' with nothing behind it; record that.
 		slog.Error("task start", "id", j.id, "err", err)
 		q.execRetry(db, `UPDATE tasks SET state = 'failed', error = ?, finished_at = ? WHERE id = ?`, "開始できませんでした", now(), j.id)
+		q.publish(db, j.id)
 		return
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return
+	}
+	// The row as it started; progress events change only Progress.
+	started, startErr := q.get(db, j.id)
+	if startErr == nil && q.Events != nil {
+		q.publishTask(started)
 	}
 
 	// Stop the work when the server shuts down, too.
@@ -191,8 +223,14 @@ func (q *Queue) run(parent context.Context, j *job) {
 			return
 		}
 		last = time.Now()
-		if _, err := q.db.ExecContext(db, `UPDATE tasks SET progress = ? WHERE id = ?`, min(max(p, 0), 1), j.id); err != nil {
+		p = min(max(p, 0), 1)
+		if _, err := q.db.ExecContext(db, `UPDATE tasks SET progress = ? WHERE id = ?`, p, j.id); err != nil {
 			slog.Warn("task progress", "id", j.id, "err", err)
+		}
+		if startErr == nil && q.Events != nil {
+			t := started
+			t.Progress = p
+			q.publishTask(t)
 		}
 	}
 
@@ -211,6 +249,7 @@ func (q *Queue) run(parent context.Context, j *job) {
 		state, msg, state, now(), j.id); err != nil {
 		slog.Error("task finish", "id", j.id, "err", err)
 	}
+	q.publish(db, j.id)
 }
 
 // execRetry runs a task-state write, retrying for about 30 seconds: the
