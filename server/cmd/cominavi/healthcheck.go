@@ -6,8 +6,27 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/tabunugoku/cominavi/server/internal/config"
 )
+
+// healthTarget picks the address to probe. Without COMINAVI_PORT the port is
+// the stored setting, so the running server records the address it listens
+// on in DATA/listen-addr. The file is read only, never created here. Without
+// it, the probe uses cfg.Addr.
+func healthTarget(cfg config.Config) string {
+	if !cfg.PortSet {
+		if b, err := os.ReadFile(cfg.ListenAddrFile()); err == nil {
+			if addr := strings.TrimSpace(string(b)); addr != "" {
+				return addr
+			}
+		}
+	}
+	return cfg.Addr
+}
 
 // healthcheck asks a running server for /api/v1/healthz and fails unless it
 // answers 200. It is the image's health probe ("cominavi healthcheck"): the

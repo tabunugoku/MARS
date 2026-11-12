@@ -6,9 +6,11 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -33,7 +35,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "healthcheck" {
 		cfg, err := config.Load()
 		if err == nil {
-			err = healthcheck(context.Background(), cfg.Addr)
+			err = healthcheck(context.Background(), healthTarget(cfg))
 		}
 		if err != nil {
 			log.Error("unhealthy", "err", err)
@@ -124,10 +126,18 @@ func run() error {
 	}
 	// Shutdown waits for connections to go idle, which a stream never does.
 	srv.RegisterOnShutdown(hub.Close)
+	ln, err := net.Listen("tcp", cfg.Addr)
+	if err != nil {
+		return err
+	}
+	if err := writeListenAddr(cfg.ListenAddrFile(), cfg.Addr); err != nil {
+		// The healthcheck then falls back to the default port; serving goes on.
+		slog.Warn("record listen address", "err", err)
+	}
 	errc := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", cfg.Addr, "data", cfg.DataDir, "version", version)
-		errc <- srv.ListenAndServe()
+		errc <- srv.Serve(ln)
 	}()
 
 	select {
@@ -142,6 +152,25 @@ func run() error {
 		return srv.Shutdown(shutdownCtx)
 	}
 	return nil
+}
+
+// writeListenAddr replaces path with addr. The write goes to a temporary file
+// in the same folder first, so a reader sees either the old or the new address.
+func writeListenAddr(path, addr string) error {
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	defer os.Remove(tmp) // a no-op once the rename has moved it
+	if _, err := f.WriteString(addr); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
 }
 
 // purgeSessions deletes expired sessions once an hour.

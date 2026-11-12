@@ -82,3 +82,8 @@ func (c Config) DBPath() string       { return filepath.Join(c.DataDir, "cominav
 func (c Config) ThumbnailDir() string { return filepath.Join(c.DataDir, "thumbnails") }
 func (c Config) PageCacheDir() string { return filepath.Join(c.DataDir, "cache", "pages") }
 func (c Config) PageThumbDir() string { return filepath.Join(c.DataDir, "cache", "page-thumbs") }
+
+// ListenAddrFile holds the address the running server listens on. The server
+// writes it once it is listening, so the healthcheck can find a port that
+// only the stored settings know.
+func (c Config) ListenAddrFile() string { return filepath.Join(c.DataDir, "listen-addr") }

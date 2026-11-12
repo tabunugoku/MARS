@@ -652,6 +652,53 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Series" } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /collections/{collectionId}/series/{seriesId}:
+    parameters:
+      - { name: collectionId, in: path, required: true, schema: { type: string } }
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addCollectionSeries
+      summary: Append one member (no-op when already there); other members, hidden ones included, are kept
+      responses:
+        "200":
+          description: The collection as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: removeCollectionSeries
+      summary: Remove one member (no-op when absent); other members are kept
+      responses:
+        "200":
+          description: The collection as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /collections/{collectionId}/order:
+    parameters:
+      - { name: collectionId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: reorderCollection
+      summary: Reorder the members the caller sees; members it cannot see (in the trash) keep their places
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seriesIds]
+              properties:
+                seriesIds: { type: array, items: { type: string }, description: "Exactly the visible members, in the new order" }
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Collection" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /read-lists:
     get:
       operationId: listReadLists
@@ -720,6 +767,53 @@ paths:
             application/json:
               schema: { type: array, items: { $ref: "#/components/schemas/Book" } }
         "404": { $ref: "#/components/responses/NotFound" }
+  /read-lists/{readListId}/books/{bookId}:
+    parameters:
+      - { name: readListId, in: path, required: true, schema: { type: string } }
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addReadListBook
+      summary: Append one member (no-op when already there); other members, hidden ones included, are kept
+      responses:
+        "200":
+          description: The readlist as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      operationId: removeReadListBook
+      summary: Remove one member (no-op when absent); other members are kept
+      responses:
+        "200":
+          description: The readlist as the caller sees it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /read-lists/{readListId}/order:
+    parameters:
+      - { name: readListId, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: reorderReadList
+      summary: Reorder the members the caller sees; members it cannot see (in the trash) keep their places
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [bookIds]
+              properties:
+                bookIds: { type: array, items: { type: string }, description: "Exactly the visible members, in the new order" }
+      responses:
+        "200":
+          description: Reordered
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadList" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409": { $ref: "#/components/responses/Conflict" }
   /me/reader-prefs:
     get:
       operationId: getReaderPrefs
@@ -938,6 +1032,11 @@ components:
           schema: { $ref: "#/components/schemas/Error" }
     TooManyRequests:
       description: Too many failed attempts; retry later
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Conflict:
+      description: The members changed since the caller loaded them; reload and retry
       content:
         application/json:
           schema: { $ref: "#/components/schemas/Error" }

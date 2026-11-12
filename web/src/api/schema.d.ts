@@ -696,6 +696,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/collections/{collectionId}/series/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Append one member (no-op when already there); other members, hidden ones included, are kept */
+        post: operations["addCollectionSeries"];
+        /** Remove one member (no-op when absent); other members are kept */
+        delete: operations["removeCollectionSeries"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/collections/{collectionId}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder the members the caller sees; members it cannot see (in the trash) keep their places */
+        put: operations["reorderCollection"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/read-lists": {
         parameters: {
             query?: never;
@@ -742,6 +782,46 @@ export interface paths {
         };
         get: operations["listReadListBooks"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/read-lists/{readListId}/books/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Append one member (no-op when already there); other members, hidden ones included, are kept */
+        post: operations["addReadListBook"];
+        /** Remove one member (no-op when absent); other members are kept */
+        delete: operations["removeReadListBook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/read-lists/{readListId}/order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Reorder the members the caller sees; members it cannot see (in the trash) keep their places */
+        put: operations["reorderReadList"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1453,6 +1533,15 @@ export interface components {
         };
         /** @description Too many failed attempts; retry later */
         TooManyRequests: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Error"];
+            };
+        };
+        /** @description The members changed since the caller loaded them; reload and retry */
+        Conflict: {
             headers: {
                 [name: string]: unknown;
             };
@@ -2669,6 +2758,85 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    addCollectionSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collection as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeCollectionSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The collection as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderCollection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Exactly the visible members, in the new order */
+                    seriesIds: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Reordered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
     listReadLists: {
         parameters: {
             query?: never;
@@ -2807,6 +2975,85 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    addReadListBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The readlist as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    removeReadListBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The readlist as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    reorderReadList: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description Exactly the visible members, in the new order */
+                    bookIds: string[];
+                };
+            };
+        };
+        responses: {
+            /** @description Reordered */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
         };
     };
     getReaderPrefs: {

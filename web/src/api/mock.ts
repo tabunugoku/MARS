@@ -99,6 +99,10 @@ function savePrefs(change: (p: ReaderPrefsAll) => void) {
   return delay(undefined);
 }
 
+// True when the two id lists hold the same members (no duplicates) in any order.
+const sameMembers = (next: string[], current: string[]) =>
+  next.length === current.length && new Set(next).size === next.length && next.every((x) => current.includes(x));
+
 const me = (): User => db.currentUser;
 const shelf = (bs: db.MockBook[], n = 20) => bs.slice(0, n).map(book);
 
@@ -301,6 +305,26 @@ export const mockApi: Api = {
     if (i >= 0) db.collections.splice(i, 1);
     return delay(undefined);
   },
+  addCollectionSeries: (id, seriesId) => {
+    const c = db.collections.find((x) => x.id === id);
+    if (!c) return fail(404, "コレクションが見つかりません");
+    if (!findSeries(seriesId)) return fail(404, "シリーズが見つかりません");
+    if (!c.seriesIds.includes(seriesId)) c.seriesIds.push(seriesId);
+    return delay(c);
+  },
+  removeCollectionSeries: (id, seriesId) => {
+    const c = db.collections.find((x) => x.id === id);
+    if (!c) return fail(404, "コレクションが見つかりません");
+    c.seriesIds = c.seriesIds.filter((x) => x !== seriesId);
+    return delay(c);
+  },
+  reorderCollection: (id, seriesIds) => {
+    const c = db.collections.find((x) => x.id === id);
+    if (!c) return fail(404, "コレクションが見つかりません");
+    if (!sameMembers(seriesIds, c.seriesIds)) return fail(409, "コレクションの内容が変わりました");
+    c.seriesIds = [...seriesIds];
+    return delay(c);
+  },
   readLists: () => delay(db.readLists),
   readList: (id) => delay(db.readLists.find((r) => r.id === id) ?? null),
   readListBooks: (id) => {
@@ -323,6 +347,27 @@ export const mockApi: Api = {
     const i = db.readLists.findIndex((x) => x.id === id);
     if (i >= 0) db.readLists.splice(i, 1);
     return delay(undefined);
+  },
+
+  addReadListBook: (id, bookId) => {
+    const r = db.readLists.find((x) => x.id === id);
+    if (!r) return fail(404, "リーディングリストが見つかりません");
+    if (!findBook(bookId)) return fail(404, "本が見つかりません");
+    if (!r.bookIds.includes(bookId)) r.bookIds.push(bookId);
+    return delay(r);
+  },
+  removeReadListBook: (id, bookId) => {
+    const r = db.readLists.find((x) => x.id === id);
+    if (!r) return fail(404, "リーディングリストが見つかりません");
+    r.bookIds = r.bookIds.filter((x) => x !== bookId);
+    return delay(r);
+  },
+  reorderReadList: (id, bookIds) => {
+    const r = db.readLists.find((x) => x.id === id);
+    if (!r) return fail(404, "リーディングリストが見つかりません");
+    if (!sameMembers(bookIds, r.bookIds)) return fail(409, "リーディングリストの内容が変わりました");
+    r.bookIds = [...bookIds];
+    return delay(r);
   },
 
   readerPrefs: () => delay(loadPrefs()),

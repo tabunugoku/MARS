@@ -84,12 +84,28 @@ export const realApi = {
   createCollection: (body: CollectionCreate) => request<Collection>("POST", "/collections", body),
   updateCollection: (id: string, body: CollectionUpdate) => request<Collection>("PATCH", `/collections/${enc(id)}`, body),
   deleteCollection: (id: string) => request<void>("DELETE", `/collections/${enc(id)}`),
+  /** One member at a time; each returns the list as the caller now sees it. */
+  addCollectionSeries: (id: string, seriesId: string) =>
+    request<Collection>("POST", `/collections/${enc(id)}/series/${enc(seriesId)}`),
+  removeCollectionSeries: (id: string, seriesId: string) =>
+    request<Collection>("DELETE", `/collections/${enc(id)}/series/${enc(seriesId)}`),
+  /** seriesIds: exactly the visible members in the new order (409 if they changed). */
+  reorderCollection: (id: string, seriesIds: string[]) =>
+    request<Collection>("PUT", `/collections/${enc(id)}/order`, { seriesIds }),
   readLists: () => get<ReadList[]>("/read-lists"),
   readList: (id: string) => byId<ReadList>(`/read-lists/${enc(id)}`),
   readListBooks: (id: string) => get<Book[]>(`/read-lists/${enc(id)}/books`),
   createReadList: (body: ReadListCreate) => request<ReadList>("POST", "/read-lists", body),
   updateReadList: (id: string, body: ReadListUpdate) => request<ReadList>("PATCH", `/read-lists/${enc(id)}`, body),
   deleteReadList: (id: string) => request<void>("DELETE", `/read-lists/${enc(id)}`),
+  /** One book at a time; each returns the list as the caller now sees it. */
+  addReadListBook: (id: string, bookId: string) =>
+    request<ReadList>("POST", `/read-lists/${enc(id)}/books/${enc(bookId)}`),
+  removeReadListBook: (id: string, bookId: string) =>
+    request<ReadList>("DELETE", `/read-lists/${enc(id)}/books/${enc(bookId)}`),
+  /** bookIds: exactly the visible members in the new order (409 if they changed). */
+  reorderReadList: (id: string, bookIds: string[]) =>
+    request<ReadList>("PUT", `/read-lists/${enc(id)}/order`, { bookIds }),
 
   // Reader settings (per user, on the server)
   readerPrefs: () => get<ReaderPrefsAll>("/me/reader-prefs"),

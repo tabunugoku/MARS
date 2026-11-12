@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
 import { ArrowDown, ArrowUp, MoreHorizontal, SquarePen, X } from "@keyline-icons/react";
-import { api, errorMessage, useApi, type Series } from "@/api";
+import { api, ApiError, errorMessage, useApi, type Collection, type Series } from "@/api";
 import { SeriesCard } from "@/components/media/cards";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Block, GridSkeleton } from "@/components/media/skeletons";
@@ -17,12 +17,21 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 
+/** The items in the order of ids; items whose id is not listed are dropped. */
+function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
+  const byId = new Map(xs.map((x) => [x.id, x] as const));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 export default function Screen() {
   const { collectionId = "" } = useParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // The member order the last change returned, for the data it was made on.
+  // It is ignored once the page has reloaded.
+  const [local, setLocal] = useState<{ base: unknown; ids: string[] } | null>(null);
 
   const { data, error, reload } = useApi(async () => {
     const c = await api.collection(collectionId);
@@ -57,6 +66,9 @@ export default function Screen() {
     );
   }
 
+  // The members as the last change left them; the server's list otherwise.
+  const shown = local && local.base === data ? orderBy(series, local.ids) : series;
+
   const openDialog = (kind: "rename" | "delete") => {
     setName(c.name);
     setDialog(kind);
@@ -87,34 +99,39 @@ export default function Screen() {
       .finally(() => setBusy(false));
   };
 
-  // Saves a new member list. Both reorder and removal go through here.
-  const saveIds = (seriesIds: string[], done: string) => {
+  // Runs one member change. The returned list is applied at once, with the
+  // controls still disabled until then, and the page reloads after it.
+  const commit = (call: Promise<Collection>, done?: string) => {
     setBusy(true);
-    api
-      .updateCollection(c.id, { seriesIds })
-      .then(() => {
-        toast.success(done);
+    call
+      .then((updated) => {
+        setLocal({ base: data, ids: updated.seriesIds });
+        setBusy(false);
+        if (done) toast.success(done);
         reload();
       })
-      .catch((err: unknown) => toast.error(errorMessage(err)))
-      .finally(() => setBusy(false));
+      .catch((err: unknown) => {
+        setBusy(false);
+        if (err instanceof ApiError && err.status === 409) {
+          toast.error("ほかの画面で変更されました。読み込み直します");
+          reload();
+        } else {
+          toast.error(errorMessage(err));
+        }
+      });
   };
 
   const move = (seriesId: string, by: -1 | 1) => {
-    const ids = [...c.seriesIds];
+    const ids = shown.map((s) => s.id);
     const index = ids.indexOf(seriesId);
     const target = index + by;
-    if (index < 0) return;
-    if (target < 0 || target >= ids.length) return;
+    if (index < 0 || target < 0 || target >= ids.length) return;
     [ids[index], ids[target]] = [ids[target], ids[index]];
-    saveIds(ids, "並び順を保存しました");
+    commit(api.reorderCollection(c.id, ids), "並び順を保存しました");
   };
 
   const removeFromCollection = (seriesId: string) => {
-    saveIds(
-      c.seriesIds.filter((id) => id !== seriesId),
-      "コレクションから外しました",
-    );
+    commit(api.removeCollectionSeries(c.id, seriesId), "コレクションから外しました");
   };
 
   return (
@@ -122,7 +139,7 @@ export default function Screen() {
       <PageHeader
         back={{ to: "/collections", label: "コレクション" }}
         title={c.name}
-        meta={`シリーズ ${c.seriesIds.length} · ${c.ordered ? "手動の並び順" : "自動の並び順"}`}
+        meta={`シリーズ ${shown.length} · ${c.ordered ? "手動の並び順" : "自動の並び順"}`}
         actions={
           isAdmin && (
             <DropdownMenu>
@@ -179,14 +196,14 @@ export default function Screen() {
         </DialogContent>
       </Dialog>
 
-      {series.length === 0 ? (
+      {shown.length === 0 ? (
         <EmptyState
           title="シリーズがありません"
           body={isAdmin ? "シリーズの「その他」メニューの「コレクションに追加」から追加できます。" : "管理者がシリーズを追加すると、ここに表示されます"}
         />
       ) : (
         <CoverGrid>
-          {series.map((s, i) => (
+          {shown.map((s, i) => (
             <div key={s.id} className="flex flex-col gap-2">
               <SeriesCard series={s} priority={i < 8} />
               {isAdmin && (
@@ -212,7 +229,7 @@ export default function Screen() {
                             variant="ghost"
                             size="icon"
                             aria-label="下へ"
-                            disabled={busy || i === series.length - 1}
+                            disabled={busy || i === shown.length - 1}
                             onClick={() => move(s.id, 1)}
                           >
                             <ArrowDown size={16} />

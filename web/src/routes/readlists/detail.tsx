@@ -3,7 +3,7 @@ import { DotTrack } from "@/components/media/dot-track";
 import { Link, useNavigate, useParams } from "react-router";
 import { ArrowDown, ArrowUp, ListMinus, MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, errorMessage, useApi, type Book } from "@/api";
+import { api, ApiError, errorMessage, useApi, type Book, type ReadList } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
 import { Cover } from "@/components/media/cover";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
@@ -21,12 +21,21 @@ import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hove
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 
+/** The items in the order of ids; items whose id is not listed are dropped. */
+function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
+  const byId = new Map(xs.map((x) => [x.id, x] as const));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 export default function Screen() {
   const { readListId = "" } = useParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // The member order the last change returned, for the data it was made on.
+  // It is ignored once the page has reloaded.
+  const [local, setLocal] = useState<{ base: unknown; ids: string[] } | null>(null);
 
   const { data, error, reload } = useApi(async () => {
     const rl = await api.readList(readListId);
@@ -73,7 +82,9 @@ export default function Screen() {
     );
   }
 
-  const next = books.find((b) => !b.progress?.completed) ?? books[0];
+  // The books as the last change left them; the server's list otherwise.
+  const shown = local && local.base === data ? orderBy(books, local.ids) : books;
+  const next = shown.find((b) => !b.progress?.completed) ?? shown[0];
 
   const openDialog = (kind: "rename" | "delete") => {
     setName(rl.name);
@@ -105,26 +116,37 @@ export default function Screen() {
       .finally(() => setBusy(false));
   };
 
-  // Saves a new member list (a reorder or a removal), then reloads the list.
-  const saveBooks = (bookIds: string[]) => {
+  // Runs one member change. The returned list is applied at once, with the
+  // controls still disabled until then, and the page reloads after it.
+  const commit = (call: Promise<ReadList>) => {
     setBusy(true);
-    api
-      .updateReadList(rl.id, { bookIds })
-      .then(() => reload())
-      .catch((err: unknown) => toast.error(errorMessage(err)))
-      .finally(() => setBusy(false));
+    call
+      .then((updated) => {
+        setLocal({ base: data, ids: updated.bookIds });
+        setBusy(false);
+        reload();
+      })
+      .catch((err: unknown) => {
+        setBusy(false);
+        if (err instanceof ApiError && err.status === 409) {
+          toast.error("ほかの画面で変更されました。読み込み直します");
+          reload();
+        } else {
+          toast.error(errorMessage(err));
+        }
+      });
   };
 
   const moveBook = (index: number, direction: -1 | 1) => {
-    const ids = books.map((b) => b.id);
+    const ids = shown.map((b) => b.id);
     const to = index + direction;
     if (to < 0 || to >= ids.length) return;
     [ids[index], ids[to]] = [ids[to], ids[index]];
-    saveBooks(ids);
+    commit(api.reorderReadList(rl.id, ids));
   };
 
   const removeBook = (bookId: string) => {
-    saveBooks(books.filter((b) => b.id !== bookId).map((b) => b.id));
+    commit(api.removeReadListBook(rl.id, bookId));
   };
 
   return (
@@ -192,13 +214,13 @@ export default function Screen() {
         </DialogContent>
       </Dialog>
 
-      {books.length === 0 ? (
+      {shown.length === 0 ? (
         <EmptyState
           title="巻がありません"
           body={isAdmin ? "巻の「その他」メニューの「リーディングリストに追加」から追加できます。" : undefined}
         />
       ) : (
-        <BookRows books={books} titles={titles} editable={isAdmin} busy={busy} onMove={moveBook} onRemove={removeBook} />
+        <BookRows books={shown} titles={titles} editable={isAdmin} busy={busy} onMove={moveBook} onRemove={removeBook} />
       )}
     </Page>
   );

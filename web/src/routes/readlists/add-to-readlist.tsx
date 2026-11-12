@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { Plus } from "@keyline-icons/react";
 import { api, errorMessage, type ReadList } from "@/api";
@@ -29,48 +29,65 @@ export function AddToReadListDialog({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [creating, setCreating] = useState(false);
+  // Lists created here. A fetch that resolves after a create keeps them.
+  const createdRef = useRef<ReadList[]>([]);
+  // Set synchronously, so Enter twice (or Enter and the button) cannot create two.
+  const creatingRef = useRef(false);
 
   useEffect(() => {
     if (!open) return;
     let live = true;
     api
       .readLists()
-      .then((ls) => live && setLists(ls))
+      .then((ls) => {
+        if (!live) return;
+        setLists(createdRef.current.reduce((xs, c) => (xs.some((y) => y.id === c.id) ? xs : [...xs, c]), ls));
+      })
       .catch((err: unknown) => live && setError(errorMessage(err)));
     return () => {
       live = false;
     };
   }, [open]);
 
-  const toggle = (list: ReadList, on: boolean) => {
-    const prev = list.bookIds;
-    const next = on ? [...prev, bookId] : prev.filter((id) => id !== bookId);
-    const patch = (bookIds: string[]) =>
-      setLists((ls) => ls?.map((l) => (l.id === list.id ? { ...l, bookIds } : l)) ?? null);
+  const replaceRow = (row: ReadList) => setLists((ls) => ls?.map((l) => (l.id === row.id ? row : l)) ?? null);
 
+  const toggle = (list: ReadList, on: boolean) => {
+    const previous = list;
+    const optimistic = on ? [...list.bookIds, bookId] : list.bookIds.filter((id) => id !== bookId);
     setSavingId(list.id);
-    patch(next);
-    api
-      .updateReadList(list.id, { bookIds: next })
-      .then((updated) => patch(updated.bookIds))
+    replaceRow({ ...list, bookIds: optimistic });
+    const call = on ? api.addReadListBook(list.id, bookId) : api.removeReadListBook(list.id, bookId);
+    call
+      // The returned list is the server's view: it replaces the row.
+      .then((updated) => replaceRow(updated))
       .catch((err: unknown) => {
-        patch(prev);
+        replaceRow(previous);
         toast.error(errorMessage(err));
       })
       .finally(() => setSavingId(null));
   };
 
   const create = () => {
+    const n = name.trim();
+    if (!n || !lists || creatingRef.current) return;
+    creatingRef.current = true;
     setCreating(true);
     api
-      .createReadList({ name: name.trim(), bookIds: [bookId] })
+      .createReadList({ name: n, bookIds: [bookId] })
       .then((created) => {
         toast.success("リーディングリストを作成しました");
         setName("");
-        setLists((ls) => [...(ls ?? []), created]);
+        createdRef.current = [...createdRef.current.filter((l) => l.id !== created.id), created];
+        setLists((ls) => {
+          const xs = ls ?? [];
+          return xs.some((l) => l.id === created.id) ? xs.map((l) => (l.id === created.id ? created : l)) : [...xs, created];
+        });
       })
       .catch((err: unknown) => toast.error(errorMessage(err)))
-      .finally(() => setCreating(false));
+      .finally(() => {
+        creatingRef.current = false;
+        setCreating(false);
+      });
   };
 
   return (
@@ -95,7 +112,7 @@ export function AddToReadListDialog({
                   <label className="flex min-h-11 cursor-pointer items-center gap-3 py-2">
                     <Checkbox
                       checked={checked}
-                      disabled={savingId !== null}
+                      disabled={savingId !== null || creating}
                       onCheckedChange={(c) => toggle(l, c === true)}
                     />
                     <span className={cn(typeClass("body"), "min-w-0 flex-1 truncate text-foreground")}>{l.name}</span>
@@ -115,15 +132,16 @@ export function AddToReadListDialog({
                 id="new-readlist-name"
                 className="flex-1"
                 value={name}
+                disabled={!lists || creating}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && name.trim() && !creating) create();
+                  if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) create();
                 }}
               />
               <Button
                 variant="secondary"
                 leadingIcon={Plus as IconComponent}
-                disabled={!name.trim() || creating}
+                disabled={!name.trim() || !lists || creating}
                 onClick={create}
               >
                 作成

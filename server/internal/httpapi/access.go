@@ -51,6 +51,8 @@ var opAccess = map[string]access{
 	"RegenerateSeriesThumbnails": adminOnly, "RegenerateLibraryThumbnails": adminOnly,
 	"CreateCollection": adminOnly, "UpdateCollection": adminOnly, "DeleteCollection": adminOnly,
 	"CreateReadList": adminOnly, "UpdateReadList": adminOnly, "DeleteReadList": adminOnly,
+	"AddCollectionSeries": adminOnly, "RemoveCollectionSeries": adminOnly, "ReorderCollection": adminOnly,
+	"AddReadListBook": adminOnly, "RemoveReadListBook": adminOnly, "ReorderReadList": adminOnly,
 }
 
 func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {
