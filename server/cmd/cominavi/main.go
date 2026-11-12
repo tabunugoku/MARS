@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"log/slog"
 	"net"
@@ -12,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
 	"time"
 
@@ -68,7 +70,10 @@ func run() error {
 
 	// Settings read at startup: the task thread count (restart applies it)
 	// and the port unless COMINAVI_PORT is set.
-	settings := httpapi.LoadServerSettings(ctx, database)
+	settings, err := httpapi.ReadServerSettings(ctx, database)
+	if err != nil {
+		slog.Warn("stored server settings could not be read, using defaults", "err", err)
+	}
 	if !cfg.PortSet {
 		cfg.Addr = cfg.AddrWithPort(settings.Port)
 	}
@@ -90,10 +95,8 @@ func run() error {
 		Pages:        &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
 		PageThumbDir: cfg.PageThumbDir(),
 		Events:       hub,
-		// Read per thumbnail, so a new size applies without a restart.
-		ThumbSize: func(ctx context.Context) (int, int) {
-			return httpapi.ThumbBounds(string(httpapi.LoadServerSettings(ctx, database).ThumbnailSize))
-		},
+		// Read at most every thumbCacheTTL, so a new size applies without a restart.
+		ThumbSize: (&thumbCache{db: database}).bounds,
 	}
 	go lib.Schedule(ctx)
 	go lib.Watch(ctx)
@@ -105,12 +108,18 @@ func run() error {
 	store := auth.Store{DB: database}
 	go purgeSessions(ctx, store)
 
-	mux := http.NewServeMux()
-	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(httpapi.Deps{
+	deps := httpapi.Deps{
 		DB: database, Version: version, Library: lib, Tasks: queue,
 		Auth: store, Limiter: &auth.Limiter{}, Gate: gate, TrustedProxies: cfg.TrustedProxies,
 		Events: hub,
-	})))
+	}
+	mux := http.NewServeMux()
+	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(deps)))
+	// OPDS and the Komga-shaped API: full paths, no prefix stripping. Longer
+	// than "/", so they win over the web UI.
+	compat := httpapi.NewCompat(deps)
+	mux.Handle("/opds/", compat)
+	mux.Handle("/komga/", compat)
 	if !cfg.Dev {
 		mux.Handle("/", webui.Handler())
 	}
@@ -172,6 +181,36 @@ func writeListenAddr(path, addr string) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+// thumbCacheTTL is how long a thumbnail box read from the settings is kept.
+const thumbCacheTTL = 30 * time.Second
+
+// thumbCache holds the thumbnail box of the stored settings, so that making a
+// thumbnail does not query the database. A new size applies within
+// thumbCacheTTL.
+type thumbCache struct {
+	db   *sql.DB
+	mu   sync.Mutex
+	w, h int
+	at   time.Time
+}
+
+// bounds returns the thumbnail box (width, height), reading the settings again
+// once the cached box is older than thumbCacheTTL.
+func (c *thumbCache) bounds(ctx context.Context) (int, int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.at.IsZero() && time.Since(c.at) < thumbCacheTTL {
+		return c.w, c.h
+	}
+	s, err := httpapi.ReadServerSettings(ctx, c.db)
+	if err != nil {
+		slog.Warn("stored server settings could not be read, using defaults", "err", err)
+	}
+	c.w, c.h = httpapi.ThumbBounds(string(s.ThumbnailSize))
+	c.at = time.Now()
+	return c.w, c.h
 }
 
 // purgeSessions deletes expired sessions once an hour.

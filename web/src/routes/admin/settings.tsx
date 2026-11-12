@@ -58,6 +58,11 @@ const m = defineMessages({
     keyDeleted: "APIキーを削除しました",
     keyCopied: "APIキーをコピーしました",
     copyFailed: "コピーできませんでした",
+    opds: "OPDS",
+    opdsNote: "Panels、Chunky、KyBook などの電子書籍アプリは、次のアドレスに接続します。サインインには ComiNavi のユーザー名とパスワード、または API キーを使います",
+    komga: "Komga 互換 API（Mihon）",
+    komgaNote: "Mihon の Komga 拡張とトラッカーは、次のアドレスに接続します。サインインには ComiNavi のユーザー名とパスワード、または API キーを使います",
+    addressCopied: "アドレスをコピーしました",
     settingsSaved: "設定を保存しました",
     collections: "コレクション",
     autoDeleteCollections: "空のコレクションを自動で削除する",
@@ -103,6 +108,11 @@ const m = defineMessages({
     keyDeleted: "API key deleted",
     keyCopied: "API key copied",
     copyFailed: "Could not copy",
+    opds: "OPDS",
+    opdsNote: "Reader apps such as Panels, Chunky and KyBook connect to this address. They sign in with a ComiNavi user name and password, or an API key.",
+    komga: "Komga-compatible API (Mihon)",
+    komgaNote: "The Komga extension and tracker in Mihon connect to this address. They sign in with a ComiNavi user name and password, or an API key.",
+    addressCopied: "Address copied",
     settingsSaved: "Settings saved",
     collections: "Collections",
     autoDeleteCollections: "Delete empty collections automatically",
@@ -110,6 +120,17 @@ const m = defineMessages({
     deleteKeyBody: "Apps using \"{name}\" will no longer be able to connect.",
   },
 });
+
+// AddressRow shows an address to enter in a reader app, in monospace, with a
+// copy button.
+function AddressRow({ url, copyLabel, onCopy }: { url: string; copyLabel: string; onCopy: (url: string) => void }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg bg-card py-1 pl-3 pr-1">
+      <code className="min-w-0 flex-1 select-all break-all font-mono text-foreground">{url}</code>
+      <IconAction label={copyLabel} icon={Copy} onClick={() => onCopy(url)} />
+    </div>
+  );
+}
 
 export default function Screen() {
   const t = useT(m);
@@ -214,10 +235,10 @@ export default function Screen() {
     }
   };
 
-  const copyKey = async (key: string) => {
+  const copyText = async (text: string, done: string) => {
     try {
-      await navigator.clipboard.writeText(key);
-      toast.success(t("keyCopied"));
+      await navigator.clipboard.writeText(text);
+      toast.success(done);
     } catch {
       toast.error(t("copyFailed"));
     }
@@ -324,7 +345,36 @@ export default function Screen() {
         <section>
           <SectionTitle>{t("integrations")}</SectionTitle>
           <FieldGroup>
-            {/* OPDS returns with the OPDS server (a later phase); Kobo sync is hidden until then too. */}
+            <Field>
+              <Switch
+                label={t("opds")}
+                checked={cur.opdsEnabled}
+                onToggle={() => patch({ opdsEnabled: !cur.opdsEnabled })}
+              />
+              <FieldDescription>{t("opdsNote")}</FieldDescription>
+              {cur.opdsEnabled && (
+                <AddressRow
+                  url={`${window.location.origin}/opds/v1.2/catalog`}
+                  copyLabel={t("copy")}
+                  onCopy={(url) => void copyText(url, t("addressCopied"))}
+                />
+              )}
+            </Field>
+            <Field>
+              <Switch
+                label={t("komga")}
+                checked={cur.komgaApiEnabled}
+                onToggle={() => patch({ komgaApiEnabled: !cur.komgaApiEnabled })}
+              />
+              <FieldDescription>{t("komgaNote")}</FieldDescription>
+              {cur.komgaApiEnabled && (
+                <AddressRow
+                  url={`${window.location.origin}/komga`}
+                  copyLabel={t("copy")}
+                  onCopy={(url) => void copyText(url, t("addressCopied"))}
+                />
+              )}
+            </Field>
             <Field>
               <FieldLabel id="set-api-keys">{t("apiKeys")}</FieldLabel>
               {keys.error && !keys.data && <LoadError message={keys.error} onRetry={keys.reload} />}
@@ -377,7 +427,7 @@ export default function Screen() {
                   </p>
                   <div className="flex items-center gap-1">
                     <code className="min-w-0 flex-1 break-all font-mono text-foreground">{createdKey.key}</code>
-                    <IconAction label={t("copy")} icon={Copy} onClick={() => void copyKey(createdKey.key)} />
+                    <IconAction label={t("copy")} icon={Copy} onClick={() => void copyText(createdKey.key, t("keyCopied"))} />
                   </div>
                   <Button variant="ghost" onClick={() => setCreatedKey(null)}>
                     {t("close")}

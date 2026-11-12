@@ -10,8 +10,9 @@ const NONE: Picked = new Set();
 
 /** Selection of cards on one screen. `visible` is the ids in display order
  *  (shift-click selects the range between two of them). `scopeKey` changes
- *  whenever the list changes (library, sort, filter): the selection then ends. */
-export function useSelection(visible: string[], scopeKey: string) {
+ *  whenever the list changes (library, sort, filter): the selection then ends.
+ *  `complete` says `visible` is the whole list, not a loaded window of it. */
+export function useSelection(visible: string[], scopeKey: string, complete = true) {
   const [state, setState] = useState<{ on: boolean; key: string; picked: Picked }>({ on: false, key: scopeKey, picked: NONE });
   // The shift-click anchor only counts within the scope it was set in.
   const anchor = useRef<{ key: string; id: string } | null>(null);
@@ -43,6 +44,28 @@ export function useSelection(visible: string[], scopeKey: string) {
   const selectAll = useCallback(() => {
     setState((s) => (s.on && s.key === scopeKey ? { ...s, picked: new Set(visible) } : s));
   }, [scopeKey, visible]);
+
+  // A pick whose id left the list (a scan removed the series or book) is dropped:
+  // the bulk calls fail whole on a missing id. Absence proves removal only when
+  // both renders held the whole list. A paged window can shift (a new series sorts
+  // ahead of it) or be capped on reload, so there a pick that left the window
+  // stays; if it was really removed, the bulk call fails and the picks are kept
+  // for the user to change. A new scope already ended the selection above.
+  const lastVisible = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const now = complete ? new Set(visible) : null;
+    const before = lastVisible.current;
+    lastVisible.current = now;
+    if (!before || !now) return;
+    const gone = [...before].filter((id) => !now.has(id));
+    if (gone.length === 0) return;
+    setState((s) => {
+      if (!gone.some((id) => s.picked.has(id))) return s;
+      const next = new Set(s.picked);
+      for (const id of gone) next.delete(id);
+      return { ...s, picked: next };
+    });
+  }, [visible, complete]);
 
   const toggle = (id: string, shift = false) => {
     const from = anchor.current?.key === scopeKey ? anchor.current.id : null;

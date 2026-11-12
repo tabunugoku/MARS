@@ -15,7 +15,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/media"
+	"github.com/tabunugoku/cominavi/server/internal/scan"
 )
 
 // SeriesCoverSQL is the SQL expression for the file name of a series' cover
@@ -116,7 +118,15 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 		return err
 	}
 	s.removeThumb(sr.thumb)
+	s.seriesChanged(sr.libraryID)
 	return nil
+}
+
+// seriesChanged announces that a series' cover changed. There is no series
+// event: a "library" event makes open screens of the library refetch, which
+// includes the series covers (see queueScan).
+func (s *Service) seriesChanged(libraryID string) {
+	s.Events.Publish(events.Event{Type: "library", LibraryID: libraryID, Data: events.Library{LibraryID: libraryID}})
 }
 
 // DropSeriesUpload removes an uploaded series cover. Local artwork is picked
@@ -141,11 +151,15 @@ func (s *Service) DropSeriesUpload(ctx context.Context, seriesID string) error {
 	}
 	s.removeThumb(sr.thumb)
 	sr.thumb, sr.source, sr.sig = "", "", ""
+	s.seriesChanged(sr.libraryID)
 	l, err := s.load(ctx, sr.libraryID)
 	if err != nil {
 		return err
 	}
-	_, err = s.syncSeriesArt(ctx, l, sr)
+	changed, err := s.syncSeriesArt(ctx, l, sr)
+	if changed {
+		s.seriesChanged(sr.libraryID) // local artwork came back
+	}
 	return err
 }
 
@@ -185,21 +199,24 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 	return nil
 }
 
-// syncArtwork looks at every live series of the library for local artwork. It
+// syncArtwork looks at the live series of the library for local artwork: all
+// of them, or for a scoped scan (scope not nil) only those inside the scope. It
 // reports whether any series thumbnail changed.
-func (s *Service) syncArtwork(ctx context.Context, l lib) (bool, error) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM series WHERE library_id = ? AND deleted_at IS NULL`, l.id)
+func (s *Service) syncArtwork(ctx context.Context, l lib, scope []string) (bool, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, dir, oneshot_file FROM series WHERE library_id = ? AND deleted_at IS NULL`, l.id)
 	if err != nil {
 		return false, err
 	}
 	var ids []string
 	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
+		var id, dir, oneshot string
+		if err := rows.Scan(&id, &dir, &oneshot); err != nil {
 			rows.Close()
 			return false, err
 		}
-		ids = append(ids, id)
+		if scan.InScope(dir+oneshot, scope) {
+			ids = append(ids, id)
+		}
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {

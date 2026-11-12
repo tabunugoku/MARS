@@ -1811,7 +1811,7 @@ components:
         books: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By book id" }
     ServerSettings:
       type: object
-      required: [port, taskThreads, thumbnailSize, thumbnailFormat, rememberMeDays, deleteEmptyCollections, opdsEnabled, koboSyncEnabled, loginBackdrop]
+      required: [port, taskThreads, thumbnailSize, thumbnailFormat, rememberMeDays, deleteEmptyCollections, opdsEnabled, komgaApiEnabled, koboSyncEnabled, loginBackdrop]
       properties:
         port: { type: integer, description: "Takes effect after a restart" }
         taskThreads: { type: integer }
@@ -1819,7 +1819,8 @@ components:
         thumbnailFormat: { type: string, enum: [webp, jpeg, avif], description: "Only jpeg is produced today" }
         rememberMeDays: { type: integer }
         deleteEmptyCollections: { type: boolean }
-        opdsEnabled: { type: boolean }
+        opdsEnabled: { type: boolean, description: "Serves the OPDS 1.2 catalog at /opds/v1.2/catalog" }
+        komgaApiEnabled: { type: boolean, description: "Serves a Komga-compatible API at /komga (for the Mihon/Tachiyomi Komga extension)" }
         koboSyncEnabled: { type: boolean }
         loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
     ServerSettingsUpdate:
@@ -1832,6 +1833,7 @@ components:
         rememberMeDays: { type: integer }
         deleteEmptyCollections: { type: boolean }
         opdsEnabled: { type: boolean }
+        komgaApiEnabled: { type: boolean }
         koboSyncEnabled: { type: boolean }
         loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
     TrashResult:

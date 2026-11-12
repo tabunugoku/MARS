@@ -206,6 +206,17 @@ followed from the other conditions and was dropped.
   (2.3 s → 7.5 s, once per library), and the longest wait dropped to 80 ms.
 - Page rows are inserted with one prepared statement per book.
 
+### Watcher scans: only the changed folders
+
+A file change seen by the watcher used to queue a scan of the whole library:
+a walk of every folder and a sync of every row. Now the watcher collects the
+top-level folders (or root-level files) that changed, and once the library
+has been quiet for 30 s it queues a scan of just those entries. Rows outside
+them are neither trashed nor restored, and the periodic schedule still sees
+the last full scan. Overflow of the watcher's event queue, the catch-up scan
+after a watcher restart, and more than 50 changed folders fall back to a
+full scan. Periodic and manual scans are always full.
+
 ### Web app: the library screen pages its series
 
 Before, the web app loaded every series at once. It called `GET /series`

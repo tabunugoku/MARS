@@ -2,6 +2,7 @@ package media
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -17,12 +18,10 @@ func Thumbnail(img []byte, maxW, maxH int) ([]byte, error) {
 	if maxW <= 0 || maxH <= 0 {
 		return nil, fmt.Errorf("media: thumbnail bounds %dx%d", maxW, maxH)
 	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(img))
-	if err != nil {
-		return nil, fmt.Errorf("media: thumbnail: %w", err)
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > MaxPixels {
+	if _, err := CheckPixels(bytes.NewReader(img), MaxPixels); errors.Is(err, ErrTooManyPixels) {
 		return nil, ErrTooLarge
+	} else if err != nil {
+		return nil, fmt.Errorf("media: thumbnail: %w", err)
 	}
 	src, _, err := image.Decode(bytes.NewReader(img))
 	if err != nil {

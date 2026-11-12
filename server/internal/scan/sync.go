@@ -45,7 +45,8 @@ func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 //   - a book whose size or mtime changed goes back to 'outdated';
 //   - rows whose files are gone get deleted_at (Komga's trash), and come
 //     back if the file reappears at the same path; rows under a path the
-//     walk could not read are left alone;
+//     walk could not read, and rows outside a scoped listing's scope, are left
+//     alone;
 //   - books with no number in their name are numbered by position, and
 //     renumbered when books around them come and go;
 //   - the library's search rows are brought up to date.
@@ -61,7 +62,12 @@ func stamp(t time.Time) string { return t.UTC().Format(time.RFC3339Nano) }
 func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listing, now time.Time) (Stats, error) {
 	var st Stats
 	found := listing.Series
+	// Rows outside a scoped listing's scope were not looked for, so they are
+	// neither trashed nor restored; rows under an unreadable path are kept too.
 	unreachable := func(rel string) bool {
+		if !InScope(rel, listing.Scope) {
+			return true
+		}
 		for _, p := range listing.Unreadable {
 			if under(rel, p) {
 				return true
@@ -229,8 +235,12 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listi
 	if err := SyncSearch(ctx, db, b, libraryID); err != nil {
 		return st, err
 	}
-	if _, err := b.Exec(ctx, `UPDATE libraries SET last_scan = ? WHERE id = ?`, ts, libraryID); err != nil {
-		return st, err
+	// A scoped sync is not a full scan: the periodic schedule keeps its view
+	// of the last full one.
+	if len(listing.Scope) == 0 {
+		if _, err := b.Exec(ctx, `UPDATE libraries SET last_scan = ? WHERE id = ?`, ts, libraryID); err != nil {
+			return st, err
+		}
 	}
 	return st, b.Flush()
 }

@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -33,6 +35,68 @@ var (
 // watchStartHook, when set, is called for each attempt to start a library's
 // watcher. Tests use it to count attempts.
 var watchStartHook func(libraryID string)
+
+// watchScanHook, when set, is called in place of queueing a scan for a
+// library's watcher, with the scope and full flag the watcher asked for. Tests
+// use it to check the scans watchers request.
+var watchScanHook func(libraryID string, scope []string, full bool)
+
+// maxScopeEntries is how many distinct top-level folders a watcher may report
+// before its scan becomes a full one: past that a full walk costs about the same.
+const maxScopeEntries = 50
+
+// dirtyScope is the set of top-level entries that changed, or the mark that a
+// full scan is needed (a lost event, or more than maxScopeEntries entries).
+// The zero value is an empty set.
+type dirtyScope struct {
+	entries map[string]bool
+	full    bool
+}
+
+func (d *dirtyScope) add(entry string) {
+	if d.full {
+		return
+	}
+	if d.entries == nil {
+		d.entries = map[string]bool{}
+	}
+	d.entries[entry] = true
+	if len(d.entries) > maxScopeEntries {
+		d.markFull()
+	}
+}
+
+func (d *dirtyScope) markFull() {
+	d.full, d.entries = true, nil
+}
+
+// take returns the entries to scan, sorted, and whether a full scan is needed
+// (then the entries are nil). The set is emptied.
+func (d *dirtyScope) take() ([]string, bool) {
+	var scope []string
+	for e := range d.entries {
+		scope = append(scope, e)
+	}
+	slices.Sort(scope)
+	full := d.full
+	d.full, d.entries = false, nil
+	if full {
+		scope = nil
+	}
+	return scope, full
+}
+
+// topEntry returns the first path segment of name relative to root, which is
+// the top-level folder or root-level file a change belongs to ("" when name is
+// the root itself).
+func topEntry(root, name string) string {
+	rel, err := filepath.Rel(root, name)
+	if err != nil || rel == "." {
+		return ""
+	}
+	first, _, _ := strings.Cut(filepath.ToSlash(rel), "/")
+	return first
+}
 
 // watchBackoff returns the wait after the given number of consecutive failed starts.
 func watchBackoff(failures int) time.Duration {
@@ -90,6 +154,10 @@ func (st *watchState) halt() {
 type watchSet struct {
 	mu     sync.Mutex
 	states map[string]*watchState // library id -> state
+	// seen marks the libraries that have had a watcher state (running or
+	// failed) since the server started. A start of such a library may have
+	// missed changes, so it queues a catch-up scan.
+	seen map[string]bool
 }
 
 // watchSets keeps the watcher state of each Service, so the Service struct
@@ -97,7 +165,7 @@ type watchSet struct {
 var watchSets sync.Map // *Service -> *watchSet
 
 func (s *Service) watches() *watchSet {
-	v, _ := watchSets.LoadOrStore(s, &watchSet{states: map[string]*watchState{}})
+	v, _ := watchSets.LoadOrStore(s, &watchSet{states: map[string]*watchState{}, seen: map[string]bool{}})
 	return v.(*watchSet)
 }
 
@@ -170,6 +238,7 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 
 		ws.mu.Lock()
 		st := ws.states[w.id]
+		seenBefore := ws.seen[w.id]
 		ws.mu.Unlock()
 		if st != nil && st.sig == sig {
 			if st.running() {
@@ -193,9 +262,8 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 		_ = json.Unmarshal([]byte(w.excl), &exclude)
 		next := &watchState{sig: sig}
 		id := w.id
-		scanFn := func() { s.queueWatchScan(ctx, id) }
-		var fail func(error)
-		fail = func(err error) { // called from the watcher goroutine
+		scanFn := func(scope []string, full bool) { s.queueWatchScan(ctx, id, scope, full) }
+		fail := func(err error) { // called from the watcher goroutine
 			msg := watchErrMessage(err)
 			slog.Warn("watch library", "library", id, "err", err)
 			ws.mu.Lock()
@@ -225,7 +293,13 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 		}
 		ws.mu.Lock()
 		ws.states[w.id] = next
+		ws.seen[w.id] = true
 		ws.mu.Unlock()
+		if err == nil && seenBefore {
+			// The library was (or was meant to be) watched before: changes
+			// made while it was not watched are picked up now, by a full scan.
+			scanFn(nil, true)
+		}
 	}
 
 	ws.mu.Lock()
@@ -241,10 +315,17 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 	}
 }
 
-// queueWatchScan queues a library scan for a watcher. The queue already
-// merges a scan that is still waiting, so at most one is pending.
-func (s *Service) queueWatchScan(ctx context.Context, libraryID string) {
-	if _, err := s.QueueScan(ctx, libraryID); err != nil && ctx.Err() == nil {
+// queueWatchScan asks for a scan of libraryID after a watcher's change: of the
+// scope entries, or of the whole library when full. The entries are merged
+// into the library's pending set first; the queued task takes them when it
+// runs, and a queued one absorbs later requests.
+func (s *Service) queueWatchScan(ctx context.Context, libraryID string, scope []string, full bool) {
+	if watchScanHook != nil {
+		watchScanHook(libraryID, scope, full)
+		return
+	}
+	s.addWatchDirty(libraryID, scope, full)
+	if _, err := s.queueWatchTask(ctx, libraryID); err != nil && ctx.Err() == nil {
 		slog.Error("watch scan", "library", libraryID, "err", err)
 	}
 }
@@ -258,10 +339,14 @@ func watchErrMessage(err error) string {
 
 // watchTree watches root and every folder under it that scan would not skip,
 // until the returned cancel is called or ctx ends. Each change that could
-// matter to the library calls scan once the library has been quiet for
-// watchDelay. A failure while watching calls fail and ends the watcher (done
-// closes). A failure to start returns err.
-func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(), fail func(error)) (context.CancelFunc, chan struct{}, error) {
+// matter to the library calls onQuiet once the library has been quiet for
+// watchDelay. onQuiet gets the top-level entries that changed (scope), or full
+// when a scan of the whole library is needed: after lost events, or with more
+// than maxScopeEntries entries. A failure while watching calls fail and ends
+// the watcher (done closes); a change still waiting for its quiet period is
+// passed to onQuiet first, so the failure does not drop it. A failure to start
+// returns err.
+func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(scope []string, full bool), fail func(error)) (context.CancelFunc, chan struct{}, error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, nil, err
@@ -277,12 +362,27 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 		defer w.Close()
 		var timer *time.Timer
 		var fire <-chan time.Time
+		var pending dirtyScope // changes since the last hand-over to onQuiet
 		quiet := func() {
 			if timer != nil {
 				timer.Stop()
 			}
 			timer = time.NewTimer(watchDelay)
 			fire = timer.C
+		}
+		// handOver passes the pending changes to onQuiet and clears them.
+		handOver := func() {
+			scope, full := pending.take()
+			onQuiet(scope, full)
+		}
+		// flush queues the scan for a change still waiting for its quiet
+		// period. Called on the way out of a failure, since nothing else will.
+		flush := func() {
+			if timer != nil {
+				timer.Stop()
+				timer, fire = nil, nil
+				handOver()
+			}
 		}
 		for {
 			select {
@@ -293,31 +393,41 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 				return
 			case ev, ok := <-w.Events:
 				if !ok {
+					flush()
 					return
 				}
 				dirty, err := handleWatchEvent(w, root, ev, exclude)
 				if err != nil && !errors.Is(err, fs.ErrNotExist) {
+					flush()
 					fail(err)
 					return
 				}
 				if dirty {
+					if e := topEntry(root, ev.Name); e != "" {
+						pending.add(e)
+					} else {
+						pending.markFull()
+					}
 					quiet()
 				}
 			case _, ok := <-w.Errors:
 				if !ok {
+					flush()
 					return
 				}
 				// Events may have been lost (for example an inotify queue
-				// overflow): pick up folders made meanwhile, then scan to
-				// be safe.
+				// overflow): pick up folders made meanwhile, then scan the
+				// whole library to be safe.
 				if err := rescanTree(w, root, exclude); err != nil {
+					flush()
 					fail(err)
 					return
 				}
+				pending.markFull()
 				quiet()
 			case <-fire:
 				fire, timer = nil, nil
-				onQuiet()
+				handOver()
 			}
 		}
 	}()

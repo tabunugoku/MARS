@@ -540,18 +540,13 @@ func (l listLink) memberVisible(ctx context.Context, tx *sql.Tx, memberID string
 
 // add appends memberID after every row of the list, hidden ones included.
 // A member already in the list keeps its place.
+// It is one statement, so two concurrent adds to the same list cannot race
+// between a check and an insert: the primary key (listCol, memberCol) makes
+// the second one a no-op.
 func (l listLink) add(ctx context.Context, tx *sql.Tx, listID, memberID string) error {
-	var one int
-	err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+l.link+` WHERE `+l.listCol+` = ? AND `+l.memberCol+` = ?`,
-		listID, memberID).Scan(&one)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, sql.ErrNoRows) {
-		return err
-	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO `+l.link+` (`+l.listCol+`, `+l.memberCol+`, position)
-		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM `+l.link+` WHERE `+l.listCol+` = ?`,
+	_, err := tx.ExecContext(ctx, `INSERT INTO `+l.link+` (`+l.listCol+`, `+l.memberCol+`, position)
+		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM `+l.link+` WHERE `+l.listCol+` = ?
+		ON CONFLICT(`+l.listCol+`, `+l.memberCol+`) DO NOTHING`,
 		listID, memberID, listID)
 	return err
 }

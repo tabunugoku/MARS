@@ -7,6 +7,7 @@
 package archive
 
 import (
+	"context"
 	"errors"
 	"io"
 )
@@ -41,6 +42,25 @@ type Archive interface {
 	// archives), so pages can be served straight from the file.
 	RandomAccess() bool
 	Close() error
+}
+
+// ContextOpener is implemented by archives whose Open can give up when a
+// context ends. Use OpenContext rather than asserting it directly.
+type ContextOpener interface {
+	OpenContext(ctx context.Context, name string) (io.ReadCloser, error)
+}
+
+// OpenContext is Open under ctx. Archives with a context-aware open (PDF) get
+// ctx; the rest check ctx first and then call Open, which for them is cheap
+// or at least not cancellable.
+func OpenContext(ctx context.Context, a Archive, name string) (io.ReadCloser, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if co, ok := a.(ContextOpener); ok {
+		return co.OpenContext(ctx, name)
+	}
+	return a.Open(name)
 }
 
 // SkipRest stops a Walk early.

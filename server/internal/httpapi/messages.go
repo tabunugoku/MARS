@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"strings"
+
+	"golang.org/x/text/language"
 )
 
 // messages is the catalog of every text the API sends back. Each message has
@@ -109,6 +110,7 @@ var messages = map[string]struct{ ja, en string }{
 	"task.interrupted_restart": {"サーバーの再起動で中断しました", "Interrupted by a server restart"},
 	"task.scan":                {"%s をスキャン", "Scan %s"},
 	"task.scan_deep":           {"%s を詳細スキャン", "Deep scan %s"},
+	"task.scan_partial":        {"%s の一部をスキャン", "Scan part of %s"},
 	"task.start_failed":        {"開始できませんでした", "Could not start"},
 	"task.thumbnails":          {"%s の表紙を作り直す", "Regenerate thumbnails for %s"},
 	"task.thumbnails_failed":   {"%s 冊の表紙を作れませんでした", "Could not make thumbnails for %s books"},
@@ -125,21 +127,36 @@ var messages = map[string]struct{ ja, en string }{
 // withLocale records the request's language. A lang query parameter ("en" or
 // "ja") wins over Accept-Language, for any request: a browser's EventSource
 // (GET /events) cannot set headers, so the web app puts lang in the URL there.
-// Any other lang value is ignored. Without it, an Accept-Language whose first
-// tag starts with "en" gives English; anything else gives Japanese.
+// Any other lang value is ignored. Without it, acceptLocale picks the language
+// from Accept-Language.
 func withLocale(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		loc := "ja"
 		if q := r.URL.Query().Get("lang"); q == "en" || q == "ja" {
 			loc = q
 		} else {
-			first, _, _ := strings.Cut(r.Header.Get("Accept-Language"), ",")
-			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(first)), "en") {
-				loc = "en"
-			}
+			loc = acceptLocale(r.Header.Get("Accept-Language"))
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), localeKey, loc)))
 	})
+}
+
+// acceptLocale picks English or Japanese from an Accept-Language header. The
+// tags come back ordered by their q-weight, and the first tag in either
+// language decides, so "fr-FR,fr;q=0.9,en;q=0.8" gives English and
+// "ja;q=0.1,en;q=0.9" gives English. Tags in other languages are skipped; no
+// usable tag gives Japanese, the source language.
+func acceptLocale(header string) string {
+	tags, _, _ := language.ParseAcceptLanguage(header)
+	for _, tag := range tags {
+		switch base, _ := tag.Base(); base.String() {
+		case "en":
+			return "en"
+		case "ja":
+			return "ja"
+		}
+	}
+	return "ja"
 }
 
 // localeOf returns the request's language, "en" or "ja".

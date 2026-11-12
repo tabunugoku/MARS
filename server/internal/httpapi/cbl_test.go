@@ -279,6 +279,35 @@ func TestCBLTooLarge(t *testing.T) {
 	}
 }
 
+// TestCBLVolumePicksSeriesOfThatYear: two series answer to the title "Alpha"
+// and both hold number 1. A Volume names the year a series started, so the
+// entry with Volume 2005 takes Charlie's book, Volume 1999 takes Alpha's, and
+// an entry without a Volume, or with one no series started in, keeps the
+// first series by title.
+func TestCBLVolumePicksSeriesOfThatYear(t *testing.T) {
+	f := newListFixture(t)
+	if _, err := f.e.db.Exec(`UPDATE series SET alternate_titles = ? WHERE id = ?`, `["Alpha"]`, f.sid("Charlie")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.e.db.Exec(`UPDATE books SET release_date = ? WHERE id = ?`, "1999-05-01", f.bid("Alpha", 0)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.e.db.Exec(`UPDATE books SET release_date = ? WHERE id = ?`, "2005-06-01", f.bid("Charlie", 0)); err != nil {
+		t.Fatal(err)
+	}
+	body := cblDocXML("Volumes",
+		cblBookXML("Alpha", "1"),
+		`<Book Series="Alpha" Number="1" Volume="2005"/>`,
+		`<Book Series="Alpha" Number="1" Volume="1999"/>`,
+		`<Book Series="Alpha" Number="1" Volume="2010"/>`,
+	)
+	res := decodeCBLResult(t, postCBL(t, f.e.admin, "?dryRun=true", body))
+	want := []string{f.bid("Alpha", 0), f.bid("Charlie", 0), f.bid("Alpha", 0), f.bid("Alpha", 0)}
+	if !slices.Equal(matchedIDs(res), want) {
+		t.Fatalf("matched %v, want %v", matchedIDs(res), want)
+	}
+}
+
 // TestCBLDefaultNameFollowsLanguage: a file without a Name gets the default
 // name in the request's language.
 func TestCBLDefaultNameFollowsLanguage(t *testing.T) {

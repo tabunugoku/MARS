@@ -133,49 +133,92 @@ func cblSeriesIndex(series []Series) map[string][]Series {
 	return index
 }
 
-// cblBook returns the visible book of a series with the given number, the
-// first by number sort when there are several.
-func (s *server) cblBook(ctx context.Context, seriesID string, number float64) (Book, bool, error) {
-	bs, err := s.listBooks(ctx, " AND b.series_id = ? AND b.number = ?", "ORDER BY b.number_sort, b.id LIMIT 1", seriesID, number)
-	if err != nil || len(bs) == 0 {
-		return Book{}, false, err
-	}
-	return bs[0], true, nil
+// cblCatalog is what one import reads of its candidate series, once: the
+// visible books of each series by number (the first in number sort order
+// wins, as a single lookup would pick it), and each series' start year.
+type cblCatalog struct {
+	byNumber  map[string]map[float64]Book
+	startYear map[string]string
 }
 
-// cblMatch finds the book for one entry. Among the series whose title or
-// alternate title matches and that hold the numbered book, a book whose
-// release year equals the entry's Year wins; otherwise the first by title.
-// Volume is not compared: a series has no volume number to compare it with.
-func (s *server) cblMatch(ctx context.Context, index map[string][]Series, e CblEntry) (Book, bool, error) {
+// loadCBLCatalog reads the visible books of every series any entry can match
+// in one query. The start year of a series is the release year of its earliest
+// book that has one, since a series carries no year of its own.
+func (s *server) loadCBLCatalog(ctx context.Context, index map[string][]Series, items []cblBook) (*cblCatalog, error) {
+	cat := &cblCatalog{byNumber: map[string]map[float64]Book{}, startYear: map[string]string{}}
+	var ids []string
+	seen := map[string]bool{}
+	for _, it := range items {
+		for _, sr := range index[cblKey(strings.TrimSpace(it.Series))] {
+			if !seen[sr.Id] {
+				seen[sr.Id] = true
+				ids = append(ids, sr.Id)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return cat, nil
+	}
+	books, err := s.listBooks(ctx, " AND b.series_id IN ("+placeholders(len(ids))+")",
+		"ORDER BY b.number_sort, b.id", anyStrings(ids)...)
+	if err != nil {
+		return nil, err
+	}
+	for _, b := range books {
+		nums := cat.byNumber[b.SeriesId]
+		if nums == nil {
+			nums = map[float64]Book{}
+			cat.byNumber[b.SeriesId] = nums
+		}
+		if _, ok := nums[b.Number]; !ok {
+			nums[b.Number] = b
+		}
+		if _, ok := cat.startYear[b.SeriesId]; !ok && b.ReleaseDate != nil && len(*b.ReleaseDate) >= 4 {
+			cat.startYear[b.SeriesId] = (*b.ReleaseDate)[:4]
+		}
+	}
+	return cat, nil
+}
+
+// match finds the book for one entry. Among the series whose title or
+// alternate title matches and that hold the numbered book, a series that
+// started in the entry's Volume wins when there is one; then a book whose
+// release year equals the entry's Year; otherwise the first by title.
+func (cat *cblCatalog) match(index map[string][]Series, e CblEntry) (Book, bool) {
 	number, err := strconv.ParseFloat(e.Number, 64)
 	if err != nil || math.IsNaN(number) || math.IsInf(number, 0) {
-		return Book{}, false, nil
+		return Book{}, false
 	}
-	year := e.Year
-	var first, fit *Book
+	type candidate struct {
+		seriesID string
+		book     Book
+	}
+	var cands []candidate
 	for _, sr := range index[cblKey(e.Series)] {
-		b, ok, err := s.cblBook(ctx, sr.Id, number)
-		if err != nil {
-			return Book{}, false, err
-		}
-		if !ok {
-			continue
-		}
-		if first == nil {
-			first = &b
-		}
-		if year != "" && fit == nil && b.ReleaseDate != nil && strings.HasPrefix(*b.ReleaseDate, year) {
-			fit = &b
+		if b, ok := cat.byNumber[sr.Id][number]; ok {
+			cands = append(cands, candidate{sr.Id, b})
 		}
 	}
-	switch {
-	case fit != nil:
-		return *fit, true, nil
-	case first != nil:
-		return *first, true, nil
+	if len(cands) == 0 {
+		return Book{}, false
 	}
-	return Book{}, false, nil
+	if e.Volume != "" {
+		var same []candidate
+		for _, c := range cands {
+			if cat.startYear[c.seriesID] == e.Volume {
+				same = append(same, c)
+			}
+		}
+		if len(same) > 0 {
+			cands = same
+		}
+	}
+	for _, c := range cands {
+		if e.Year != "" && c.book.ReleaseDate != nil && strings.HasPrefix(*c.book.ReleaseDate, e.Year) {
+			return c.book, true
+		}
+	}
+	return cands[0].book, true
 }
 
 func (s *server) ImportReadList(ctx context.Context, req ImportReadListRequestObject) (ImportReadListResponseObject, error) {
@@ -207,6 +250,10 @@ func (s *server) ImportReadList(ctx context.Context, req ImportReadListRequestOb
 		return nil, err
 	}
 	index := cblSeriesIndex(series)
+	cat, err := s.loadCBLCatalog(ctx, index, doc.Books.Items)
+	if err != nil {
+		return nil, err
+	}
 
 	res := CblImportResult{Name: name, Matched: []CblMatch{}, Unmatched: []CblEntry{}}
 	var bookIDs []string
@@ -217,10 +264,7 @@ func (s *server) ImportReadList(ctx context.Context, req ImportReadListRequestOb
 			Volume: strings.TrimSpace(item.Volume),
 			Year:   strings.TrimSpace(item.Year),
 		}
-		book, ok, err := s.cblMatch(ctx, index, entry)
-		if err != nil {
-			return nil, err
-		}
+		book, ok := cat.match(index, entry)
 		if !ok {
 			res.Unmatched = append(res.Unmatched, entry)
 			continue

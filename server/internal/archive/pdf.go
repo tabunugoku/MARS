@@ -8,7 +8,6 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
-	"sync"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/filter"
@@ -19,7 +18,11 @@ import (
 
 // maxPDFBytes bounds the PDFs we open. pdfcpu parses the whole file, so every
 // object stream and image stream of the book is held in memory while it is
-// open. Larger files are refused rather than risking the server's memory.
+// open: measured resident size is about 1x the file size (see
+// TestPDFOpenMemory). A PDF is open only while the page cache extracts it, and
+// the cache runs two extractions at once, so the peak is about 2x this bound.
+// Larger files are refused. Lowering it would turn PDFs that open today into
+// unsupported books, so it stays at 512 MB.
 const maxPDFBytes = 512 << 20
 
 // maxPDFImageBytes bounds the decoded pixels of one page image. A small Flate
@@ -52,15 +55,28 @@ type pdfPage struct {
 }
 
 // pdfArchive exposes each page's single image. The parsed PDF stays in
-// memory; pdfcpu decodes images into it, so access is serialised by mu.
+// memory; pdfcpu decodes images into it, so access is serialised by busy, a
+// one-slot semaphore. A waiter gives up when its context ends.
 type pdfArchive struct {
 	file   *os.File
 	ctx    *model.Context
 	pages  []pdfPage
 	byName map[string]int
-	mu     sync.Mutex
-	closed bool
+	busy   chan struct{} // holds one token while a render or Close runs
+	closed bool          // guarded by busy
 }
+
+// lock takes the archive's render slot, or returns c's error if c ends first.
+func (pa *pdfArchive) lock(c context.Context) error {
+	select {
+	case pa.busy <- struct{}{}:
+		return nil
+	case <-c.Done():
+		return c.Err()
+	}
+}
+
+func (pa *pdfArchive) unlock() { <-pa.busy }
 
 // openPDF reads the PDF on file without writing anything. Encrypted files
 // and files whose pages are not one browser-servable image are unsupported.
@@ -74,7 +90,7 @@ func openPDF(c context.Context, file *os.File, size int64) (Archive, error) {
 		file.Close()
 		return nil, fmt.Errorf("%w: PDF over %d MB", ErrUnsupported, maxPDFBytes>>20)
 	}
-	pa := &pdfArchive{file: file}
+	pa := &pdfArchive{file: file, busy: make(chan struct{}, 1)}
 	if err := pa.load(c, file); err != nil {
 		file.Close()
 		return nil, err
@@ -457,23 +473,45 @@ func (pa *pdfArchive) render(c context.Context, pg *pdfPage) (r io.Reader, err e
 			r, err = nil, pdfUnsupported(pg.page, "cannot be decoded")
 		}
 	}()
+	if err := c.Err(); err != nil {
+		return nil, err
+	}
 	if pg.raw {
 		return bytes.NewReader(pg.sd.Raw), nil
 	}
-	pa.mu.Lock()
-	defer pa.mu.Unlock()
+	if err := pa.lock(c); err != nil {
+		return nil, err
+	}
+	defer pa.unlock()
 	if pa.closed {
 		return nil, errors.New("archive: PDF is closed")
 	}
 	defer func() { pg.sd.Content = nil }()
+	// The inflate below cannot be interrupted once started (it is bounded by
+	// maxPDFImageBytes), so the context is checked on both sides of it.
 	if pg.decodeLen > 0 {
+		if err := c.Err(); err != nil {
+			return nil, err
+		}
 		if err := decodeBounded(pg); err != nil {
+			if cerr := c.Err(); cerr != nil {
+				return nil, cerr
+			}
 			return nil, pdfUnsupported(pg.page, "cannot be decoded")
+		}
+		if err := c.Err(); err != nil {
+			return nil, err
 		}
 	}
 	img, err := pdfcpu.ExtractImage(c, pa.ctx, pg.sd, false, pg.resName, pg.objNr, false)
 	if err != nil {
+		if cerr := c.Err(); cerr != nil {
+			return nil, cerr
+		}
 		return nil, pdfUnsupported(pg.page, "cannot be decoded")
+	}
+	if err := c.Err(); err != nil {
+		return nil, err
 	}
 	if img.FileType != pg.ext {
 		return nil, pdfUnsupported(pg.page, "cannot be decoded")
@@ -490,11 +528,17 @@ func (pa *pdfArchive) Entries() []Entry {
 }
 
 func (pa *pdfArchive) Open(name string) (io.ReadCloser, error) {
+	return pa.OpenContext(context.Background(), name)
+}
+
+// OpenContext is Open that gives up with c's error when c ends, including
+// while it waits for another page's render to finish.
+func (pa *pdfArchive) OpenContext(c context.Context, name string) (io.ReadCloser, error) {
 	i, ok := pa.byName[name]
 	if !ok {
 		return nil, notExist(name)
 	}
-	r, err := pa.render(context.Background(), &pa.pages[i])
+	r, err := pa.render(c, &pa.pages[i])
 	if err != nil {
 		return nil, err
 	}
@@ -526,9 +570,12 @@ func (pa *pdfArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error
 func (pa *pdfArchive) RandomAccess() bool { return false }
 
 func (pa *pdfArchive) Close() error {
-	pa.mu.Lock()
+	// Wait for a running render, then drop the parsed PDF (pdfcpu's context
+	// holds the file's objects) so its memory is reclaimed once the archive
+	// value itself is unreferenced.
+	pa.busy <- struct{}{}
 	pa.closed = true
 	pa.ctx = nil
-	pa.mu.Unlock()
+	<-pa.busy
 	return pa.file.Close()
 }
