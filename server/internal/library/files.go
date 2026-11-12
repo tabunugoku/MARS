@@ -122,8 +122,15 @@ func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error
 	if err != nil {
 		return err
 	}
-	_, err = s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ? WHERE id = ? AND thumbnail != ?`, name, bookID, name)
-	return err
+	if _, err = s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ? WHERE id = ? AND thumbnail != ?`, name, bookID, name); err != nil {
+		return err
+	}
+	// The file may be new under the same name: tell open screens either way.
+	var libID, seriesID string
+	if err := s.DB.QueryRowContext(ctx, `SELECT library_id, series_id FROM books WHERE id = ?`, bookID).Scan(&libID, &seriesID); err == nil {
+		s.bookChanged(libID, seriesID, bookID, status)
+	}
+	return nil
 }
 
 // QueueThumbnails queues regenerating the thumbnail of every analysed book

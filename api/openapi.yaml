@@ -274,6 +274,26 @@ paths:
         "200": { $ref: "#/components/responses/Image" }
         "304": { description: Not modified }
         "404": { $ref: "#/components/responses/NotFound" }
+  /events:
+    get:
+      operationId: streamEvents
+      summary: Live changes as server-sent events (text/event-stream)
+      description: >
+        One long-lived stream per app. Each message has an event name and a
+        JSON data line: `task` (TaskEvent, administrators only), `library`
+        (LibraryEvent), `book` (BookEvent) and `progress` (ProgressEvent, the
+        caller's own reading progress). Library, book and progress events are
+        sent only for libraries the caller may see. A comment line is sent
+        about every 25 seconds as a heartbeat. When the client falls behind
+        the stream is closed; on reconnecting, refetch what is shown. A user
+        may hold 16 streams and the server 512; past that the request is
+        answered 429 with Retry-After.
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream:
+              schema: { type: string }
   /tasks:
     get:
       operationId: listTasks
@@ -1076,6 +1096,44 @@ components:
         progress: { type: number, format: double }
         startedAt: { type: string, nullable: true }
         error: { type: string }
+    TaskEvent:
+      description: Data of a `task` event; the task as listTasks returns it
+      allOf: [{ $ref: "#/components/schemas/Task" }]
+    LibraryEvent:
+      description: Data of a `library` event, sent when a scan or analysis changed the library's series or books
+      type: object
+      required: [libraryId, seriesAdded, seriesRemoved, booksAdded, booksChanged, booksRemoved, restored]
+      properties:
+        libraryId: { type: string }
+        seriesAdded: { type: integer }
+        seriesRemoved: { type: integer }
+        booksAdded: { type: integer }
+        booksChanged: { type: integer }
+        booksRemoved: { type: integer }
+        restored:
+          type: integer
+          description: Series and unchanged books back from the trash, and unchanged books moved to another series
+    BookEvent:
+      description: Data of a `book` event, sent when a book was analysed (pages, thumbnail, metadata)
+      type: object
+      required: [bookId, seriesId, libraryId, mediaStatus]
+      properties:
+        bookId: { type: string }
+        seriesId: { type: string }
+        libraryId: { type: string }
+        mediaStatus: { $ref: "#/components/schemas/MediaStatus" }
+    ProgressEvent:
+      description: >
+        Data of a `progress` event: the caller's reading progress changed on
+        one book (bookId), a whole series (seriesId) or a library. writer is
+        the writer the change came from, when it had one.
+      type: object
+      required: [libraryId]
+      properties:
+        libraryId: { type: string }
+        seriesId: { type: string }
+        bookId: { type: string }
+        writer: { type: string }
     Role:
       type: string
       enum: [admin, user]

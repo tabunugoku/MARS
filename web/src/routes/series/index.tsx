@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router";
 import { ArrowDown, ArrowUp, ChevronLeft, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, formatDate, seriesFileUrl, startDownload, statusLabel, useApi, type Series } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
 import { BookCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
@@ -35,6 +36,15 @@ function SeriesPage({ id }: { id: string }) {
     const [library, books] = await Promise.all([api.library(series.libraryId), api.booksOfSeries(id)]);
     return { series, library, books };
   }, [id]);
+  // New or analysed books, and reading on another tab or device.
+  const libraryId = data?.series.libraryId;
+  useLiveReload(reload, (e) =>
+    e.type === "library"
+      ? e.data.libraryId === libraryId
+      : e.type === "book" || e.type === "progress"
+        ? e.data.seriesId === id || (e.type === "progress" && !e.data.seriesId && e.data.libraryId === libraryId)
+        : false,
+  );
 
   const [tab, setTab] = useState(0);
   const [order, setOrder] = useState<"asc" | "desc">("asc");

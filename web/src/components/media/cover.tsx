@@ -1,4 +1,5 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
+import { coverRevision, onCoverRetry, onCoverRevision } from "@/lib/cover-retry";
 import { cn } from "@/lib/utils";
 
 export interface CoverProps {
@@ -20,8 +21,19 @@ export interface CoverProps {
 /** The one cover primitive. Fixed 2:3 box so grids never shift while art loads. */
 export const Cover = memo(function Cover({ src, title, label, progress, unread, read, className, priority }: CoverProps) {
   // A book without a thumbnail yet (not analysed, or no image) answers 404.
+  // A thumbnail made again in this tab's lifetime (see live events) is
+  // fetched anew under ?r=; a failed one is tried again then too.
+  const [rev, setRev] = useState(() => coverRevision(src));
+  useEffect(() => {
+    if (!src) return;
+    setRev(coverRevision(src));
+    return onCoverRevision(src, () => setRev(coverRevision(src)));
+  }, [src]);
+  const url = rev && src.startsWith("/") ? `${src}${src.includes("?") ? "&" : "?"}r=${rev}` : src;
   const [failed, setFailed] = useState<string | null>(null);
-  const missing = !src || failed === src;
+  const missing = !src || failed === url;
+  // Try again once books have been analysed (see live events).
+  useEffect(() => (missing && src ? onCoverRetry(() => setFailed(null)) : undefined), [missing, src]);
   return (
     <div
       className={cn("relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-muted", className)}
@@ -34,12 +46,12 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
         </span>
       ) : (
         <img
-          src={src}
+          src={url}
           alt=""
           loading={priority ? "eager" : "lazy"}
           decoding="async"
           draggable={false}
-          onError={() => setFailed(src)}
+          onError={() => setFailed(url)}
           className="size-full object-cover"
         />
       )}

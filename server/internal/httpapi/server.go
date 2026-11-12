@@ -15,7 +15,9 @@ import (
 	"log/slog"
 	"net/http"
 	"net/netip"
+	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/library"
 	"github.com/tabunugoku/cominavi/server/internal/task"
 )
@@ -30,6 +32,10 @@ type Deps struct {
 	Gate    *SetupGate
 	// TrustedProxies are reverse proxies whose X-Forwarded-For is believed.
 	TrustedProxies []netip.Prefix
+	// Events feeds GET /events; nil turns the stream off.
+	Events *events.Hub
+	// Heartbeat is the stream's keep-alive interval (25 s when zero).
+	Heartbeat time.Duration
 }
 
 type server struct{ Deps }
@@ -58,6 +64,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /books/{bookId}/file", s.serveBookFile)
 	mux.HandleFunc("GET /series/{seriesId}/file", s.serveSeriesZip)
 	mux.HandleFunc("GET /public/covers/{seriesId}", s.servePublicCover)
+	mux.HandleFunc("GET /events", s.serveEvents)
 	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
 	return s.authenticate(mux)
 }

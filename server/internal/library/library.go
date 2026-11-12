@@ -20,6 +20,7 @@ import (
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
 	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 	"github.com/tabunugoku/cominavi/server/internal/scan"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -36,6 +37,7 @@ type Service struct {
 	Queue    *task.Queue
 	ThumbDir string
 	Pages    *media.PageCache
+	Events   *events.Hub // may be nil
 
 	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library
 	coverLocks sync.Map // book id -> ctxMutex; see coverLock
@@ -134,6 +136,13 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
+		if st != (scan.Stats{}) {
+			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
+				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
+				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
+				Restored: st.Restored,
+			}})
+		}
 		_, err = s.queueAnalyze(context.WithoutCancel(ctx), l.id, deep)
 		return err
 	})
@@ -226,7 +235,12 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 		if err := scan.SyncSearch(ctx, s.DB, b, l.id); err != nil {
 			return err
 		}
-		return b.Flush()
+		if err := b.Flush(); err != nil {
+			return err
+		}
+		// Series titles and fields may have changed from ComicInfo.
+		s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{LibraryID: l.id, BooksChanged: len(todo)}})
+		return nil
 	})
 }
 
@@ -252,14 +266,14 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	}
 	full, err := resolve(l.root, rel)
 	if err != nil {
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
 	a, err := media.AnalyzeCover(ctx, full, coverPage)
 	switch {
 	case errors.Is(err, archive.ErrUnsupported):
-		return seriesID, nil, s.markBook(ctx, bookID, v, "unsupported", err.Error())
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "unsupported", err.Error())
 	case err != nil:
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
 
 	var ci *scan.ComicInfo
@@ -338,7 +352,27 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 			return "", nil, err
 		}
 	}
-	return seriesID, ci, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return "", nil, err
+	}
+	s.bookChanged(l.id, seriesID, bookID, "ready")
+	return seriesID, ci, nil
+}
+
+// marked is markBook followed by a "book" event.
+func (s *Service) marked(ctx context.Context, libraryID, seriesID, bookID string, v version, status, msg string) error {
+	if err := s.markBook(ctx, bookID, v, status, msg); err != nil {
+		return err
+	}
+	s.bookChanged(libraryID, seriesID, bookID, status)
+	return nil
+}
+
+// bookChanged announces that a book's analysis or thumbnail changed.
+func (s *Service) bookChanged(libraryID, seriesID, bookID, status string) {
+	s.Events.Publish(events.Event{Type: "book", LibraryID: libraryID, Data: events.Book{
+		BookID: bookID, SeriesID: seriesID, LibraryID: libraryID, MediaStatus: status,
+	}})
 }
 
 func (s *Service) markBook(ctx context.Context, bookID string, v version, status, msg string) error {

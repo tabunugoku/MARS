@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Play } from "@keyline-icons/react";
 import { api, useApi, type Book, type Series } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { BookCard, SeriesCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -22,7 +23,7 @@ const ymd = (iso: string) => {
 };
 
 export default function Screen() {
-  const { data } = useApi(
+  const { data, reload } = useApi(
     async () => {
       const d = await api.dashboard();
       return {
@@ -36,6 +37,8 @@ export default function Screen() {
     },
     [],
   );
+  // New books and reading elsewhere; quieter than the library screens.
+  useLiveReload(reload, (e) => e.type === "library" || e.type === "progress", { quiet: 2000, maxWait: 15000 });
 
   if (!data) {
     return (
