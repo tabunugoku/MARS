@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -30,6 +32,16 @@ func TestHealthcheck(t *testing.T) {
 	srv.Close()
 	if err := healthcheck(context.Background(), addr); err == nil {
 		t.Fatal("stopped server counted as healthy")
+	}
+}
+
+// A scoped IPv6 listen address must reach the dialer: before the URL was
+// built with url.URL, "%eth0" failed to parse and every probe failed.
+func TestHealthcheckScopedIPv6(t *testing.T) {
+	err := healthcheck(context.Background(), "[fe80::1%eth0]:1")
+	var ue *url.Error
+	if !errors.As(err, &ue) || ue.Op == "parse" {
+		t.Fatalf("want a dial error, got %v", err)
 	}
 }
 

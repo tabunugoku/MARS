@@ -39,12 +39,25 @@ type Service struct {
 	Pages    *media.PageCache
 	Events   *events.Hub // may be nil
 
-	scanLocks sync.Map // library id -> *sync.Mutex; one walk+sync at a time per library
+	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library
+	coverLocks sync.Map // book id -> ctxMutex; see coverLock
+	scans      scanGate // every scan sync against PauseScans
 }
 
-func (s *Service) scanLock(id string) *sync.Mutex {
-	m, _ := s.scanLocks.LoadOrStore(id, &sync.Mutex{})
-	return m.(*sync.Mutex)
+// coverLock orders the writers of a book's cover: an analysis, a cover
+// choice and a thumbnail regeneration each read cover_page, write the
+// thumbnail file and store the result under it, so a slow analysis cannot
+// put back the page an admin just replaced.
+// Waiting for it ends with the caller's ctx, so a cancelled request or
+// analysis does not sit behind a slow archive read.
+func (s *Service) coverLock(bookID string) ctxMutex {
+	m, _ := s.coverLocks.LoadOrStore(bookID, newCtxMutex())
+	return m.(ctxMutex)
+}
+
+func (s *Service) scanLock(id string) ctxMutex {
+	m, _ := s.scanLocks.LoadOrStore(id, newCtxMutex())
+	return m.(ctxMutex)
 }
 
 type lib struct {
@@ -98,16 +111,24 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 		}
 		// A running scan is not deduplicated by the queue, so two can overlap;
 		// the lock keeps an older walk from being committed after a newer one.
+		if err := s.scans.enter(ctx); err != nil {
+			return err
+		}
 		mu := s.scanLock(l.id)
-		mu.Lock()
+		if err := mu.Lock(ctx); err != nil {
+			s.scans.leave()
+			return err
+		}
 		found, err := scan.Walk(ctx, l.root, l.exclude)
 		if err != nil {
 			mu.Unlock()
+			s.scans.leave()
 			return fmt.Errorf("フォルダを読めません: %w", err)
 		}
 		progress(0.5)
 		st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
 		mu.Unlock()
+		s.scans.leave()
 		if err != nil {
 			return err
 		}
@@ -198,6 +219,12 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 			if err := applySeriesInfo(ctx, tx, seriesID, byBook, ts); err != nil {
 				return err
 			}
+			// Index in the same transaction: a cancel between the two
+			// would leave new titles that search cannot find, and a
+			// re-run finds nothing left to analyse to repair it.
+			if err := scan.IndexSeries(ctx, tx, seriesID); err != nil {
+				return err
+			}
 			if err := b.Step(ctx); err != nil {
 				return err
 			}
@@ -249,15 +276,6 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
 
-	thumb := ""
-	if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
-		if thumb, err = s.writeThumb(bookID, jpg); err != nil {
-			return "", nil, err
-		}
-	} else {
-		slog.Warn("thumbnail", "book", bookID, "err", err)
-	}
-
 	var ci *scan.ComicInfo
 	if l.importComicInfo && a.ComicInfo != nil {
 		if c, err := scan.ParseComicInfo(bytes.NewReader(a.ComicInfo)); err == nil {
@@ -267,16 +285,46 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		}
 	}
 
+	// From here to the commit the book's cover is ours: a cover choice made
+	// while the archive was being read wins over the page we read then.
+	mu := s.coverLock(bookID)
+	if err := mu.Lock(ctx); err != nil {
+		return "", nil, err
+	}
+	defer mu.Unlock()
+	var nowCover int
+	if err := s.DB.QueryRowContext(ctx, `SELECT cover_page FROM books WHERE id = ?`, bookID).Scan(&nowCover); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return seriesID, nil, nil
+		}
+		return "", nil, err
+	}
+	coverChanged := nowCover != coverPage && nowCover >= 1 && nowCover <= len(a.Pages)
+
+	thumb := ""
+	if !coverChanged {
+		if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
+			if thumb, err = s.writeThumb(bookID, jpg); err != nil {
+				return "", nil, err
+			}
+		} else {
+			slog.Warn("thumbnail", "book", bookID, "err", err)
+		}
+	}
+
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return "", nil, err
 	}
 	defer tx.Rollback()
 	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	// A changed cover keeps its page and the thumbnail its choice made.
 	res, err := tx.ExecContext(ctx, `
-		UPDATE books SET page_count = ?, media_status = 'ready', media_error = '', thumbnail = ?, cover_page = ?, updated_at = ?
+		UPDATE books SET page_count = ?, media_status = 'ready', media_error = '',
+			thumbnail = CASE WHEN ? THEN thumbnail ELSE ? END,
+			cover_page = CASE WHEN ? THEN cover_page ELSE ? END, updated_at = ?
 		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
-		len(a.Pages), thumb, a.CoverPage, ts, bookID, v.size, v.mtime)
+		len(a.Pages), coverChanged, thumb, coverChanged, a.CoverPage, ts, bookID, v.size, v.mtime)
 	if err != nil {
 		return "", nil, err
 	}
@@ -642,4 +690,13 @@ func (s *Service) Schedule(ctx context.Context) {
 			tick(false)
 		}
 	}
+}
+
+// PauseScans waits for every running scan sync to finish and keeps new ones
+// from starting, in any library, until the returned func is called. A scan
+// commits in batches and remembers the rows it read, so a hard delete in
+// between (emptying the trash) would make its later updates miss rows that
+// are gone. When ctx ends first it gives up and holds nothing.
+func (s *Service) PauseScans(ctx context.Context) (func(), error) {
+	return s.scans.pause(ctx)
 }
