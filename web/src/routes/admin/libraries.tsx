@@ -182,7 +182,7 @@ export default function Screen() {
     daily: t("intervalDaily"),
     weekly: t("intervalWeekly"),
   };
-  // right: the numeric and action columns are right-aligned.
+  // right: the numeric columns are right-aligned.
   const heads = [
     { label: t("colName"), right: false },
     { label: t("colRoot"), right: false },
@@ -190,7 +190,7 @@ export default function Screen() {
     { label: t("colBooks"), right: true },
     { label: t("colSize"), right: true },
     { label: t("colLastScan"), right: false },
-    { label: t("colActions"), right: true },
+    { label: t("colActions"), right: false },
   ];
   const { data: libs, error, reload } = useApi(() => api.libraries(), []);
   const [dlg, setDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -345,7 +345,7 @@ export default function Screen() {
                     <TableCell className="text-right tabular-nums whitespace-nowrap">{formatBytes(l.sizeBytes)}</TableCell>
                     <TableCell className="whitespace-nowrap">{l.lastScan ? relTime(l.lastScan) : t("notScanned")}</TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
+                      <div className="flex gap-1">
                         <IconAction label={t("scan")} icon={RefreshCw} onClick={() => !busy && scan(l)} />
                         <IconAction label={t("edit")} icon={SquarePen} onClick={() => !busy && openEdit(l)} />
                         <IconAction
