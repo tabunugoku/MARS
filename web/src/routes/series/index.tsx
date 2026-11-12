@@ -172,8 +172,8 @@ function SeriesPage({ id }: { id: string }) {
     setSaved(null);
     reload();
   };
-  const afterBulk = () => {
-    sel.clear();
+  const afterBulk = (ok = true) => {
+    if (ok) sel.clear();
     reloadAfter();
   };
   const bulk = useBulkRun((ok) => {
@@ -465,7 +465,7 @@ function SeriesPage({ id }: { id: string }) {
         )}
       </AnimatePresence>
       {isAdmin && (
-        <AddToReadListDialog key={listRun} bookIds={sel.ids} open={readListOpen} onOpenChange={setReadListOpen} onAdded={afterBulk} />
+        <AddToReadListDialog key={listRun} bookIds={sel.ids} open={readListOpen} onOpenChange={setReadListOpen} onAdded={() => afterBulk()} />
       )}
       {isAdmin && (
         <BooksBulkDialog key={tagsRun} bookIds={sel.ids} open={tagsOpen} onOpenChange={setTagsOpen} onDone={afterBulk} />

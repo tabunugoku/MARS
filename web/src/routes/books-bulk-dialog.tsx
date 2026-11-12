@@ -41,9 +41,10 @@ export function BooksBulkDialog({
   bookIds: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Runs after a successful save: the parent reloads and clears the selection. A failed
-   *  save keeps the dialog and the selection open so the user can retry. */
-  onDone: () => void;
+  /** After the save: ok when every chunk worked (the dialog has closed). On a
+   *  failure the dialog stays open for a retry, but earlier chunks may have
+   *  been saved, so the caller still reloads; it keeps the selection. */
+  onDone: (ok: boolean) => void;
 }) {
   const t = useT(m);
   const [addTags, setAddTags] = useState("");
@@ -63,9 +64,10 @@ export function BooksBulkDialog({
       );
       toast.success(t("updated", { n }));
       onOpenChange(false);
-      onDone();
+      onDone(true);
     } catch (err) {
       toast.error(errorMessage(err));
+      onDone(false);
     } finally {
       setSaving(false);
     }
