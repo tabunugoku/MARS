@@ -274,6 +274,17 @@ paths:
         "200": { $ref: "#/components/responses/Image" }
         "304": { description: Not modified }
         "404": { $ref: "#/components/responses/NotFound" }
+  /books/{bookId}/pages/{page}/thumbnail:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+      - { name: page, in: path, required: true, schema: { type: integer, minimum: 1 } }
+    get:
+      operationId: getBookPageThumbnail
+      summary: A small JPEG of one page, for page lists (ETag, long private cache under ?v=)
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "304": { description: Not modified }
+        "404": { $ref: "#/components/responses/NotFound" }
   /events:
     get:
       operationId: streamEvents
@@ -722,6 +733,13 @@ paths:
   /me/reader-prefs/global:
     put:
       operationId: setGlobalReaderPrefs
+      summary: Save the global set of one profile (desktop unless profile=mobile)
+      parameters:
+        - name: profile
+          in: query
+          required: false
+          schema: { type: string, enum: [desktop, mobile], default: desktop }
+          description: Each browser chooses which profile it reads with; mobile is meant for phones and small tablets
       requestBody:
         required: true
         content:
@@ -1071,13 +1089,14 @@ components:
         page: { type: integer, minimum: 1 }
     Page:
       type: object
-      required: [number, width, height, mediaType, url]
+      required: [number, width, height, mediaType, url, thumbnailUrl]
       properties:
         number: { type: integer }
         width: { type: integer }
         height: { type: integer }
         mediaType: { type: string }
         url: { type: string }
+        thumbnailUrl: { type: string, description: "A small JPEG of the page, for page lists" }
     TaskKind:
       type: string
       enum: [scan, analyze, thumbnail, hash, trash]
@@ -1389,11 +1408,17 @@ components:
         spread: { type: string, enum: ["off", "on", cover] }
         fit: { type: string, enum: [screen, width, height, original] }
         bg: { type: string, enum: [black, gray, white] }
+        splitWide:
+          type: boolean
+          description: On a portrait screen, show a landscape page (a scanned two-page spread) as its two halves, one after the other
     ReaderPrefsAll:
       type: object
       required: [global, series, books]
       properties:
         global: { $ref: "#/components/schemas/GlobalReaderPrefs" }
+        globalMobile:
+          allOf: [{ $ref: "#/components/schemas/GlobalReaderPrefs" }]
+          description: The mobile profile's global set; absent until it is first saved
         series: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By series id" }
         books: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By book id" }
     ServerSettings:

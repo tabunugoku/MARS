@@ -282,6 +282,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/books/{bookId}/pages/{page}/thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+                page: number;
+            };
+            cookie?: never;
+        };
+        /** A small JPEG of one page, for page lists (ETag, long private cache under ?v=) */
+        get: operations["getBookPageThumbnail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/events": {
         parameters: {
             query?: never;
@@ -754,6 +774,7 @@ export interface paths {
             cookie?: never;
         };
         get?: never;
+        /** Save the global set of one profile (desktop unless profile=mobile) */
         put: operations["setGlobalReaderPrefs"];
         post?: never;
         delete?: never;
@@ -1092,6 +1113,8 @@ export interface components {
             height: number;
             mediaType: string;
             url: string;
+            /** @description A small JPEG of the page, for page lists */
+            thumbnailUrl: string;
         };
         /** @enum {string} */
         TaskKind: "scan" | "analyze" | "thumbnail" | "hash" | "trash";
@@ -1355,9 +1378,13 @@ export interface components {
             fit: "screen" | "width" | "height" | "original";
             /** @enum {string} */
             bg: "black" | "gray" | "white";
+            /** @description On a portrait screen, show a landscape page (a scanned two-page spread) as its two halves, one after the other */
+            splitWide?: boolean;
         };
         ReaderPrefsAll: {
             global: components["schemas"]["GlobalReaderPrefs"];
+            /** @description The mobile profile's global set; absent until it is first saved */
+            globalMobile?: components["schemas"]["GlobalReaderPrefs"];
             /** @description By series id */
             series: {
                 [key: string]: components["schemas"]["ReaderPrefs"];
@@ -1912,6 +1939,29 @@ export interface operations {
         };
     };
     getBookPage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+                page: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: components["responses"]["Image"];
+            /** @description Not modified */
+            304: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBookPageThumbnail: {
         parameters: {
             query?: never;
             header?: never;
@@ -2781,7 +2831,10 @@ export interface operations {
     };
     setGlobalReaderPrefs: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Each browser chooses which profile it reads with; mobile is meant for phones and small tablets */
+                profile?: "desktop" | "mobile";
+            };
             header?: never;
             path?: never;
             cookie?: never;

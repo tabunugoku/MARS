@@ -185,6 +185,7 @@ func TestLibraryScope(t *testing.T) {
 		"/api/v1/books/" + hb[0].Id,
 		"/api/v1/books/" + hb[0].Id + "/pages",
 		"/api/v1/books/" + hb[0].Id + "/pages/1",
+		"/api/v1/books/" + hb[0].Id + "/pages/1/thumbnail",
 		"/api/v1/books/" + hb[0].Id + "/thumbnail",
 	} {
 		if rec := r.do("GET", u, nil); rec.Code != 404 {
@@ -210,6 +211,9 @@ func TestLibraryScope(t *testing.T) {
 	e.admin.json("PATCH", "/api/v1/users/"+u.Id, map[string]any{"canStream": false}, 200, nil)
 	if rec := r.do("GET", "/api/v1/books/"+sb[0].Id+"/pages/1", nil); rec.Code != 403 {
 		t.Fatalf("page without canStream: %d", rec.Code)
+	}
+	if rec := r.do("GET", "/api/v1/books/"+sb[0].Id+"/pages/1/thumbnail", nil); rec.Code != 403 {
+		t.Fatalf("page thumbnail without canStream: %d", rec.Code)
 	}
 	e.admin.json("PATCH", "/api/v1/users/"+u.Id, map[string]any{"libraryIds": []string{b.Id}}, 200, nil)
 	r.json("GET", "/api/v1/series/"+shown.Id, nil, 404, nil)

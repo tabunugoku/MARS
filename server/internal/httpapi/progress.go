@@ -219,6 +219,19 @@ func (s *server) GetReaderPrefs(ctx context.Context, req GetReaderPrefsRequestOb
 	case !errors.Is(err, sql.ErrNoRows):
 		return nil, err
 	}
+	// The mobile profile (target 'mobile'), only once it has been saved.
+	err = s.DB.QueryRowContext(ctx, `SELECT prefs FROM reader_prefs WHERE user_id = ? AND scope = 'global' AND target = 'mobile'`,
+		currentUser(ctx).ID).Scan(&raw)
+	switch {
+	case err == nil:
+		m := defaultGlobalPrefs
+		if err := json.Unmarshal([]byte(raw), &m); err != nil {
+			return nil, err
+		}
+		out.GlobalMobile = &m
+	case !errors.Is(err, sql.ErrNoRows):
+		return nil, err
+	}
 	if err := s.visiblePrefs(ctx, "series", "series", out.Series); err != nil {
 		return nil, err
 	}
@@ -236,7 +249,17 @@ func (s *server) SetGlobalReaderPrefs(ctx context.Context, req SetGlobalReaderPr
 	if !b.Direction.Valid() || !b.Spread.Valid() || !b.Fit.Valid() || !b.Bg.Valid() {
 		return SetGlobalReaderPrefs400JSONResponse{badRequest("読書設定の値が正しくありません")}, nil
 	}
-	if err := s.putPrefs(ctx, "global", "", jsonText(b)); err != nil {
+	target := ""
+	if p := req.Params.Profile; p != nil {
+		switch *p {
+		case Mobile:
+			target = "mobile"
+		case Desktop:
+		default:
+			return SetGlobalReaderPrefs400JSONResponse{badRequest("profile は desktop か mobile です")}, nil
+		}
+	}
+	if err := s.putPrefs(ctx, "global", target, jsonText(b)); err != nil {
 		return nil, err
 	}
 	return SetGlobalReaderPrefs204Response{}, nil

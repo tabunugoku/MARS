@@ -24,20 +24,27 @@ import { ReaderSettings } from "./settings";
 // stays out of the way until asked for (tap the centre, or press M).
 // ---------------------------------------------------------------------------
 
-type View = { pages: number[] }; // one or two page numbers shown together
+/** One or two page numbers shown together. half: only that half of a
+ *  landscape page, in reading order ("first" is the right half in RTL). */
+type View = { pages: number[]; half?: "first" | "second" };
 
 /** A page scanned as a two-page spread (wider than tall) always stands alone. */
 const isWide = (pg: Page | undefined) => !!pg && pg.width > pg.height;
 
 /** Group pages into views. Spread mode pairs pages; "cover" keeps page 1
- *  alone; a page that is already a spread is never paired. */
-function buildViews(pages: Page[], spread: ReaderPrefs["spread"]): View[] {
+ *  alone; a page that is already a spread is never paired. With split, such
+ *  a page becomes two views, one per half. */
+function buildViews(pages: Page[], spread: ReaderPrefs["spread"], split = false): View[] {
   const count = pages.length;
   const views: View[] = [];
   let p = 1;
-  if (spread === "cover" && count > 0) views.push({ pages: [p++] });
+  const single = (n: number) => {
+    if (split && isWide(pages[n - 1])) views.push({ pages: [n], half: "first" }, { pages: [n], half: "second" });
+    else views.push({ pages: [n] });
+  };
+  if (spread === "cover" && count > 0) single(p++);
   while (p <= count) {
-    if (spread === "off" || p === count || isWide(pages[p - 1]) || isWide(pages[p])) views.push({ pages: [p++] });
+    if (spread === "off" || p === count || isWide(pages[p - 1]) || isWide(pages[p])) single(p++);
     else {
       views.push({ pages: [p, p + 1] });
       p += 2;
@@ -224,7 +231,10 @@ function ReaderBody({
 
   const webtoon = prefs.direction === "webtoon";
   const pageCount = pages.length;
-  const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread), [pages, prefs.spread, webtoon]);
+  // A landscape page in halves on a portrait screen, when this profile asks.
+  const portrait = useMatchMedia("(orientation: portrait)");
+  const split = !webtoon && !!globalPrefs.splitWide && portrait;
+  const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread, split), [pages, prefs.spread, webtoon, split]);
   // index views.length = the end card
   const [vi, setVi] = useState(() => Math.max(0, views.findIndex((v) => v.pages.includes(startPage))));
   const viewIndex = Math.min(vi, views.length);
@@ -349,7 +359,7 @@ function ReaderBody({
   // shows decoded pixels; two further views are preloaded invisibly.
   const slot = (i: number) =>
     i < 0 ? null : i === views.length ? <EndCard key="end" book={book} next={next} seriesId={book.seriesId} incognito={incognito} /> : i > views.length ? null : (
-      <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} />
+      <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} pageInfo={(p) => pages[p - 1]} />
     );
 
   const tone = bgClass[prefs.bg];
@@ -506,7 +516,46 @@ function PageImg({ src, page, fit, className }: { src: string; page: number; fit
   return <img src={src} alt={`${page}ページ`} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
 }
 
-function PageView({ view, url, rtl, fit }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"] }) {
+/** Whether a media query matches now; follows changes (rotation, resize). */
+function useMatchMedia(query: string): boolean {
+  const [on, setOn] = useState(() => typeof matchMedia !== "undefined" && matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const update = () => setOn(m.matches);
+    update();
+    m.addEventListener("change", update);
+    return () => m.removeEventListener("change", update);
+  }, [query]);
+  return on;
+}
+
+/** One half of a landscape page, as large as the stage allows: a box with
+ *  the half's aspect, sized with container units, cropping the image. */
+function HalfPage({ src, page, width, height, side }: { src: string; page: number; width: number; height: number; side: "left" | "right" }) {
+  const ar = width / 2 / height;
+  return (
+    <div className="flex size-full items-center justify-center" style={{ containerType: "size" }}>
+      <div className="overflow-hidden" style={{ width: `min(100cqw, ${100 * ar}cqh)`, height: `min(100cqh, ${100 / ar}cqw)` }}>
+        <img
+          src={src}
+          alt={`${page}ページ（${side === "right" ? "右" : "左"}半分）`}
+          draggable={false}
+          decoding="sync"
+          className={cn("size-full object-cover", side === "right" ? "object-right" : "object-left")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PageView({ view, url, rtl, fit, pageInfo }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"]; pageInfo: (page: number) => Page | undefined }) {
+  if (view.half) {
+    const p = view.pages[0];
+    const info = pageInfo(p);
+    // In RTL the right half is read first.
+    const side = (view.half === "first") === rtl ? "right" : "left";
+    return <HalfPage src={url(p)} page={p} width={info?.width ?? 2} height={info?.height ?? 1} side={side} />;
+  }
   const pages = rtl ? [...view.pages].reverse() : view.pages;
   const scroll = fit !== "screen";
   if (pages.length === 1) {
@@ -578,7 +627,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
         </button>
       </div>
       <div ref={ref} dir={rtl ? "rtl" : "ltr"} className="shelf-scroll flex gap-2 overflow-x-auto px-4 pb-1">
-        {pages.map(({ number: p, url }) => (
+        {pages.map(({ number: p, thumbnailUrl }) => (
           <button
             key={p}
             type="button"
@@ -589,7 +638,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
             aria-label={`${p}ページへ`}
             aria-current={p === current ? "page" : undefined}
           >
-            <img src={url} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
+            <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
             <span className={cn(typeClass("micro"), "mt-1 block text-center tabular-nums text-white/70")}>{p}</span>
           </button>
         ))}

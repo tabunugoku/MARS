@@ -4,6 +4,10 @@
 // the server; loadReaderPrefs() fetches them once after sign-in, and the
 // getters below then answer synchronously, because the reader needs them
 // before its first frame. Setters update the cache at once and write through.
+//
+// The global set comes in two profiles, desktop and mobile; each browser
+// reads with one of them (chosen on the settings page, detected by default).
+// Series and volume settings are shared by both.
 import { api } from "./impl";
 import type { ReadingDirection } from "./types";
 
@@ -15,10 +19,17 @@ export interface ReaderPrefs {
 }
 
 /** The master set. Its direction may defer to the series' own metadata
- *  (manga right-to-left, webtoon vertical scroll), which is the default. */
+ *  (manga right-to-left, webtoon vertical scroll), which is the default.
+ *  splitWide: on a portrait screen, a landscape page (a scanned spread) is
+ *  shown as its two halves, one after the other. */
 export interface GlobalReaderPrefs extends Omit<ReaderPrefs, "direction"> {
   direction: ReadingDirection | "series";
+  splitWide?: boolean;
 }
+
+export type ReaderProfile = "desktop" | "mobile";
+/** What this browser uses: a profile, or "auto" (detected). */
+export type ReaderProfileChoice = ReaderProfile | "auto";
 
 export type SeriesReaderPrefs = { mode: "global" } | { mode: "custom"; prefs: ReaderPrefs };
 
@@ -29,6 +40,7 @@ export const DEFAULT_GLOBAL: GlobalReaderPrefs = { direction: "series", spread: 
 
 const cache = {
   global: DEFAULT_GLOBAL,
+  globalMobile: undefined as GlobalReaderPrefs | undefined,
   series: new Map<string, ReaderPrefs>(),
   books: new Map<string, ReaderPrefs>(),
 };
@@ -48,6 +60,7 @@ export function loadReaderPrefs(): Promise<void> {
   loading ??= api.readerPrefs().then(
     (all) => {
       cache.global = { ...DEFAULT_GLOBAL, ...all.global };
+      cache.globalMobile = all.globalMobile ? { ...DEFAULT_GLOBAL, ...all.globalMobile } : undefined;
       cache.series = new Map(Object.entries(all.series));
       cache.books = new Map(Object.entries(all.books));
       notify();
@@ -60,8 +73,44 @@ export function loadReaderPrefs(): Promise<void> {
   return loading;
 }
 
-export function getGlobalPrefs(): GlobalReaderPrefs {
-  return cache.global;
+const PROFILE_KEY = "cominavi.readerProfile";
+
+/** A touch screen without hover: a phone or a tablet. */
+export function detectedProfile(): ReaderProfile {
+  return typeof matchMedia !== "undefined" && matchMedia("(pointer: coarse) and (hover: none)").matches ? "mobile" : "desktop";
+}
+
+export function getProfileChoice(): ReaderProfileChoice {
+  try {
+    const v = localStorage.getItem(PROFILE_KEY);
+    if (v === "desktop" || v === "mobile") return v;
+  } catch {
+    // storage blocked: detect
+  }
+  return "auto";
+}
+
+export function setProfileChoice(c: ReaderProfileChoice): void {
+  try {
+    if (c === "auto") localStorage.removeItem(PROFILE_KEY);
+    else localStorage.setItem(PROFILE_KEY, c);
+  } catch {
+    // storage blocked: the choice lasts for this page only
+  }
+  notify();
+}
+
+/** The profile this browser reads with. */
+export function activeProfile(): ReaderProfile {
+  const c = getProfileChoice();
+  return c === "auto" ? detectedProfile() : c;
+}
+
+/** The global set of a profile (this browser's when omitted). A mobile
+ *  profile that was never saved starts from the desktop one, single page. */
+export function getGlobalPrefs(profile: ReaderProfile = activeProfile()): GlobalReaderPrefs {
+  if (profile === "desktop") return cache.global;
+  return cache.globalMobile ?? { ...cache.global, spread: "off", splitWide: false };
 }
 /** One cached value and how to read and replace it. */
 interface Slot<V> {
@@ -107,9 +156,13 @@ function setScoped(kind: "series" | "books", id: string, p: SeriesReaderPrefs, p
   return p.mode === "global" ? writeThrough(`${kind}:${id}`, slot, undefined, del) : writeThrough(`${kind}:${id}`, slot, p.prefs, put);
 }
 
-export function setGlobalPrefs(p: GlobalReaderPrefs): Promise<void> {
+export function setGlobalPrefs(p: GlobalReaderPrefs, profile: ReaderProfile = activeProfile()): Promise<void> {
+  if (profile === "mobile") {
+    const slot: Slot<GlobalReaderPrefs | undefined> = { get: () => cache.globalMobile, set: (v) => (cache.globalMobile = v) };
+    return writeThrough("global:mobile", slot, p, () => api.putGlobalPrefs(p, "mobile"));
+  }
   const slot: Slot<GlobalReaderPrefs> = { get: () => cache.global, set: (v) => (cache.global = v) };
-  return writeThrough("global", slot, p, () => api.putGlobalPrefs(p));
+  return writeThrough("global", slot, p, () => api.putGlobalPrefs(p, "desktop"));
 }
 
 const asScoped = (p: ReaderPrefs | undefined): SeriesReaderPrefs => (p ? { mode: "custom", prefs: p } : { mode: "global" });
@@ -154,4 +207,7 @@ export function effectivePrefs(series: SeriesReaderPrefs, book: SeriesReaderPref
 export const DIRECTION_LABEL: Record<ReadingDirection, string> = { rtl: "右→左", ltr: "左→右", vertical: "縦", webtoon: "縦スクロール" };
 export const SPREAD_LABEL: Record<ReaderPrefs["spread"], string> = { off: "単ページ", on: "見開き", cover: "表紙だけ単ページ" };
 export const FIT_LABEL: Record<ReaderPrefs["fit"], string> = { screen: "画面", width: "幅", height: "高さ", original: "原寸" };
+export const PROFILE_LABEL: Record<ReaderProfile, string> = { desktop: "PC", mobile: "モバイル" };
+/** "PC 用" / "モバイル用": a space only after Latin letters. */
+export const PROFILE_FOR_LABEL: Record<ReaderProfile, string> = { desktop: "PC 用", mobile: "モバイル用" };
 export const BG_LABEL: Record<ReaderPrefs["bg"], string> = { black: "黒", gray: "グレー", white: "白" };

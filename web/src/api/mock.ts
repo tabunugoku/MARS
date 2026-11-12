@@ -9,7 +9,7 @@ import type { Api } from "./real";
 import type {
   Book, Collection, Library, LoginScreen, ReaderPrefsAll, ReadList, Series, SeriesQuery, ServerSettings, User,
 } from "./types";
-import type { GlobalReaderPrefs, ReaderPrefs } from "./reader-prefs";
+import type { GlobalReaderPrefs, ReaderPrefs, ReaderProfile } from "./reader-prefs";
 
 const LATENCY = 120;
 const delay = <T,>(v: T): Promise<T> => new Promise((res) => setTimeout(() => res(structuredClone(v)), LATENCY));
@@ -211,9 +211,10 @@ export const mockApi: Api = {
     const webtoon = findSeries(b.seriesId)?.readingDirection === "webtoon";
     const [w, h] = webtoon ? [800, 1280] : [1000, 1500];
     return delay(
-      Array.from({ length: b.pageCount }, (_, i) => ({
-        number: i + 1, width: w, height: h, mediaType: "image/svg+xml", url: pageArt(b.coverSeed, i + 1, { webtoon }),
-      })),
+      Array.from({ length: b.pageCount }, (_, i) => {
+        const url = pageArt(b.coverSeed, i + 1, { webtoon });
+        return { number: i + 1, width: w, height: h, mediaType: "image/svg+xml", url, thumbnailUrl: url };
+      }),
     );
   },
   setProgress: (bookId, page, completed) => {
@@ -325,7 +326,8 @@ export const mockApi: Api = {
   },
 
   readerPrefs: () => delay(loadPrefs()),
-  putGlobalPrefs: (p: GlobalReaderPrefs) => savePrefs((all) => void (all.global = p)),
+  putGlobalPrefs: (p: GlobalReaderPrefs, profile: ReaderProfile = "desktop") =>
+    savePrefs((all) => void (profile === "mobile" ? (all.globalMobile = p) : (all.global = p))),
   putSeriesPrefs: (id: string, p: ReaderPrefs) => savePrefs((all) => void (all.series[id] = p)),
   deleteSeriesPrefs: (id: string) => savePrefs((all) => void delete all.series[id]),
   putBookPrefs: (id: string, p: ReaderPrefs) => savePrefs((all) => void (all.books[id] = p)),

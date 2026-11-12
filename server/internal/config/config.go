@@ -73,3 +73,4 @@ func Load() (Config, error) {
 func (c Config) DBPath() string       { return filepath.Join(c.DataDir, "cominavi.db") }
 func (c Config) ThumbnailDir() string { return filepath.Join(c.DataDir, "thumbnails") }
 func (c Config) PageCacheDir() string { return filepath.Join(c.DataDir, "cache", "pages") }
+func (c Config) PageThumbDir() string { return filepath.Join(c.DataDir, "cache", "page-thumbs") }

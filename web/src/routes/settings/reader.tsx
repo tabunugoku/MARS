@@ -11,12 +11,20 @@ import {
   SPREAD_LABEL,
   customBookIds,
   customSeriesIds,
+  PROFILE_FOR_LABEL,
+  PROFILE_LABEL,
+  activeProfile,
+  detectedProfile,
   getGlobalPrefs,
+  getProfileChoice,
+  setProfileChoice,
   setBookPrefs,
   setGlobalPrefs,
   setSeriesPrefs,
   type Book,
   type GlobalReaderPrefs,
+  type ReaderProfile,
+  type ReaderProfileChoice,
 } from "@/api";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
@@ -24,12 +32,14 @@ import { LoadError } from "@/components/shell/load-error";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 
 // The master reader settings. Every volume follows these unless it or its
 // series was given its own in the reader's 表示設定 panel. Changes apply at once.
+// The master set has a PC and a mobile profile; each browser reads with one.
 
 const DIRECTION_OPTIONS: [GlobalReaderPrefs["direction"], string][] = [
   ["series", "作品の指定に従う"],
@@ -38,7 +48,9 @@ const DIRECTION_OPTIONS: [GlobalReaderPrefs["direction"], string][] = [
 
 type Target = { kind: "series" | "book"; id: string };
 
-const HEADER = <PageHeader title="リーダー設定" meta="すべての作品に使う表示設定です。シリーズや巻ごとの設定は、リーダーの表示設定で選べます。" />;
+const HEADER = <PageHeader title="リーダー設定" meta="すべての作品に使う表示設定です。PC 用とモバイル用があり、端末ごとにどちらを使うか選べます。シリーズや巻ごとの設定は、リーダーの表示設定で選べ、どちらの端末にも効きます。" />;
+
+const PROFILE_OPTIONS = Object.entries(PROFILE_LABEL) as [ReaderProfile, string][];
 
 function Choice<T extends string>({ id, label, hint, value, options, onChange }: { id: string; label: string; hint?: string; value: T; options: [T, string][]; onChange: (v: T) => void }) {
   return (
@@ -89,7 +101,10 @@ export default function Screen() {
 }
 
 function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, string> }) {
-  const [prefs, setPrefs] = useState<GlobalReaderPrefs>(getGlobalPrefs);
+  // Which profile this browser reads with, and which one the form edits.
+  const [choice, setChoice] = useState<ReaderProfileChoice>(getProfileChoice);
+  const [editing, setEditing] = useState<ReaderProfile>(activeProfile);
+  const [prefs, setPrefs] = useState<GlobalReaderPrefs>(() => getGlobalPrefs(activeProfile()));
   const [customSeries, setCustomSeries] = useState<string[]>(customSeriesIds);
   const [customBooks, setCustomBooks] = useState<string[]>(customBookIds);
   // One write at a time: changes made while one is in flight are ignored.
@@ -110,15 +125,26 @@ function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, st
     setPrefs(next);
     setBusy(true);
     try {
-      await setGlobalPrefs(next);
+      await setGlobalPrefs(next, editing);
     } catch (err) {
       // Go back to the saved choice, and write it again so the cache matches the server.
       setPrefs(previous);
-      setGlobalPrefs(previous).catch(() => {});
+      setGlobalPrefs(previous, editing).catch(() => {});
       toast.error(errorMessage(err));
     } finally {
       setBusy(false);
     }
+  };
+
+  const edit = (p: ReaderProfile) => {
+    if (busy) return;
+    setEditing(p);
+    setPrefs(getGlobalPrefs(p));
+  };
+  const choose = (c: ReaderProfileChoice) => {
+    setProfileChoice(c);
+    setChoice(c);
+    edit(c === "auto" ? detectedProfile() : c);
   };
 
   const reset = async (targets: Target[]) => {
@@ -144,8 +170,23 @@ function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, st
 
       <div className="max-w-[640px] space-y-10">
         <section>
+          <SectionTitle>この端末</SectionTitle>
+          <FieldGroup>
+            <Choice
+              id="rp-profile"
+              label="この端末で使う設定"
+              hint="この端末のブラウザにだけ保存されます。"
+              value={choice}
+              options={[["auto", `自動（${PROFILE_LABEL[detectedProfile()]}）`], ...PROFILE_OPTIONS]}
+              onChange={choose}
+            />
+          </FieldGroup>
+        </section>
+
+        <section>
           <SectionTitle>表示</SectionTitle>
           <FieldGroup>
+            <Choice id="rp-editing" label="変更する設定" value={editing} options={PROFILE_OPTIONS.map(([v]) => [v, PROFILE_FOR_LABEL[v]])} onChange={edit} />
             <Choice
               id="rp-direction"
               label="読み方向"
@@ -157,6 +198,15 @@ function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, st
             <Choice id="rp-spread" label="見開き" value={prefs.spread} options={Object.entries(SPREAD_LABEL) as [GlobalReaderPrefs["spread"], string][]} onChange={(spread) => patch({ spread })} />
             <Choice id="rp-fit" label="表示サイズ" value={prefs.fit} options={Object.entries(FIT_LABEL) as [GlobalReaderPrefs["fit"], string][]} onChange={(fit) => patch({ fit })} />
             <Choice id="rp-bg" label="背景" value={prefs.bg} options={Object.entries(BG_LABEL) as [GlobalReaderPrefs["bg"], string][]} onChange={(bg) => patch({ bg })} />
+            <Field>
+              <Switch
+                label="縦長の画面では、横長のページを 2 ページに分ける"
+                checked={!!prefs.splitWide}
+                disabled={busy}
+                onToggle={() => patch({ splitWide: !prefs.splitWide })}
+              />
+              <p className={cn(typeClass("caption"), "text-muted-foreground")}>見開きで取り込まれたページを、読む順に半分ずつ表示します。</p>
+            </Field>
           </FieldGroup>
         </section>
 

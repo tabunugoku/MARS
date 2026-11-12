@@ -7,7 +7,7 @@ import type {
   ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
   SeriesUpdate, ServerSettings, SetupRequest, Task, TrashResult, User, UserCreate, UserUpdate,
 } from "./types";
-import type { GlobalReaderPrefs, ReaderPrefs } from "./reader-prefs";
+import type { GlobalReaderPrefs, ReaderPrefs, ReaderProfile } from "./reader-prefs";
 
 const enc = encodeURIComponent;
 const get = <T,>(path: string) => request<T>("GET", path);
@@ -93,7 +93,8 @@ export const realApi = {
 
   // Reader settings (per user, on the server)
   readerPrefs: () => get<ReaderPrefsAll>("/me/reader-prefs"),
-  putGlobalPrefs: (p: GlobalReaderPrefs) => request<void>("PUT", "/me/reader-prefs/global", p),
+  putGlobalPrefs: (p: GlobalReaderPrefs, profile: ReaderProfile = "desktop") =>
+    request<void>("PUT", `/me/reader-prefs/global${profile === "mobile" ? "?profile=mobile" : ""}`, p),
   putSeriesPrefs: (id: string, p: ReaderPrefs) => request<void>("PUT", `/me/reader-prefs/series/${enc(id)}`, p),
   deleteSeriesPrefs: (id: string) => request<void>("DELETE", `/me/reader-prefs/series/${enc(id)}`),
   putBookPrefs: (id: string, p: ReaderPrefs) => request<void>("PUT", `/me/reader-prefs/books/${enc(id)}`, p),

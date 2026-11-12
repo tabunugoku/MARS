@@ -279,7 +279,7 @@ function BookPage({ id }: { id: string }) {
               label={picking ? `${n}ページ目を表紙にする` : undefined}
             >
               <img
-                src={data.pages[n - 1].url}
+                src={data.pages[n - 1].thumbnailUrl}
                 alt=""
                 loading="lazy"
                 decoding="async"
