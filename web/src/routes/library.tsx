@@ -282,7 +282,7 @@ export default function Screen() {
 
   // Selection ends when the list changes (library, sort or filter): the key says which list it is.
   const selKey = JSON.stringify([scope ?? null, sort, desc, read, status, genre, tag, publisher, language, author, age ?? null, complete ?? null]);
-  const sel = useSelection(series?.map((s) => s.id) ?? [], selKey);
+  const sel = useSelection(series?.map((s) => s.id) ?? [], selKey, !seriesList.hasMore);
 
   // Select all must not miss pages not loaded yet. When the whole list fits under
   // the bulk ceiling, the remaining pages load first (one page at a time, shown as

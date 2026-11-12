@@ -206,6 +206,27 @@ func TestCompatAPIKeyCookie(t *testing.T) {
 		t.Fatalf("session token as key cookie: %d", rec.Code)
 	}
 
+	// Switching kinds expires the other cookie, so cookie-only requests follow
+	// the account signed in last: password then key, key then password.
+	expired := func(rec *httptest.ResponseRecorder, name string) bool {
+		for _, ck := range rec.Result().Cookies() {
+			if ck.Name == name && ck.MaxAge < 0 {
+				return true
+			}
+		}
+		return false
+	}
+	sessionCookie := func(r *http.Request) { r.AddCookie(&http.Cookie{Name: compatCookie, Value: token}) }
+	if rec := compatGet(h, p, sessionCookie, header("X-API-Key", created.Key)); rec.Code != 200 || !expired(rec, compatCookie) {
+		t.Fatalf("key sign-in beside a session cookie: %d, session cookie kept", rec.Code)
+	}
+	if rec := compatGet(h, p, keyCookie, basicAuth("読者", "reader pass")); rec.Code != 200 || !expired(rec, compatKeyCookie) {
+		t.Fatalf("password sign-in beside a key cookie: %d, key cookie kept", rec.Code)
+	}
+	if rec := compatGet(h, p, header("X-API-Key", created.Key)); expired(rec, compatCookie) {
+		t.Fatal("expired a session cookie the request did not carry")
+	}
+
 	reader.json("DELETE", "/api/v1/me/api-keys/"+created.Id, nil, 204, nil)
 	if rec := compatGet(h, p, keyCookie); rec.Code != 401 {
 		t.Fatalf("key cookie after the key was deleted: %d", rec.Code)

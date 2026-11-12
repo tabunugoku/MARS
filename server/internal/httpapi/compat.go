@@ -43,7 +43,9 @@ import (
 //
 // Credentials the request sends (X-API-Key, Bearer, Basic) win over either
 // cookie: a client that switched to another key or account is served as the
-// one it names now, not as the one a leftover cookie remembers.
+// one it names now, not as the one a leftover cookie remembers. A sign-in that
+// works also expires the other kind of cookie, so the tracker's cookie-only
+// requests follow the switch too.
 
 const (
 	compatCookie    = "cn_compat"
@@ -115,8 +117,13 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 	// byKey checks an API key and, on success, hands it back as a cookie.
 	byKey := func(k string) (auth.User, bool, bool) {
 		u, ok, done := try(s.Auth.UserByAPIKey(ctx, k))
-		if ok && strings.HasPrefix(r.URL.Path, "/komga/") {
-			setCompatCookie(w, r, compatKeyCookie, "/komga/", k)
+		if ok {
+			// A leftover session cookie would win over the key cookie on
+			// cookie-only requests (the tracker), as another account.
+			clearCompatCookie(w, r, compatCookie, "/")
+			if strings.HasPrefix(r.URL.Path, "/komga/") {
+				setCompatCookie(w, r, compatKeyCookie, "/komga/", k)
+			}
 		}
 		return u, ok, done
 	}
@@ -180,6 +187,7 @@ func (s *server) compatBasic(w http.ResponseWriter, r *http.Request, cache *basi
 		u, err := s.Auth.UserBySession(ctx, token)
 		if err == nil {
 			setCompatCookie(w, r, compatCookie, "/", token)
+			clearCompatCookie(w, r, compatKeyCookie, "/komga/")
 			return u, true, false
 		}
 		cache.drop(key) // signed out, password changed, or expired
@@ -237,6 +245,7 @@ func (s *server) compatBasic(w http.ResponseWriter, r *http.Request, cache *basi
 	}
 	cache.put(key, token, time.Now())
 	setCompatCookie(w, r, compatCookie, "/", token)
+	clearCompatCookie(w, r, compatKeyCookie, "/komga/")
 	return u, true, false
 }
 
@@ -249,6 +258,19 @@ func setCompatCookie(w http.ResponseWriter, r *http.Request, name, path, value s
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: name, Value: value, Path: path, MaxAge: int(compatSession / time.Second),
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
+	})
+}
+
+// clearCompatCookie expires a compat cookie the request carries. A sign-in
+// that names its credentials clears the other kind, so cookie-only requests
+// afterwards (the tracker) go on as the account the client chose last.
+func clearCompatCookie(w http.ResponseWriter, r *http.Request, name, path string) {
+	if _, err := r.Cookie(name); err != nil {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: name, Value: "", Path: path, MaxAge: -1,
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
 	})
 }

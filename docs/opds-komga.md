@@ -24,7 +24,9 @@ answers 404.
   A sign-in to `/komga/` with an API key (any of the three ways) sets
   `cn_compat_key` (Path `/komga/`) to that key instead, checked as a key on
   every use, so deleting the key ends it; `/opds/` never echoes a key.
-  Credentials the request sends win over either cookie. Neither cookie works
+  Credentials the request sends win over either cookie, and a sign-in that
+  works expires the other kind, so the tracker follows an account switch.
+  Neither cookie works
   on `/api/v1`.
 - Handlers read the caller with `currentUser(ctx)` and must read series and
   books only through `seriesQuery`/`bookQuery`/`listSeries`/`listBooks`
