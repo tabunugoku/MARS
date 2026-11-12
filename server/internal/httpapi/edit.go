@@ -427,6 +427,13 @@ func (s *server) UpdateSettings(ctx context.Context, req UpdateSettingsRequestOb
 // series cascades to its live books and their pages, progress and list
 // entries; those cascaded rows are not counted, only the rows named directly.
 func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (EmptyTrashResponseObject, error) {
+	// A scan restores trashed rows by the ids it read earlier, across
+	// several commits: wait for running scans and hold new ones off.
+	resume, err := s.Library.PauseScans(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer resume()
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err

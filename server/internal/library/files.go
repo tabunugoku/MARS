@@ -49,6 +49,9 @@ func (s *Service) writeThumb(bookID string, jpg []byte) (string, error) {
 
 // RegenerateThumbnail makes the book's thumbnail again from its cover page.
 func (s *Service) RegenerateThumbnail(ctx context.Context, bookID string) error {
+	mu := s.coverLock(bookID)
+	mu.Lock()
+	defer mu.Unlock()
 	var page int
 	err := s.DB.QueryRowContext(ctx, `SELECT cover_page FROM books WHERE id = ? AND deleted_at IS NULL`, bookID).Scan(&page)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -64,6 +67,9 @@ func (s *Service) RegenerateThumbnail(ctx context.Context, bookID string) error 
 // and later analyses keep using it. The choice is stored only once the
 // thumbnail was made.
 func (s *Service) SetCover(ctx context.Context, bookID string, n int) error {
+	mu := s.coverLock(bookID)
+	mu.Lock()
+	defer mu.Unlock()
 	if err := s.thumbFromPage(ctx, bookID, n); err != nil {
 		return err
 	}

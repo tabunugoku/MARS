@@ -93,12 +93,13 @@ export function usePagedApi<T extends { id: string }>(
   reload: () => void;
   retry: () => void;
 } {
-  const [state, setState] = useState<{ items: T[] | undefined; total: number; loading: boolean; error: string | null }>({
-    items: undefined,
-    total: 0,
-    loading: true,
-    error: null,
-  });
+  const [state, setState] = useState<{
+    items: T[] | undefined;
+    total: number;
+    loading: boolean;
+    error: string | null;
+    hasMore: boolean;
+  }>({ items: undefined, total: 0, loading: true, error: null, hasMore: false });
   // The latest fetchPage (it closes over the current filters); the list as
   // it stands, kept in refs so loadMore never asks for the same page twice;
   // a generation that drops answers meant for an older list.
@@ -106,34 +107,50 @@ export function usePagedApi<T extends { id: string }>(
   useEffect(() => {
     fetchRef.current = fetchPage;
   });
-  const list = useRef<{ items: T[] | undefined; total: number; busy: boolean; failed: boolean }>({
-    items: undefined,
+  type Req = { offset: number; limit: number; replace: boolean };
+  // next is the server offset to ask for next. It counts rows the server
+  // sent, not unique items shown: when series come and go between pages a
+  // page can repeat rows already shown, and counting shown items would ask
+  // for the same rows again forever. failed keeps the request to repeat.
+  const empty = () => ({
+    items: undefined as T[] | undefined,
     total: 0,
+    next: 0,
+    end: false,
     busy: false,
-    failed: false,
+    failed: null as Req | null,
   });
+  const list = useRef(empty());
   const gen = useRef(0);
 
-  const load = useCallback((offset: number, limit: number, replace: boolean) => {
+  const load = useCallback((req: Req): void => {
     const g = gen.current;
-    Object.assign(list.current, { busy: true, failed: false });
+    Object.assign(list.current, { busy: true, failed: null });
     setState((s) => ({ ...s, loading: true, error: null }));
-    fetchRef.current(offset, limit).then(
+    fetchRef.current(req.offset, req.limit).then(
       (page) => {
         if (g !== gen.current) return;
         let items = page.items;
         const prev = list.current.items;
-        if (!replace && prev) {
+        let added = items.length;
+        if (!req.replace && prev) {
           // Offsets shift when series come and go between pages: keep the first copy.
           const seen = new Set(prev.map((x) => x.id));
-          items = [...prev, ...page.items.filter((x) => !seen.has(x.id))];
+          const fresh = page.items.filter((x) => !seen.has(x.id));
+          added = fresh.length;
+          items = [...prev, ...fresh];
         }
-        list.current = { items, total: page.total, busy: false, failed: false };
-        setState({ items, total: page.total, loading: false, error: null });
+        const next = req.offset + page.items.length;
+        const end = page.items.length === 0 || next >= page.total;
+        list.current = { items, total: page.total, next, end, busy: false, failed: null };
+        setState({ items, total: page.total, loading: false, error: null, hasMore: !end });
+        // A page of nothing but repeats changes nothing on screen, so the
+        // scroll sentinel would not fire again: fetch the next one now.
+        if (!req.replace && added === 0 && !end) load({ offset: next, limit: req.limit, replace: false });
       },
       (err: unknown) => {
         if (g !== gen.current) return;
-        Object.assign(list.current, { busy: false, failed: true });
+        Object.assign(list.current, { busy: false, failed: req });
         setState((s) => ({ ...s, loading: false, error: errorMessage(err) }));
       },
     );
@@ -141,29 +158,31 @@ export function usePagedApi<T extends { id: string }>(
 
   useEffect(() => {
     gen.current++;
-    list.current = { items: undefined, total: 0, busy: false, failed: false };
-    setState({ items: undefined, total: 0, loading: true, error: null });
-    load(0, pageSize, true);
+    list.current = empty();
+    setState({ items: undefined, total: 0, loading: true, error: null, hasMore: false });
+    load({ offset: 0, limit: pageSize, replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, pageSize]);
 
   const loadMore = () => {
     const l = list.current;
-    if (l.busy || l.failed || !l.items || l.items.length >= l.total) return;
-    load(l.items.length, pageSize, false);
+    if (l.busy || l.failed || !l.items || l.end) return;
+    load({ offset: l.next, limit: pageSize, replace: false });
   };
   const reload = () => {
     gen.current++;
     const n = list.current.items?.length ?? 0;
-    load(0, Math.min(Math.max(n, pageSize), 1000), true);
+    load({ offset: 0, limit: Math.min(Math.max(n, pageSize), 1000), replace: true });
   };
+  // Repeat exactly what failed: a failed reload stays a reload, so its
+  // answer replaces the stale list instead of being appended to it.
   const retry = () => {
     const l = list.current;
-    if (l.items && !l.busy) load(l.items.length, pageSize, false);
+    if (l.busy) return;
+    if (l.failed) load(l.failed);
     else if (!l.items) reload();
   };
-  const hasMore = state.items !== undefined && state.items.length < state.total;
-  return { ...state, hasMore, loadMore, reload, retry };
+  return { ...state, loadMore, reload, retry };
 }
 
 export const formatBytes = (n: number) => {
