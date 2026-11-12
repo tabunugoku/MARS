@@ -29,19 +29,24 @@ const (
 	defaultPageThumbMax    = 512 << 20
 )
 
-// PageThumb is a page thumbnail ready to serve.
+// PageThumb is a page thumbnail ready to serve. File is open (a prune cannot
+// take it away mid-response); the caller closes it.
 type PageThumb struct {
-	Path    string
+	File    *os.File
 	ETag    string
 	Version string
 }
+
+// errStale: the book file changed while a thumbnail was being made.
+var errStale = errors.New("page thumbnail: book changed")
 
 type pageThumbs struct {
 	once     sync.Once
 	sem      chan struct{}
 	mu       sync.Mutex
 	inflight map[string]chan struct{}
-	written  int64 // bytes written since the last prune
+	written  int64      // bytes written since the last prune
+	publish  sync.Mutex // a new file and the removal of older versions
 }
 
 func (p *pageThumbs) init() {
@@ -58,34 +63,23 @@ func (s *Service) PageThumbnail(ctx context.Context, bookID string, n int) (Page
 	if s.PageThumbDir == "" {
 		return PageThumb{}, ErrNotFound
 	}
-	var size int64
-	var mtime string
-	err := s.DB.QueryRowContext(ctx, `
-		SELECT b.size_bytes, b.mtime FROM books b JOIN pages p ON p.book_id = b.id
-		WHERE b.id = ? AND p.number = ? AND b.deleted_at IS NULL AND b.media_status = 'ready'`, bookID, n).Scan(&size, &mtime)
-	if errors.Is(err, sql.ErrNoRows) {
-		return PageThumb{}, ErrNotFound
-	}
-	if err != nil {
-		return PageThumb{}, err
-	}
-	v := Version(size, mtime)
-	t := PageThumb{
-		Path:    filepath.Join(s.PageThumbDir, bookID, fmt.Sprintf("%s-%d.jpg", v, n)),
-		ETag:    fmt.Sprintf(`"t-%s-%d-%s"`, bookID, n, v),
-		Version: v,
-	}
 	p := &s.pageThumbs
 	p.init()
-	for {
-		if _, err := os.Stat(t.Path); err == nil {
-			return t, nil
+	// A few rounds: a prune or a changed book file can undo one.
+	for range 4 {
+		v, err := s.pageVersion(ctx, bookID, n)
+		if err != nil {
+			return PageThumb{}, err
+		}
+		path := filepath.Join(s.PageThumbDir, bookID, fmt.Sprintf("%s-%d.jpg", v, n))
+		if f, err := os.Open(path); err == nil {
+			return PageThumb{File: f, ETag: fmt.Sprintf(`"t-%s-%d-%s"`, bookID, n, v), Version: v}, nil
 		}
 		p.mu.Lock()
-		wait, busy := p.inflight[t.Path]
+		wait, busy := p.inflight[path]
 		if !busy {
 			wait = make(chan struct{})
-			p.inflight[t.Path] = wait
+			p.inflight[path] = wait
 		}
 		p.mu.Unlock()
 		if busy {
@@ -96,16 +90,33 @@ func (s *Service) PageThumbnail(ctx context.Context, bookID string, n int) (Page
 				return PageThumb{}, ctx.Err()
 			}
 		}
-		err := s.makePageThumb(ctx, bookID, n, v, t.Path)
+		err = s.makePageThumb(ctx, bookID, n, v, path)
 		p.mu.Lock()
-		delete(p.inflight, t.Path)
+		delete(p.inflight, path)
 		p.mu.Unlock()
 		close(wait)
-		if err != nil {
+		if err != nil && !errors.Is(err, errStale) {
 			return PageThumb{}, err
 		}
-		return t, nil
 	}
+	return PageThumb{}, errors.New("page thumbnail: gave up after retries")
+}
+
+// pageVersion is the version of the book file a page is served from, or
+// ErrNotFound when the book is not ready or has no such page.
+func (s *Service) pageVersion(ctx context.Context, bookID string, n int) (string, error) {
+	var size int64
+	var mtime string
+	err := s.DB.QueryRowContext(ctx, `
+		SELECT b.size_bytes, b.mtime FROM books b JOIN pages p ON p.book_id = b.id
+		WHERE b.id = ? AND p.number = ? AND b.deleted_at IS NULL AND b.media_status = 'ready'`, bookID, n).Scan(&size, &mtime)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return Version(size, mtime), nil
 }
 
 func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, path string) error {
@@ -123,6 +134,10 @@ func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, pa
 	pg, err := s.OpenPage(ctx, bookID, n)
 	if err != nil {
 		return err
+	}
+	if pg.Version != v { // rescanned while this waited: never file new bytes under the old version
+		pg.Close()
+		return errStale
 	}
 	img, err := io.ReadAll(io.LimitReader(pg.Body, media.MaxEntryBytes+1))
 	pg.Close()
@@ -148,20 +163,13 @@ func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, pa
 	if cerr := f.Close(); err == nil {
 		err = cerr
 	}
-	if err == nil {
-		err = os.Rename(f.Name(), path)
-	}
 	if err != nil {
 		os.Remove(f.Name())
 		return err
 	}
-	// Thumbnails of an older version of the file are never asked for again.
-	if old, _ := filepath.Glob(filepath.Join(dir, "*.jpg")); len(old) > 0 {
-		for _, o := range old {
-			if !strings.HasPrefix(filepath.Base(o), v+"-") {
-				os.Remove(o)
-			}
-		}
+	if err := s.publishPageThumb(ctx, bookID, n, v, f.Name(), path); err != nil {
+		os.Remove(f.Name())
+		return err
 	}
 	p.mu.Lock()
 	p.written += int64(len(jpg))
@@ -172,6 +180,33 @@ func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, pa
 	p.mu.Unlock()
 	if prune {
 		go s.prunePageThumbs()
+	}
+	return nil
+}
+
+// publishPageThumb moves a made thumbnail into place and, when its version is
+// still the book's, removes thumbnails of other versions (never asked for
+// again). Under one lock, so a maker of an outdated version that finishes
+// late cannot remove the files of a newer one.
+func (s *Service) publishPageThumb(ctx context.Context, bookID string, n int, v, tmp, path string) error {
+	p := &s.pageThumbs
+	p.publish.Lock()
+	defer p.publish.Unlock()
+	cur, err := s.pageVersion(ctx, bookID, n)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return err
+	}
+	if cur != v {
+		return errStale
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	old, _ := filepath.Glob(filepath.Join(filepath.Dir(path), "*.jpg"))
+	for _, o := range old {
+		if !strings.HasPrefix(filepath.Base(o), v+"-") {
+			os.Remove(o)
+		}
 	}
 	return nil
 }

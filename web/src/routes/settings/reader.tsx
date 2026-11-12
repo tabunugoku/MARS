@@ -120,16 +120,15 @@ function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, st
 
   const patch = async (p: Partial<GlobalReaderPrefs>) => {
     if (busy) return;
-    const previous = prefs;
     const next = { ...prefs, ...p };
     setPrefs(next);
     setBusy(true);
     try {
       await setGlobalPrefs(next, editing);
     } catch (err) {
-      // Go back to the saved choice, and write it again so the cache matches the server.
-      setPrefs(previous);
-      setGlobalPrefs(previous, editing).catch(() => {});
+      // The cache is already back to what the server holds (for a mobile set
+      // never saved, nothing: it keeps following the PC one). Show that.
+      setPrefs(getGlobalPrefs(editing));
       toast.error(errorMessage(err));
     } finally {
       setBusy(false);

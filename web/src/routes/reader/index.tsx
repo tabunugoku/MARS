@@ -53,6 +53,32 @@ function buildViews(pages: Page[], spread: ReaderPrefs["spread"], split = false)
   return views;
 }
 
+/** The view showing page n; its second half when second is set and the page
+ *  is split. -1 when no view shows it. */
+function findView(views: View[], n: number, second = false): number {
+  const i = views.findIndex((v) => v.pages.includes(n));
+  return second && views[i + 1]?.half === "second" && views[i + 1].pages[0] === n ? i + 1 : i;
+}
+
+/** The server keeps a page number only. Which half of a split page the reader
+ *  stopped at is kept in this browser: the page whose second half was showing. */
+const halfKey = (bookId: string) => `cominavi.half.${bookId}`;
+function readHalf(bookId: string): number | null {
+  try {
+    return Number(localStorage.getItem(halfKey(bookId))) || null;
+  } catch {
+    return null;
+  }
+}
+function writeHalf(bookId: string, page: number | null) {
+  try {
+    if (page) localStorage.setItem(halfKey(bookId), String(page));
+    else localStorage.removeItem(halfKey(bookId));
+  } catch {
+    // storage blocked: the half is not remembered
+  }
+}
+
 const progressKey = (p: { page: number; completed: boolean }) => `${p.page}|${p.completed}`;
 
 /** Saves the reading position: a second after the last turn, and right away
@@ -236,10 +262,11 @@ function ReaderBody({
   const split = !webtoon && !!globalPrefs.splitWide && portrait;
   const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread, split), [pages, prefs.spread, webtoon, split]);
   // index views.length = the end card
-  const [vi, setVi] = useState(() => Math.max(0, views.findIndex((v) => v.pages.includes(startPage))));
+  const [vi, setVi] = useState(() => Math.max(0, findView(views, startPage, !incognito && readHalf(book.id) === startPage)));
   const viewIndex = Math.min(vi, views.length);
   const atEnd = viewIndex === views.length;
   const currentPage = atEnd ? pageCount : views[viewIndex].pages[0];
+  const half = atEnd ? undefined : views[viewIndex].half;
   const url = (p: number) => pages[p - 1]?.url ?? "";
 
   // The page the reader is "on", independent of grouping (Infinity = end card).
@@ -247,17 +274,24 @@ function ReaderBody({
   // is declared before the one that records the anchor, so it reads the page
   // from the previous layout, not the one recomputed with the stale index.
   const anchor = useRef<number>(currentPage);
+  // The page whose second half is showing, kept while a landscape screen shows it whole.
+  const secondOf = useRef<number | null>(half === "second" ? currentPage : null);
   const [webtoonPage, setWebtoonPage] = useState(currentPage);
   const [webtoonEnd, setWebtoonEnd] = useState(false);
   useEffect(() => {
     const a = anchor.current;
-    setVi(a === Infinity ? views.length : Math.max(0, views.findIndex((v) => v.pages.includes(a))));
+    setVi(a === Infinity ? views.length : Math.max(0, findView(views, a, secondOf.current === a)));
     setWebtoonPage(a === Infinity ? pageCount : a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [views]);
   useEffect(() => {
-    if (!webtoon) anchor.current = atEnd ? Infinity : currentPage;
-  }, [atEnd, currentPage, webtoon]);
+    if (webtoon) return;
+    anchor.current = atEnd ? Infinity : currentPage;
+    if (half) secondOf.current = half === "second" ? currentPage : null;
+    else if (secondOf.current !== currentPage) secondOf.current = null;
+    // Remember it for the next visit too.
+    if (!incognito) writeHalf(book.id, atEnd ? null : secondOf.current);
+  }, [atEnd, currentPage, half, webtoon, incognito, book.id]);
   const [jump, setJump] = useState<{ page: number; n: number } | null>(null);
 
   // The end card counts as the last page, finished (in webtoon too, where it
@@ -265,7 +299,8 @@ function ReaderBody({
   const shownPage = webtoon ? (webtoonEnd ? pageCount : webtoonPage) : currentPage;
   const lastShown = webtoon ? shownPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
   const finished = webtoon ? webtoonEnd : atEnd;
-  const navigated = useProgressSaver(book.id, shownPage, lastShown >= pageCount, finished ? "end" : String(shownPage), book.progress, incognito);
+  // The first half of a split last page leaves the second half unread.
+  const navigated = useProgressSaver(book.id, shownPage, lastShown >= pageCount && half !== "first", finished ? "end" : String(shownPage), book.progress, incognito);
 
   const axis = prefs.direction === "vertical" ? "y" : "x";
   const forward = prefs.direction === "rtl" ? -1 : 1;
@@ -350,7 +385,10 @@ function ReaderBody({
       anchor.current = p;
       setWebtoonPage(p);
       setJump((j) => ({ page: p, n: (j?.n ?? 0) + 1 }));
-    } else setVi(Math.max(0, views.findIndex((v) => v.pages.includes(p))));
+    } else {
+      secondOf.current = null;
+      setVi(Math.max(0, findView(views, p)));
+    }
     setPanel("none");
     navigated();
   };

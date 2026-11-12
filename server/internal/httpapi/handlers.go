@@ -400,11 +400,7 @@ func (s *server) servePageThumbnail(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
 		return
 	}
-	f, err := os.Open(t.Path)
-	if err != nil { // pruned in between: the next request makes it again
-		writeError(w, http.StatusServiceUnavailable, "もう一度お試しください")
-		return
-	}
+	f := t.File
 	defer f.Close()
 	h := w.Header()
 	h.Set("ETag", t.ETag)

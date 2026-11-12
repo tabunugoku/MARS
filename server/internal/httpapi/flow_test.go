@@ -313,6 +313,18 @@ func TestScanAndServe(t *testing.T) {
 	if n, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg")); len(n) != 1 {
 		t.Fatalf("page thumbnail files %v", n)
 	}
+	// The book file changes: the next thumbnail is made for the new version
+	// and the old version's file goes.
+	oldFiles, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg"))
+	if _, err := e.db.Exec(`UPDATE books SET mtime = '2001-01-01T00:00:00Z' WHERE id = ?`, books[0].Id); err != nil {
+		t.Fatal(err)
+	}
+	if rec := c.do("GET", "/api/v1/books/"+books[0].Id+"/pages/3/thumbnail", nil); rec.Code != 200 || rec.Header().Get("ETag") == "" {
+		t.Fatalf("page thumbnail after change: %d", rec.Code)
+	}
+	if n, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg")); len(n) != 1 || n[0] == oldFiles[0] {
+		t.Fatalf("page thumbnail files after change %v (before %v)", n, oldFiles)
+	}
 
 	for _, u := range []string{books[0].ThumbnailUrl, yofuke.ThumbnailUrl} {
 		rec := c.do("GET", u, nil)

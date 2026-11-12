@@ -74,6 +74,8 @@ export function loadReaderPrefs(): Promise<void> {
 }
 
 const PROFILE_KEY = "cominavi.readerProfile";
+/** This page's choice, so it holds even when storage refuses to keep it. */
+let profileChoice: ReaderProfileChoice | undefined;
 
 /** A touch screen without hover: a phone or a tablet. */
 export function detectedProfile(): ReaderProfile {
@@ -81,6 +83,7 @@ export function detectedProfile(): ReaderProfile {
 }
 
 export function getProfileChoice(): ReaderProfileChoice {
+  if (profileChoice) return profileChoice;
   try {
     const v = localStorage.getItem(PROFILE_KEY);
     if (v === "desktop" || v === "mobile") return v;
@@ -91,6 +94,7 @@ export function getProfileChoice(): ReaderProfileChoice {
 }
 
 export function setProfileChoice(c: ReaderProfileChoice): void {
+  profileChoice = c;
   try {
     if (c === "auto") localStorage.removeItem(PROFILE_KEY);
     else localStorage.setItem(PROFILE_KEY, c);
