@@ -653,7 +653,7 @@ export default function Screen() {
         <AddToCollectionDialog seriesIds={sel.ids} open={collectionOpen} onOpenChange={setCollectionOpen} onAdded={() => afterBulk()} />
       )}
       {isAdmin && (
-        <SeriesBulkDialog key={bulkRun} seriesIds={sel.ids} open={bulkOpen} onOpenChange={setBulkOpen} onDone={() => afterBulk()} />
+        <SeriesBulkDialog key={bulkRun} seriesIds={sel.ids} open={bulkOpen} onOpenChange={setBulkOpen} onDone={afterBulk} />
       )}
     </Page>
   );

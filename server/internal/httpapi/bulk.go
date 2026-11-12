@@ -307,14 +307,15 @@ func (s *server) BulkUpdateBooks(ctx context.Context, req BulkUpdateBooksRequest
 
 // setReadState writes the caller's progress on the live books matching where
 // (a condition on alias b with its args). Read puts each book on its last page
-// (page 1 when it has none) and only for ready books; unread clears the
-// caller's progress on every live book. Like markRead, a write without a
-// writer is not ordered, so it always applies.
+// (page 1 when it has none); unread clears the caller's progress. Both cover
+// every live book, ready or not, as markRead does: the series' read count
+// counts them all, so skipping one would leave the series never fully read.
+// Like markRead, a write without a writer is not ordered, so it always applies.
 func setReadState(ctx context.Context, tx *sql.Tx, read bool, where string, args []any) error {
 	uid := currentUser(ctx).ID
 	if read {
 		_, err := tx.ExecContext(ctx, `INSERT INTO read_progress (user_id, book_id, page, completed, read_at)
-			SELECT ?, b.id, max(b.page_count, 1), 1, ? FROM books b WHERE b.deleted_at IS NULL AND b.media_status = 'ready' AND `+where+`
+			SELECT ?, b.id, max(b.page_count, 1), 1, ? FROM books b WHERE b.deleted_at IS NULL AND `+where+`
 			ON CONFLICT(user_id, book_id) DO UPDATE SET page = excluded.page, completed = 1, read_at = excluded.read_at`,
 			append([]any{uid, time.Now().UTC().Format(time.RFC3339)}, args...)...)
 		return err

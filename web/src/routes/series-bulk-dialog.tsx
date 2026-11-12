@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, statusLabel, type ReadingDirection, type SeriesBulkUpdate, type SeriesStatus } from "@/api";
 import { inChunks, splitList } from "@/components/media/selection-state";
@@ -81,9 +81,13 @@ export function SeriesBulkDialog({
   seriesIds: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Runs after a successful save: the parent reloads and clears the selection. A failed
-   *  save keeps the dialog and the selection open so the user can retry. */
-  onDone: () => void;
+  /** ok: every chunk worked and the dialog has closed; the caller reloads and
+   *  clears the selection. A failure keeps the dialog, its draft and the
+   *  selection for a retry. Earlier chunks may have been saved, so when the
+   *  dialog is then closed without a successful retry, onDone(false) runs and
+   *  the caller reloads (keeping the selection). Reloading while the dialog is
+   *  open could swap the screen for its error view and lose the draft. */
+  onDone: (ok: boolean) => void;
 }) {
   const t = useT(m);
   const labels = statusLabel();
@@ -127,6 +131,17 @@ export function SeriesBulkDialog({
   if (removeT.length) fields.removeTags = removeT;
   const changed = Object.keys(fields).length > 0;
 
+  // A failed save may have saved earlier chunks: the caller reloads once the
+  // dialog closes (see onDone).
+  const failed = useRef(false);
+  const close = (next: boolean) => {
+    onOpenChange(next);
+    if (!next && failed.current) {
+      failed.current = false;
+      onDone(false);
+    }
+  };
+
   const submit = async () => {
     if (!changed || !ageValid || saving || seriesIds.length === 0) return;
     setSaving(true);
@@ -134,16 +149,18 @@ export function SeriesBulkDialog({
       const n = await inChunks(seriesIds, (chunk) => api.bulkUpdateSeries({ ...fields, seriesIds: chunk }).then((r) => r.updated));
       toast.success(t("updated", { n }));
       onOpenChange(false);
-      onDone();
+      failed.current = false;
+      onDone(true);
     } catch (err) {
       toast.error(errorMessage(err));
+      failed.current = true;
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
