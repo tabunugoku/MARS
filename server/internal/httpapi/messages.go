@@ -110,6 +110,7 @@ var messages = map[string]struct{ ja, en string }{
 	"task.interrupted_restart": {"サーバーの再起動で中断しました", "Interrupted by a server restart"},
 	"task.scan":                {"%s をスキャン", "Scan %s"},
 	"task.scan_deep":           {"%s を詳細スキャン", "Deep scan %s"},
+	"task.scan_partial":        {"%s の一部をスキャン", "Scan part of %s"},
 	"task.start_failed":        {"開始できませんでした", "Could not start"},
 	"task.thumbnails":          {"%s の表紙を作り直す", "Regenerate thumbnails for %s"},
 	"task.thumbnails_failed":   {"%s 冊の表紙を作れませんでした", "Could not make thumbnails for %s books"},

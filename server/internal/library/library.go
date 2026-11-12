@@ -52,9 +52,10 @@ type Service struct {
 	// from now on; nil means 400x600.
 	ThumbSize func(ctx context.Context) (w, h int)
 
-	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library
-	coverLocks sync.Map // book id -> ctxMutex; see coverLock
-	scans      scanGate // every scan sync against PauseScans
+	scanLocks  sync.Map     // library id -> ctxMutex; one walk+sync at a time per library
+	coverLocks sync.Map     // book id -> ctxMutex; see coverLock
+	scans      scanGate     // every scan sync against PauseScans
+	watchDirty watchPending // per library: top-level entries a watcher saw change, not yet scanned
 }
 
 // coverLock orders the writers of a book's cover: an analysis, a cover
@@ -119,54 +120,140 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 		key, label = "scan:deep", task.Text{Code: "task.scan_deep", Arg: l.name, English: "Deep scan " + l.name}
 	}
 	return s.Queue.SubmitKey(ctx, "scan", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
-		l, err := s.load(ctx, libraryID) // settings may have changed while queued
+		return s.scanLibrary(ctx, libraryID, nil, deep, progress)
+	})
+}
+
+// queueWatchTask queues the scan a file watcher asks for. It has its own queue
+// key, so a queued one takes in later watcher requests. When it runs it takes
+// the library's pending entries (see addWatchDirty): only those folders are
+// scanned, or the whole library when the set is marked full or is empty.
+func (s *Service) queueWatchTask(ctx context.Context, libraryID string) (task.Task, error) {
+	l, err := s.load(ctx, libraryID)
+	if err != nil {
+		return task.Task{}, err
+	}
+	label := task.Text{Code: "task.scan_partial", Arg: l.name, English: "Scan part of " + l.name}
+	return s.Queue.SubmitKey(ctx, "scan", "scan:watch", label, l.id, func(ctx context.Context, progress func(float64)) error {
+		scope, full := s.takeWatchDirty(libraryID)
+		if full || len(scope) == 0 {
+			scope = nil
+		}
+		err := s.scanLibrary(ctx, libraryID, scope, false, progress)
 		if err != nil {
-			return err
+			// The taken entries were not scanned: the next watch scan is full.
+			s.addWatchDirty(libraryID, nil, true)
 		}
-		// A running scan is not deduplicated by the queue, so two can overlap;
-		// the lock keeps an older walk from being committed after a newer one.
-		if err := s.scans.enter(ctx); err != nil {
-			return err
-		}
-		mu := s.scanLock(l.id)
-		if err := mu.Lock(ctx); err != nil {
-			s.scans.leave()
-			return err
-		}
-		found, err := scan.Walk(ctx, l.root, l.exclude)
-		if err != nil {
-			mu.Unlock()
-			s.scans.leave()
-			// The path goes into the English text only: the API's text has none.
-			return &task.CodedError{Code: "task.folder_unreadable", Err: fmt.Errorf("cannot read the folder %s: %w", l.root, err)}
-		}
-		progress(0.5)
-		st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
-		mu.Unlock()
-		s.scans.leave()
-		if err != nil {
-			return err
-		}
-		if len(found.Unreadable) > 0 {
-			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
-		}
-		slog.Info("scan", "library", l.name, "stats", st)
-		artChanged, err := s.syncArtwork(ctx, l)
-		if err != nil {
-			return err
-		}
-		// An artwork-only change (a cover file added, replaced or removed)
-		// is announced too, so open screens refetch the series covers.
-		if st != (scan.Stats{}) || artChanged {
-			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
-				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
-				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
-				Restored: st.Restored,
-			}})
-		}
-		_, err = s.queueAnalyze(context.WithoutCancel(ctx), l.id, deep)
 		return err
 	})
+}
+
+// scanLibrary is the body of a scan task. It walks the library (only scope
+// when scope is not nil), syncs the rows, then syncs the artwork, announces
+// the change and queues the analysis. A scoped scan leaves the rest alone.
+func (s *Service) scanLibrary(ctx context.Context, libraryID string, scope []string, deep bool, progress func(float64)) error {
+	l, err := s.load(ctx, libraryID) // settings may have changed while queued
+	if err != nil {
+		return err
+	}
+	// A running scan is not deduplicated by the queue, so two can overlap;
+	// the lock keeps an older walk from being committed after a newer one.
+	if err := s.scans.enter(ctx); err != nil {
+		return err
+	}
+	mu := s.scanLock(l.id)
+	if err := mu.Lock(ctx); err != nil {
+		s.scans.leave()
+		return err
+	}
+	var found scan.Listing
+	if scope == nil {
+		found, err = scan.Walk(ctx, l.root, l.exclude)
+	} else {
+		found, err = scan.WalkScope(ctx, l.root, l.exclude, scope)
+	}
+	if errors.Is(err, scan.ErrNoScope) {
+		// Only entries that are skipped or invalid were dirty: nothing to scan.
+		mu.Unlock()
+		s.scans.leave()
+		return nil
+	}
+	if err != nil {
+		mu.Unlock()
+		s.scans.leave()
+		// The path goes into the English text only: the API's text has none.
+		return &task.CodedError{Code: "task.folder_unreadable", Err: fmt.Errorf("cannot read the folder %s: %w", l.root, err)}
+	}
+	progress(0.5)
+	st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
+	mu.Unlock()
+	s.scans.leave()
+	if err != nil {
+		return err
+	}
+	if len(found.Unreadable) > 0 {
+		slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
+	}
+	slog.Info("scan", "library", l.name, "stats", st, "scoped", scope != nil)
+	artChanged, err := s.syncArtwork(ctx, l, scope)
+	if err != nil {
+		return err
+	}
+	// An artwork-only change (a cover file added, replaced or removed)
+	// is announced too, so open screens refetch the series covers.
+	if st != (scan.Stats{}) || artChanged {
+		s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
+			LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
+			BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
+			Restored: st.Restored,
+		}})
+	}
+	_, err = s.queueAnalyze(context.WithoutCancel(ctx), l.id, deep)
+	return err
+}
+
+// watchPending holds, per library, the top-level entries that watchers saw
+// change and that no watch scan has taken yet.
+type watchPending struct {
+	mu   sync.Mutex
+	libs map[string]*dirtyScope
+}
+
+// addWatchDirty merges changes into the library's pending set: the entries,
+// or the full mark (scope is then ignored).
+func (s *Service) addWatchDirty(libraryID string, scope []string, full bool) {
+	p := &s.watchDirty
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.libs == nil {
+		p.libs = map[string]*dirtyScope{}
+	}
+	d := p.libs[libraryID]
+	if d == nil {
+		d = &dirtyScope{}
+		p.libs[libraryID] = d
+	}
+	if full {
+		d.markFull()
+		return
+	}
+	for _, e := range scope {
+		d.add(e)
+	}
+}
+
+// takeWatchDirty empties the library's pending set and returns it as
+// dirtyScope.take does. A library with nothing pending gives a full scope.
+func (s *Service) takeWatchDirty(libraryID string) ([]string, bool) {
+	p := &s.watchDirty
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	d := p.libs[libraryID]
+	if d == nil {
+		return nil, true
+	}
+	delete(p.libs, libraryID)
+	return d.take()
 }
 
 // QueueAnalyze queues the analysis of every live book still 'outdated'.

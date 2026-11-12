@@ -49,7 +49,7 @@ func TestWatchTreeScans(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	stop, done, err := watchTree(ctx, root, []string{"skipme"},
-		func() { scans.Add(1) },
+		func([]string, bool) { scans.Add(1) },
 		func(err error) { t.Errorf("watcher failed: %v", err) })
 	if err != nil {
 		t.Fatal(err)
@@ -98,7 +98,7 @@ func TestWatchTreeScans(t *testing.T) {
 func TestWatchTreeMissingRoot(t *testing.T) {
 	ctx := context.Background()
 	cancel, done, err := watchTree(ctx, filepath.Join(t.TempDir(), "gone"), nil,
-		func() {}, func(error) {})
+		func([]string, bool) {}, func(error) {})
 	if err == nil {
 		t.Fatal("watching a missing folder succeeded")
 	}
@@ -189,7 +189,7 @@ func TestWatchTreeRootRemoved(t *testing.T) {
 	testMkdir(t, root, "a")
 	failed := make(chan error, 1)
 	cancel, done, err := watchTree(context.Background(), root, nil,
-		func() {}, func(err error) { failed <- err })
+		func([]string, bool) {}, func(err error) { failed <- err })
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func TestWatchTreeFailureQueuesPendingChange(t *testing.T) {
 	testMkdir(t, root, "a")
 	var scans atomic.Int32
 	cancel, done, err := watchTree(context.Background(), root, nil,
-		func() { scans.Add(1) }, func(error) {})
+		func([]string, bool) { scans.Add(1) }, func(error) {})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -332,7 +332,7 @@ func TestWatchRestartQueuesCatchUpScan(t *testing.T) {
 	}
 
 	var scans atomic.Int32
-	watchScanHook = func(id string) {
+	watchScanHook = func(id string, _ []string, _ bool) {
 		if id == "lib1" {
 			scans.Add(1)
 		}
