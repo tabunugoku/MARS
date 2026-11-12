@@ -84,12 +84,27 @@ func sameOrigin(r *http.Request) bool {
 // authenticate resolves the caller from the session cookie or an API key,
 // refuses unauthenticated requests to non-public routes, and applies the
 // CSRF check to cookie-based writes (including sign-in itself).
+// bodyCap is the most a request may send. Image uploads and CBL imports
+// stream their body to an administrator-only handler that enforces its own
+// limit (20 MB and 5 MB); everything else is small JSON.
+func bodyCap(r *http.Request) int64 {
+	p := r.URL.Path
+	switch {
+	case r.Method == http.MethodPut && strings.HasSuffix(p, "/thumbnail") &&
+		(strings.HasPrefix(p, "/books/") || strings.HasPrefix(p, "/series/")):
+		return 20<<20 + 1
+	case r.Method == http.MethodPost && p == "/read-lists/import":
+		return 5<<20 + 1
+	}
+	return maxBody
+}
+
 func (s *server) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// One cap for every request body, including those the generated
 		// handlers decode (before requireAdmin runs).
 		if r.Body != nil {
-			r.Body = http.MaxBytesReader(w, r.Body, maxBody)
+			r.Body = http.MaxBytesReader(w, r.Body, bodyCap(r))
 		}
 		ctx := r.Context()
 		var u auth.User

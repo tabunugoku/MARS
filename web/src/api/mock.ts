@@ -7,7 +7,8 @@ import { coverArt, pageArt } from "@/lib/art";
 import { ApiError } from "./http";
 import type { Api } from "./real";
 import type {
-  Book, Collection, Library, LoginScreen, ReaderPrefsAll, ReadList, Series, SeriesQuery, ServerSettings, User,
+  Book, CblEntry, CblImportResult, Collection, Library, LoginScreen, ReaderPrefsAll, ReadList, Series, SeriesQuery,
+  ServerSettings, User,
 } from "./types";
 import type { GlobalReaderPrefs, ReaderPrefs, ReaderProfile } from "./reader-prefs";
 
@@ -18,15 +19,56 @@ const now = () => new Date().toISOString();
 let nextId = 1;
 const newId = (p: string) => `${p}-new-${nextId++}`;
 
-const series = (s: db.MockSeries): Series => ({ ...s, thumbnailUrl: coverArt(s.coverSeed, s.title) });
+// Object URLs of uploaded thumbnails, by series or book id (revoked on replace).
+const uploads = new Map<string, string>();
+function setUpload(key: string, file: Blob) {
+  const old = uploads.get(key);
+  if (old) URL.revokeObjectURL(old);
+  uploads.set(key, URL.createObjectURL(file));
+}
+const series = (s: db.MockSeries): Series => ({ ...s, thumbnailUrl: seriesCover(s) });
 const findSeries = (id: string) => db.series.find((s) => s.id === id);
 const book = (b: db.MockBook): Book => ({
   ...b,
   seriesTitle: findSeries(b.seriesId)?.title ?? b.seriesTitle,
-  thumbnailUrl: coverArt(b.coverSeed, b.title, String(b.number)),
+  thumbnailUrl: uploads.get(b.id) ?? coverArt(b.coverSeed, b.title, String(b.number)),
 });
+// An uploaded cover wins, then the cover book's thumbnail, then the generated art.
+function seriesCover(s: db.MockSeries): string {
+  if (s.thumbnailSource === "upload") return uploads.get(s.id) ?? "";
+  const cover = s.coverBookId ? findBook(s.coverBookId) : undefined;
+  return cover ? book(cover).thumbnailUrl : coverArt(s.coverSeed, s.title);
+}
 const findBook = (id: string) => db.books.find((b) => b.id === id);
 const seriesBooks = (id: string) => db.books.filter((b) => b.seriesId === id).sort((a, b) => a.numberSort - b.numberSort);
+
+// The list after adding and removing names; a name already present is kept once.
+function editNames(cur: string[], add: string[] = [], remove: string[] = []): string[] {
+  const out = cur.filter((x) => !remove.includes(x));
+  for (const x of add) if (!out.includes(x)) out.push(x);
+  return out;
+}
+const sameList = (a: string[], b: string[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+// Known total reached, as the server counts it (complete filter).
+const reached = (s: Series) => s.totalBookCount !== null && s.bookCount >= s.totalBookCount;
+// Comparison key of a series title, folded as the server does (cbl.go).
+const cblKey = (s: string) => s.normalize("NFKC").replace(/\s/g, "").toLowerCase();
+// The book for one CBL entry: a title match with that number; a matching release year wins.
+function matchCbl(e: CblEntry): db.MockBook | undefined {
+  const number = Number(e.number);
+  if (e.number === "" || Number.isNaN(number)) return undefined;
+  const key = cblKey(e.series);
+  let first: db.MockBook | undefined;
+  let fit: db.MockBook | undefined;
+  for (const s of db.series) {
+    if (![s.title, ...s.alternateTitles].some((t) => cblKey(t) === key)) continue;
+    const b = seriesBooks(s.id).find((x) => x.number === number);
+    if (!b) continue;
+    if (!first) first = b;
+    if (!fit && e.year && b.releaseDate?.startsWith(e.year)) fit = b;
+  }
+  return fit ?? first;
+}
 
 function readState(s: Series) {
   if (s.booksRead === s.bookCount) return "read" as const;
@@ -56,6 +98,12 @@ function filterSeries(q: SeriesQuery): db.MockSeries[] {
   }
   if (q.status?.length) xs = xs.filter((s) => q.status!.includes(s.status));
   if (q.genres?.length) xs = xs.filter((s) => s.genres.some((g) => q.genres!.includes(g)));
+  if (q.tags?.length) xs = xs.filter((s) => s.tags.some((t) => q.tags!.includes(t)));
+  if (q.publishers?.length) xs = xs.filter((s) => q.publishers!.includes(s.publisher));
+  if (q.languages?.length) xs = xs.filter((s) => q.languages!.includes(s.language));
+  if (q.authors?.length) xs = xs.filter((s) => s.authors.some((a) => q.authors!.includes(a.name)));
+  if (q.ageRatingMax !== undefined) xs = xs.filter((s) => s.ageRating === null || s.ageRating <= q.ageRatingMax!);
+  if (q.complete !== undefined) xs = xs.filter((s) => reached(s) === q.complete);
   if (q.readState?.length) xs = xs.filter((s) => q.readState!.includes(readState(s)));
   const sort = q.sort ?? "title";
   const key: Record<string, (s: Series) => string | number> = {
@@ -172,6 +220,18 @@ export const mockApi: Api = {
     }),
   genres: (libraryId) =>
     delay([...new Set(db.series.filter((s) => !libraryId || s.libraryId === libraryId).flatMap((s) => s.genres))].sort()),
+  seriesFacets: (libraryId) => {
+    const ss = db.series.filter((s) => !libraryId || s.libraryId === libraryId);
+    const distinct = (xs: string[]) => [...new Set(xs.filter((x) => x !== ""))].sort((a, b) => a.localeCompare(b, "ja"));
+    return delay({
+      genres: distinct(ss.flatMap((s) => s.genres)),
+      tags: distinct(ss.flatMap((s) => s.tags)),
+      publishers: distinct(ss.map((s) => s.publisher)),
+      languages: distinct(ss.map((s) => s.language)),
+      authors: distinct(ss.flatMap((s) => s.authors.map((a) => a.name))),
+      ageRatings: [...new Set(ss.flatMap((s) => (s.ageRating === null ? [] : [s.ageRating])))].sort((a, b) => a - b),
+    });
+  },
   seriesById: (id) => {
     const s = findSeries(id);
     return delay(s ? series(s) : null);
@@ -180,10 +240,56 @@ export const mockApi: Api = {
   updateSeries: (id, changes) => {
     const s = findSeries(id);
     if (!s) return fail(404, "シリーズが見つかりません");
-    const { lockedFields, ...fields } = changes;
+    const { lockedFields, coverBookId, ...fields } = changes;
     Object.assign(s, fields);
+    if (coverBookId !== undefined) s.coverBookId = coverBookId;
     s.lockedFields = lockedFields ?? [...new Set([...s.lockedFields, ...Object.keys(fields)])];
     s.updatedAt = now();
+    return delay(series(s));
+  },
+  bulkUpdateSeries: (body) => {
+    const targets = body.seriesIds.map(findSeries).filter((s): s is db.MockSeries => s !== undefined);
+    if (targets.length !== body.seriesIds.length) return fail(404, "シリーズが見つかりません");
+    let updated = 0;
+    for (const s of targets) {
+      const locks: string[] = [];
+      if (body.status !== undefined && s.status !== body.status) { s.status = body.status; locks.push("status"); }
+      if (body.publisher !== undefined && s.publisher !== body.publisher) { s.publisher = body.publisher; locks.push("publisher"); }
+      if (body.readingDirection !== undefined && s.readingDirection !== body.readingDirection) {
+        s.readingDirection = body.readingDirection;
+        locks.push("readingDirection");
+      }
+      if (body.ageRating !== undefined && s.ageRating !== body.ageRating) { s.ageRating = body.ageRating; locks.push("ageRating"); }
+      if (body.language !== undefined && s.language !== body.language) { s.language = body.language; locks.push("language"); }
+      const genres = editNames(s.genres, body.addGenres, body.removeGenres);
+      if (!sameList(genres, s.genres)) { s.genres = genres; locks.push("genres"); }
+      const tags = editNames(s.tags, body.addTags, body.removeTags);
+      if (!sameList(tags, s.tags)) { s.tags = tags; locks.push("tags"); }
+      if (locks.length === 0) continue;
+      s.lockedFields = [...new Set([...s.lockedFields, ...locks])];
+      s.updatedAt = now();
+      updated++;
+    }
+    return delay({ updated });
+  },
+  setSeriesReadState: (seriesIds, read) => {
+    markRead(seriesIds.flatMap((id) => seriesBooks(id)), read);
+    return delay(undefined);
+  },
+  uploadSeriesThumbnail: (id, file) => {
+    const s = findSeries(id);
+    if (!s) return fail(404, "シリーズが見つかりません");
+    setUpload(id, file);
+    s.thumbnailSource = "upload";
+    return delay(series(s));
+  },
+  deleteSeriesThumbnail: (id) => {
+    const s = findSeries(id);
+    if (!s) return fail(404, "シリーズが見つかりません");
+    const old = uploads.get(id);
+    if (old) URL.revokeObjectURL(old);
+    uploads.delete(id);
+    s.thumbnailSource = "book";
     return delay(series(s));
   },
   markSeriesRead: (id, completed) => {
@@ -203,6 +309,30 @@ export const mockApi: Api = {
     Object.assign(b, fields);
     b.lockedFields = lockedFields ?? [...new Set([...b.lockedFields, ...Object.keys(fields)])];
     return delay(book(b));
+  },
+  setBooksReadState: (bookIds, read) => {
+    markRead(bookIds.map(findBook).filter((b): b is db.MockBook => b !== undefined), read);
+    return delay(undefined);
+  },
+  uploadBookThumbnail: (id, file) => {
+    const b = findBook(id);
+    if (!b) return fail(404, "本が見つかりません");
+    setUpload(id, file);
+    b.thumbnailUploaded = true;
+    return delay(book(b));
+  },
+  bulkUpdateBooks: (body) => {
+    const targets = body.bookIds.map(findBook).filter((b): b is db.MockBook => b !== undefined);
+    if (targets.length !== body.bookIds.length) return fail(404, "本が見つかりません");
+    let updated = 0;
+    for (const b of targets) {
+      const tags = editNames(b.tags, body.addTags, body.removeTags);
+      if (sameList(tags, b.tags)) continue;
+      b.tags = tags;
+      b.lockedFields = [...new Set([...b.lockedFields, "tags"])];
+      updated++;
+    }
+    return delay({ updated });
   },
   adjacentBooks: (id) => {
     const b = findBook(id);
@@ -314,6 +444,13 @@ export const mockApi: Api = {
     if (!c.seriesIds.includes(seriesId)) c.seriesIds.push(seriesId);
     return delay(c);
   },
+  addCollectionSeriesMany: (id, seriesIds) => {
+    const c = db.collections.find((x) => x.id === id);
+    if (!c) return fail(404, "コレクションが見つかりません");
+    if (seriesIds.some((x) => !findSeries(x))) return fail(404, "シリーズが見つかりません");
+    for (const x of seriesIds) if (!c.seriesIds.includes(x)) c.seriesIds.push(x);
+    return delay(c);
+  },
   removeCollectionSeries: (id, seriesId) => {
     const c = db.collections.find((x) => x.id === id);
     if (!c) return fail(404, "コレクションが見つかりません");
@@ -326,6 +463,29 @@ export const mockApi: Api = {
     if (!sameMembers(seriesIds, c.seriesIds)) return fail(409, "コレクションの内容が変わりました");
     c.seriesIds = [...seriesIds];
     return delay(c);
+  },
+  importReadList: async (file, dryRun) => {
+    const doc = new DOMParser().parseFromString(await file.text(), "text/xml");
+    if (doc.getElementsByTagName("parsererror").length > 0) throw new ApiError(400, "CBL ファイルを読み込めませんでした");
+    const name = doc.getElementsByTagName("Name")[0]?.textContent?.trim() || "読書リスト";
+    const entries: CblEntry[] = Array.from(doc.getElementsByTagName("Book"), (el) => ({
+      series: el.getAttribute("Series")?.trim() ?? "",
+      number: el.getAttribute("Number")?.trim() ?? "",
+      volume: el.getAttribute("Volume")?.trim() ?? "",
+      year: el.getAttribute("Year")?.trim() ?? "",
+    }));
+    const matched: CblImportResult["matched"] = [];
+    const unmatched: CblEntry[] = [];
+    for (const e of entries) {
+      const hit = matchCbl(e);
+      if (hit) matched.push({ entry: e, book: book(hit) });
+      else unmatched.push(e);
+    }
+    if (dryRun) return delay<CblImportResult>({ name, readList: null, matched, unmatched });
+    if (matched.length === 0) throw new ApiError(400, "一致する本がありませんでした");
+    const readList: ReadList = { id: newId("rl"), name, summary: "", bookIds: [...new Set(matched.map((m) => m.book.id))] };
+    db.readLists.push(readList);
+    return delay<CblImportResult>({ name, readList, matched, unmatched });
   },
   readLists: () => delay(db.readLists),
   readList: (id) => delay(db.readLists.find((r) => r.id === id) ?? null),
@@ -351,6 +511,13 @@ export const mockApi: Api = {
     return delay(undefined);
   },
 
+  addReadListBooks: (id, bookIds) => {
+    const r = db.readLists.find((x) => x.id === id);
+    if (!r) return fail(404, "リーディングリストが見つかりません");
+    if (bookIds.some((x) => !findBook(x))) return fail(404, "本が見つかりません");
+    for (const x of bookIds) if (!r.bookIds.includes(x)) r.bookIds.push(x);
+    return delay(r);
+  },
   addReadListBook: (id, bookId) => {
     const r = db.readLists.find((x) => x.id === id);
     if (!r) return fail(404, "リーディングリストが見つかりません");

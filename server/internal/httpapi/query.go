@@ -7,6 +7,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/tabunugoku/cominavi/server/internal/library"
 )
 
 // Every handler that returns series or books builds its query from
@@ -26,6 +28,12 @@ const seriesCols = `s.id, s.library_id, s.title, s.title_sort, s.alternate_title
 	s.created_at, s.updated_at,
 	(SELECT count(*) FROM books b WHERE b.series_id = s.id AND b.deleted_at IS NULL)`
 
+// seriesCoverCols are the cover's file name (see library.SeriesCoverSQL), where
+// the cover comes from, and the cover book while it is live (NULL otherwise).
+const seriesCoverCols = `(` + library.SeriesCoverSQL + `),
+	CASE WHEN s.thumbnail != '' THEN s.thumbnail_source ELSE 'book' END,
+	(SELECT cb.id FROM books cb WHERE cb.id = s.cover_book_id AND cb.deleted_at IS NULL)`
+
 // seriesQuery returns "SELECT ... FROM series s WHERE <visible>" and its
 // arguments. Append " AND ..." conditions, then ORDER BY / LIMIT.
 func seriesQuery(ctx context.Context) (string, []any) {
@@ -35,7 +43,8 @@ func seriesQuery(ctx context.Context) (string, []any) {
 	(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 1),
 	(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
-	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 0)
+	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 0),
+	` + seriesCoverCols + `
 	FROM series s WHERE s.deleted_at IS NULL AND ` + cond, append([]any{uid, uid}, args...)
 }
 
@@ -43,9 +52,11 @@ func scanSeries(r scanner) (Series, error) {
 	var x Series
 	var alt, status, dir, genres, tags, au, locked string
 	var age, total sql.NullInt64
+	var cover, source string
+	var coverBook sql.NullString
 	err := r.Scan(&x.Id, &x.LibraryId, &x.Title, &x.TitleSort, &alt, &status, &x.Summary, &x.Publisher,
 		&dir, &age, &x.Language, &genres, &tags, &au, &total, &locked, &x.CreatedAt, &x.UpdatedAt, &x.BookCount,
-		&x.BooksRead, &x.BooksInProgress)
+		&x.BooksRead, &x.BooksInProgress, &cover, &source, &coverBook)
 	x.AlternateTitles, x.Genres, x.Tags, x.LockedFields = strs(alt), strs(genres), strs(tags), strs(locked)
 	x.Status, x.ReadingDirection, x.Authors = SeriesStatus(status), ReadingDirection(dir), authors(au)
 	if age.Valid {
@@ -56,8 +67,21 @@ func scanSeries(r scanner) (Series, error) {
 		v := int(total.Int64)
 		x.TotalBookCount = &v
 	}
-	x.ThumbnailUrl = "/api/v1/series/" + x.Id + "/thumbnail"
+	x.ThumbnailSource = SeriesThumbnailSource(source)
+	if coverBook.Valid {
+		x.CoverBookId = &coverBook.String
+	}
+	x.ThumbnailUrl = thumbURL("/api/v1/series/"+x.Id+"/thumbnail", cover)
 	return x, err
+}
+
+// thumbURL adds the version of a thumbnail's file name to its URL, so a
+// changed image is fetched again. No file, no version.
+func thumbURL(base, file string) string {
+	if file == "" {
+		return base
+	}
+	return base + "?v=" + library.ThumbVersion(file)
 }
 
 // listSeries runs seriesQuery + where (starting with " AND", or "") + tail
@@ -92,6 +116,7 @@ func (s *server) oneSeries(ctx context.Context, id string) (x Series, ok bool, e
 
 const bookCols = `b.id, b.series_id, b.library_id, b.title, b.number, b.number_sort, b.summary, b.release_date, b.isbn,
 	b.authors, b.tags, b.format, b.path, b.size_bytes, b.page_count, b.media_status, b.created_at, b.locked_fields, b.cover_page, b.media_error,
+	b.thumbnail, b.thumbnail_uploaded,
 	(SELECT title FROM series WHERE id = b.series_id)`
 
 // bookQuery returns "SELECT ... FROM books b LEFT JOIN read_progress rp ...
@@ -110,9 +135,9 @@ func scanBook(ctx context.Context, r scanner) (Book, error) {
 	var release, readAt sql.NullString
 	var page sql.NullInt64
 	var completed sql.NullBool
-	var au, tags, format, status, locked, mediaErr string
+	var au, tags, format, status, locked, mediaErr, thumb string
 	err := r.Scan(&x.Id, &x.SeriesId, &x.LibraryId, &x.Title, &x.Number, &x.NumberSort, &x.Summary, &release, &x.Isbn,
-		&au, &tags, &format, &x.Path, &x.SizeBytes, &x.PageCount, &status, &x.CreatedAt, &locked, &x.CoverPage, &mediaErr, &x.SeriesTitle,
+		&au, &tags, &format, &x.Path, &x.SizeBytes, &x.PageCount, &status, &x.CreatedAt, &locked, &x.CoverPage, &mediaErr, &thumb, &x.ThumbnailUploaded, &x.SeriesTitle,
 		&page, &completed, &readAt)
 	x.Authors, x.Tags, x.Format, x.MediaStatus = authors(au), strs(tags), BookFormat(format), MediaStatus(status)
 	x.LockedFields = strs(locked)
@@ -124,7 +149,7 @@ func scanBook(ctx context.Context, r scanner) (Book, error) {
 	if page.Valid {
 		x.Progress = &ReadProgress{Page: int(page.Int64), Completed: completed.Bool, ReadAt: readAt.String}
 	}
-	x.ThumbnailUrl = "/api/v1/books/" + x.Id + "/thumbnail"
+	x.ThumbnailUrl = thumbURL("/api/v1/books/"+x.Id+"/thumbnail", thumb)
 	return x, err
 }
 

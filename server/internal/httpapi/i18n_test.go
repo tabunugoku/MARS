@@ -102,7 +102,7 @@ func TestHandlersHoldNoJapanese(t *testing.T) {
 	fset := token.NewFileSet()
 	checked := 0
 	for _, f := range files {
-		if strings.HasSuffix(f, "_test.go") || f == "messages.go" || f == "api.gen.go" {
+		if strings.HasSuffix(f, "_test.go") || strings.HasPrefix(f, "messages") || f == "api.gen.go" {
 			continue
 		}
 		src, err := os.ReadFile(f)
@@ -121,7 +121,7 @@ func TestHandlersHoldNoJapanese(t *testing.T) {
 			}
 			s, err := strconv.Unquote(lit.Value)
 			if err == nil && japanese.MatchString(s) {
-				t.Errorf("%s: Japanese text outside messages.go: %s", fset.Position(lit.Pos()), lit.Value)
+				t.Errorf("%s: Japanese text outside the messages*.go catalog: %s", fset.Position(lit.Pos()), lit.Value)
 			}
 			return true
 		})

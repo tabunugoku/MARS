@@ -57,9 +57,10 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     keepalive: opts.keepalive,
     headers: {
       "Accept-Language": getLocale(),
-      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      ...(body === undefined ? {} : { "Content-Type": body instanceof Blob ? "application/octet-stream" : "application/json" }),
     },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    // A Blob (an uploaded file) goes as it is; anything else as JSON.
+    body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
   });
   if (res.ok) {
     opts.onHeaders?.(res.headers);

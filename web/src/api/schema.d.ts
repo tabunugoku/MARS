@@ -196,11 +196,13 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** Cover of the series' first book, JPEG */
+        /** Cover of the series, JPEG: an uploaded image, else the local artwork file, else the cover book's thumbnail (see Series.thumbnailSource) */
         get: operations["getSeriesThumbnail"];
-        put?: never;
+        /** Replace the series cover with an uploaded image (administrators only) */
+        put: operations["uploadSeriesThumbnail"];
         post?: never;
-        delete?: never;
+        /** Drop the uploaded series cover; local artwork or the cover book's thumbnail shows again (administrators only) */
+        delete: operations["deleteSeriesThumbnail"];
         options?: never;
         head?: never;
         patch?: never;
@@ -236,7 +238,8 @@ export interface paths {
         };
         /** Cover thumbnail, JPEG */
         get: operations["getBookThumbnail"];
-        put?: never;
+        /** Replace the book's thumbnail with an uploaded image until it is regenerated or its cover page is chosen again (administrators only) */
+        put: operations["uploadBookThumbnail"];
         post?: never;
         delete?: never;
         options?: never;
@@ -689,7 +692,8 @@ export interface paths {
         };
         get: operations["listCollectionSeries"];
         put?: never;
-        post?: never;
+        /** Append several members in the given order (ones already there stay where they are); hidden members are kept */
+        post: operations["addCollectionSeriesMany"];
         delete?: never;
         options?: never;
         head?: never;
@@ -782,7 +786,8 @@ export interface paths {
         };
         get: operations["listReadListBooks"];
         put?: never;
-        post?: never;
+        /** Append several books in the given order (ones already there stay where they are); hidden members are kept */
+        post: operations["addReadListBooks"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1072,6 +1077,117 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/series/facets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filter options over the series the caller may see */
+        get: operations["listSeriesFacets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the same fields on many series in one transaction; every field changed is locked (administrators only)
+         * @description Ids the caller cannot see are refused (404) and nothing changes.
+         */
+        post: operations["bulkUpdateSeries"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add or remove tags on many books in one transaction; tags are locked (administrators only)
+         * @description Ids the caller cannot see are refused (404) and nothing changes.
+         */
+        post: operations["bulkUpdateBooks"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/read-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark every book of these series read or unread for the caller, in one transaction */
+        post: operations["setSeriesReadState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/read-state": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark these books read or unread for the caller, in one transaction */
+        post: operations["setBooksReadState"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/read-lists/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a read list from a ComicRack CBL file, matching its entries to books the caller may see
+         * @description Entries are matched by series title (or an alternate title, ignoring case, width and spacing) and book number. With dryRun nothing is created and readList is null.
+         */
+        post: operations["importReadList"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1114,6 +1230,8 @@ export interface components {
             scanInterval?: components["schemas"]["ScanInterval"];
             watch?: boolean;
             importComicInfo?: boolean;
+            /** @description Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover */
+            importLocalArtwork?: boolean;
             exclude?: string[];
         };
         LibraryUpdate: {
@@ -1122,6 +1240,8 @@ export interface components {
             scanInterval?: components["schemas"]["ScanInterval"];
             watch?: boolean;
             importComicInfo?: boolean;
+            /** @description Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover */
+            importLocalArtwork?: boolean;
             exclude?: string[];
         };
         /** @enum {string} */
@@ -1157,10 +1277,15 @@ export interface components {
             booksRead: number;
             booksInProgress: number;
             thumbnailUrl: string;
+            thumbnailSource: components["schemas"]["SeriesThumbnailSource"];
+            /** @description The book whose thumbnail is the series cover when no image is uploaded or found; null means the first book */
+            coverBookId: string | null;
             createdAt: string;
             updatedAt: string;
             lockedFields: string[];
         };
+        /** @enum {string} */
+        SeriesThumbnailSource: "book" | "upload" | "local";
         ReadProgress: {
             page: number;
             completed: boolean;
@@ -1192,6 +1317,8 @@ export interface components {
             mediaError?: string;
             progress: components["schemas"]["ReadProgress"] | null;
             thumbnailUrl: string;
+            /** @description The thumbnail is an uploaded image rather than made from the cover page */
+            thumbnailUploaded: boolean;
             createdAt: string;
             lockedFields: string[];
             /** @description Page the thumbnail is made from (1 unless an administrator chose another) */
@@ -1372,6 +1499,8 @@ export interface components {
             authors?: components["schemas"]["Author"][];
             /** @description null clears it */
             totalBookCount?: number | null;
+            /** @description A book of this series; null goes back to the first book. Not a locked field. */
+            coverBookId?: string | null;
             lockedFields?: string[];
         };
         /** @description Fields to change; locking works as in SeriesUpdate */
@@ -1421,6 +1550,67 @@ export interface components {
             books: components["schemas"]["Book"][];
             collections: components["schemas"]["Collection"][];
             readLists: components["schemas"]["ReadList"][];
+        };
+        SeriesIdList: {
+            seriesIds: string[];
+        };
+        BookIdList: {
+            bookIds: string[];
+        };
+        SeriesFacets: {
+            genres: string[];
+            tags: string[];
+            publishers: string[];
+            languages: string[];
+            authors: string[];
+            ageRatings: number[];
+        };
+        /** @description Fields left out are not changed. Genres and tags are added and removed, not replaced. */
+        SeriesBulkUpdate: {
+            seriesIds: string[];
+            status?: components["schemas"]["SeriesStatus"];
+            publisher?: string;
+            readingDirection?: components["schemas"]["ReadingDirection"];
+            /** @description null clears it */
+            ageRating?: number | null;
+            language?: string;
+            addGenres?: string[];
+            removeGenres?: string[];
+            addTags?: string[];
+            removeTags?: string[];
+        };
+        BookBulkUpdate: {
+            bookIds: string[];
+            addTags?: string[];
+            removeTags?: string[];
+        };
+        BulkResult: {
+            updated: number;
+        };
+        SeriesReadState: {
+            seriesIds: string[];
+            read: boolean;
+        };
+        BooksReadState: {
+            bookIds: string[];
+            read: boolean;
+        };
+        CblEntry: {
+            series: string;
+            number: string;
+            volume: string;
+            year: string;
+        };
+        CblMatch: {
+            entry: components["schemas"]["CblEntry"];
+            book: components["schemas"]["Book"];
+        };
+        CblImportResult: {
+            /** @description The list's name from the file (Name element), or the default name */
+            name: string;
+            readList: components["schemas"]["ReadList"] | null;
+            matched: components["schemas"]["CblMatch"][];
+            unmatched: components["schemas"]["CblEntry"][];
         };
         Collection: {
             id: string;
@@ -1821,6 +2011,18 @@ export interface operations {
                 status?: components["schemas"]["SeriesStatus"][];
                 /** @description Any of these genres */
                 genres?: string[];
+                /** @description Any of these tags */
+                tags?: string[];
+                /** @description Any of these publishers */
+                publishers?: string[];
+                /** @description Any of these languages */
+                languages?: string[];
+                /** @description Any of these author names (any role) */
+                authors?: string[];
+                /** @description Age rating at most this; series without one are included */
+                ageRatingMax?: number;
+                /** @description true: series whose total book count is known and reached; false: the others */
+                complete?: boolean;
                 /** @description For the caller */
                 readState?: components["schemas"]["ReadState"][];
                 sort?: components["schemas"]["SeriesSort"];
@@ -1958,6 +2160,58 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    uploadSeriesThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The bytes of a JPEG, PNG or WebP image (the format is detected from the bytes), at most 20 MB; it is resized to the thumbnail size and stored as JPEG */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description The series with its new cover */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteSeriesThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The series */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Series"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
     getBook: {
         parameters: {
             query?: never;
@@ -2021,6 +2275,35 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Image"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    uploadBookThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        /** @description The bytes of a JPEG, PNG or WebP image (the format is detected from the bytes), at most 20 MB; it is resized to the thumbnail size and stored as JPEG */
+        requestBody: {
+            content: {
+                "application/octet-stream": string;
+            };
+        };
+        responses: {
+            /** @description The book with its new thumbnail */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -2781,6 +3064,34 @@ export interface operations {
             404: components["responses"]["NotFound"];
         };
     };
+    addCollectionSeriesMany: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                collectionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesIdList"];
+            };
+        };
+        responses: {
+            /** @description The collection as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Collection"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
     addCollectionSeries: {
         parameters: {
             query?: never;
@@ -2997,6 +3308,34 @@ export interface operations {
                     "application/json": components["schemas"]["Book"][];
                 };
             };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    addReadListBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                readListId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookIdList"];
+            };
+        };
+        responses: {
+            /** @description The read list as the caller sees it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
         };
     };
@@ -3443,6 +3782,156 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    listSeriesFacets: {
+        parameters: {
+            query?: {
+                libraryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Distinct values, sorted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesFacets"];
+                };
+            };
+        };
+    };
+    bulkUpdateSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesBulkUpdate"];
+            };
+        };
+        responses: {
+            /** @description How many series were changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    bulkUpdateBooks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BookBulkUpdate"];
+            };
+        };
+        responses: {
+            /** @description How many books were changed */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BulkResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setSeriesReadState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SeriesReadState"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setBooksReadState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BooksReadState"];
+            };
+        };
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    importReadList: {
+        parameters: {
+            query?: {
+                dryRun?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description The CBL file (XML), at most 5 MB */
+        requestBody: {
+            content: {
+                "application/xml": string;
+            };
+        };
+        responses: {
+            /** @description What matched and what did not */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CblImportResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
 }

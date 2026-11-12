@@ -1,8 +1,9 @@
 import type { IconComponent } from "@/lib/icon-context";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
-import { ArrowUpDown, Circle, CircleCheck, MoreHorizontal, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
+import { AnimatePresence } from "motion/react";
+import { ArrowUpDown, Circle, CircleCheck, FolderPlus, ListChecks, MoreHorizontal, PenLine, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
 import { api, errorMessage, formatBytes, statusLabel, useApi, usePagedApi, type SeriesSort, type SeriesStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
@@ -10,9 +11,10 @@ import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { KindIcon } from "@/components/media/kind-icon";
+import { SelectionBar, SelectTile, type BarAction } from "@/components/media/selection";
+import { inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
 import { CoverSkeleton, GridSkeleton } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
 import { MenuItem } from "@/components/ui/menu-item";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
@@ -20,6 +22,9 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { defineMessages, intlLocale, useT } from "@/i18n";
+import { CheckList, FilterGroup, CheckRow } from "./library-filters";
+import { AddToCollectionDialog } from "./series/add-to-collection";
+import { SeriesBulkDialog } from "./series-bulk-dialog";
 
 const m = defineMessages({
   ja: {
@@ -54,12 +59,31 @@ const m = defineMessages({
     readState: "既読状態",
     status: "ステータス",
     genres: "ジャンル",
+    tags: "タグ",
+    publishers: "出版社",
+    languages: "言語",
+    authors: "作者",
+    ageRating: "年齢制限",
+    ageUpTo: ({ n }) => `${n}+ 以下`,
+    completion: "完結",
+    completeYes: "完結",
+    completeNo: "未完結",
+    any: "すべて",
+    searchOptions: "候補を検索",
+    noOptionMatch: "一致する候補がありません",
     clear: "クリア",
     removeChip: "{label}を外す",
     noMatch: "条件に合うシリーズがありません",
     clearFilters: "絞り込みをクリア",
     noSeries: "シリーズがありません",
     noSeriesBody: "ライブラリをスキャンすると、ここに表示されます",
+    select: "選択",
+    markRead: "既読にする",
+    markUnread: "未読にする",
+    markedReadN: ({ n }) => `${n} 件を既読にしました`,
+    markedUnreadN: ({ n }) => `${n} 件を未読にしました`,
+    addToCollection: "コレクションに追加",
+    bulkEdit: "一括編集",
   },
   en: {
     allLibraries: "All libraries",
@@ -93,12 +117,31 @@ const m = defineMessages({
     readState: "Read state",
     status: "Status",
     genres: "Genres",
+    tags: "Tags",
+    publishers: "Publishers",
+    languages: "Languages",
+    authors: "Authors",
+    ageRating: "Age rating",
+    ageUpTo: ({ n }) => `Up to ${n}+`,
+    completion: "Completion",
+    completeYes: "Complete",
+    completeNo: "Not complete",
+    any: "Any",
+    searchOptions: "Search options",
+    noOptionMatch: "No matches",
     clear: "Clear",
     removeChip: "Remove {label}",
     noMatch: "No series match these filters",
     clearFilters: "Clear filters",
     noSeries: "No series yet",
     noSeriesBody: "Scan the library and series will show up here",
+    select: "Select",
+    markRead: "Mark as read",
+    markUnread: "Mark as unread",
+    markedReadN: ({ n }) => `Marked ${n} as read`,
+    markedUnreadN: ({ n }) => `Marked ${n} as unread`,
+    addToCollection: "Add to collection",
+    bulkEdit: "Edit series",
   },
 });
 
@@ -125,6 +168,9 @@ export default function Screen() {
   const [params, setParams] = useSearchParams();
   const [panelOpen, setPanelOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [collectionOpen, setCollectionOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkRun, setBulkRun] = useState(0);
 
   const isAll = libraryId === "all";
   const scope = isAll ? undefined : libraryId;
@@ -136,7 +182,23 @@ export default function Screen() {
   const read = list(params.get("read")).filter(isReadState);
   const status = list(params.get("status")).filter(isStatus);
   const genre = list(params.get("genre"));
-  const filterCount = read.length + status.length + genre.length;
+  const tag = list(params.get("tag"));
+  const publisher = list(params.get("publisher"));
+  const language = list(params.get("language"));
+  const author = list(params.get("author"));
+  // Age rating "up to N" (a whole number) and completion (1 complete, 0 not).
+  const age = parseAge(params.get("age"));
+  const complete = params.get("complete") === "1" ? true : params.get("complete") === "0" ? false : undefined;
+  const filterCount =
+    read.length +
+    status.length +
+    genre.length +
+    tag.length +
+    publisher.length +
+    language.length +
+    author.length +
+    (age === undefined ? 0 : 1) +
+    (complete === undefined ? 0 : 1);
 
   const update = (patch: Record<string, string | null>) =>
     setParams(
@@ -155,16 +217,32 @@ export default function Screen() {
     const next = current.includes(value) ? current.filter((x) => x !== value) : [...current, value];
     update({ [key]: next.join(",") || null });
   };
-  const clearAll = () => update({ read: null, status: null, genre: null });
+  const clearAll = () =>
+    update({
+      read: null,
+      status: null,
+      genre: null,
+      tag: null,
+      publisher: null,
+      language: null,
+      author: null,
+      age: null,
+      complete: null,
+    });
 
   const me = useApi(() => api.me(), []);
   const isAdmin = me.data?.role === "admin";
   const libs = useApi(() => (isAll ? api.libraries() : Promise.resolve([])), [isAll]);
   // One library by id: null when it does not exist or is hidden from the caller.
   const one = useApi(() => (isAll ? Promise.resolve(undefined) : api.library(libraryId)), [libraryId]);
-  // Genre options of this scope, from the server (not from a full list).
-  const genreList = useApi(() => api.genres(scope), [scope]);
-  const genres = [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, intlLocale()));
+  // Every filter's options of this scope, from the server (not from a full list).
+  const facets = useApi(() => api.seriesFacets(scope), [scope]);
+  const genres = sortedOptions(facets.data?.genres);
+  const tags = sortedOptions(facets.data?.tags);
+  const publishers = sortedOptions(facets.data?.publishers);
+  const languages = sortedOptions(facets.data?.languages);
+  const authors = sortedOptions(facets.data?.authors);
+  const ageRatings = [...(facets.data?.ageRatings ?? [])].sort((a, b) => a - b);
   // A page at a time; a new scope, sort or filter starts again from the top.
   const seriesList = usePagedApi(
     (offset, limit) =>
@@ -175,18 +253,50 @@ export default function Screen() {
         readState: read.length ? read : undefined,
         status: status.length ? status : undefined,
         genres: genre.length ? genre : undefined,
+        tags: tag.length ? tag : undefined,
+        publishers: publisher.length ? publisher : undefined,
+        languages: language.length ? language : undefined,
+        authors: author.length ? author : undefined,
+        ageRatingMax: age,
+        complete,
         limit,
         offset,
       }),
-    [scope, sort, desc, read.join(), status.join(), genre.join()],
+    [
+      scope,
+      sort,
+      desc,
+      read.join(),
+      status.join(),
+      genre.join(),
+      tag.join(),
+      publisher.join(),
+      language.join(),
+      author.join(),
+      age,
+      complete,
+    ],
   );
   const series = seriesList.items;
+
+  // Selection ends when the list changes (library, sort or filter): the key says which list it is.
+  const selKey = JSON.stringify([scope ?? null, sort, desc, read, status, genre, tag, publisher, language, author, age ?? null, complete ?? null]);
+  const sel = useSelection(series?.map((s) => s.id) ?? [], selKey);
+  // After a bulk action: the selection clears and the visible data reloads.
+  const afterBulk = () => {
+    sel.clear();
+    seriesList.reload();
+    facets.reload();
+    if (isAll) libs.reload();
+    else one.reload();
+  };
+  const bulk = useBulkRun(afterBulk);
 
   // Scans, analysis and reading elsewhere change what this list shows.
   useLiveReload(
     () => {
       seriesList.reload();
-      genreList.reload();
+      facets.reload();
       if (isAll) libs.reload();
       else one.reload();
     },
@@ -261,6 +371,38 @@ export default function Screen() {
     ...read.map((v) => ({ key: `read-${v}`, label: readLabel(v), remove: () => toggle("read", read, v) })),
     ...status.map((v) => ({ key: `status-${v}`, label: statusLabel()[v], remove: () => toggle("status", status, v) })),
     ...genre.map((v) => ({ key: `genre-${v}`, label: v, remove: () => toggle("genre", genre, v) })),
+    ...tag.map((v) => ({ key: `tag-${v}`, label: v, remove: () => toggle("tag", tag, v) })),
+    ...publisher.map((v) => ({ key: `publisher-${v}`, label: v, remove: () => toggle("publisher", publisher, v) })),
+    ...language.map((v) => ({ key: `language-${v}`, label: languageName(v), remove: () => toggle("language", language, v) })),
+    ...author.map((v) => ({ key: `author-${v}`, label: v, remove: () => toggle("author", author, v) })),
+    ...(age === undefined ? [] : [{ key: "age", label: t("ageUpTo", { n: age }), remove: () => update({ age: null }) }]),
+    ...(complete === undefined
+      ? []
+      : [{ key: "complete", label: complete ? t("completeYes") : t("completeNo"), remove: () => update({ complete: null }) }]),
+  ];
+
+  const readSeries = (read: boolean) =>
+    bulk.run(
+      () => inChunks(sel.ids, (chunk) => api.setSeriesReadState(chunk, read).then(() => chunk.length)),
+      (n) => t(read ? "markedReadN" : "markedUnreadN", { n }),
+    );
+  const selectionActions: BarAction[] = [
+    { key: "read", label: t("markRead"), icon: CircleCheck as IconComponent, onSelect: () => readSeries(true) },
+    { key: "unread", label: t("markUnread"), icon: Circle as IconComponent, onSelect: () => readSeries(false) },
+    ...(isAdmin
+      ? [
+          { key: "collection", label: t("addToCollection"), icon: FolderPlus as IconComponent, onSelect: () => setCollectionOpen(true) },
+          {
+            key: "edit",
+            label: t("bulkEdit"),
+            icon: PenLine as IconComponent,
+            onSelect: () => {
+              setBulkRun((r) => r + 1);
+              setBulkOpen(true);
+            },
+          },
+        ]
+      : []),
   ];
 
   const header = (
@@ -273,9 +415,7 @@ export default function Screen() {
           <DropdownMenu>
             <Tooltip content={t("moreActions")}>
               <span className="inline-flex">
-                <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")} />}>
-                  <MoreHorizontal size={16} />
-                </DropdownTrigger>
+                <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")}><MoreHorizontal size={16} /></Button>} />
               </span>
             </Tooltip>
             <DropdownContent align="end">
@@ -317,6 +457,27 @@ export default function Screen() {
     );
   }
 
+  // One list filter: a checkbox list of the options, with a search box when long.
+  const listGroup = (
+    title: string,
+    options: string[],
+    selected: string[],
+    key: string,
+    label?: (value: string) => string,
+  ) =>
+    options.length > 0 && (
+      <FilterGroup title={title}>
+        <CheckList
+          options={options}
+          selected={selected}
+          label={label}
+          onToggle={(v) => toggle(key, selected, v)}
+          searchLabel={t("searchOptions")}
+          noMatch={t("noOptionMatch")}
+        />
+      </FilterGroup>
+    );
+
   return (
     <Page>
       {header}
@@ -324,6 +485,11 @@ export default function Screen() {
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
         <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
         <div className="flex items-center gap-2">
+          {!sel.active && series.length > 0 && (
+            <Button variant="secondary" onClick={sel.enter} leadingIcon={ListChecks as IconComponent}>
+              {t("select")}
+            </Button>
+          )}
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
             <SelectTrigger aria-label={t("sortLabel")} />
             <SelectContent>
@@ -367,10 +533,46 @@ export default function Screen() {
               <CheckRow key={v} label={statusLabel()[v]} checked={status.includes(v)} onChange={() => toggle("status", status, v)} />
             ))}
           </FilterGroup>
-          <FilterGroup title={t("genres")}>
-            {genres.map((g) => (
-              <CheckRow key={g} label={g} checked={genre.includes(g)} onChange={() => toggle("genre", genre, g)} />
-            ))}
+          {listGroup(t("genres"), genres, genre, "genre")}
+          {listGroup(t("tags"), tags, tag, "tag")}
+          {listGroup(t("publishers"), publishers, publisher, "publisher")}
+          {listGroup(t("languages"), languages, language, "language", languageName)}
+          {listGroup(t("authors"), authors, author, "author")}
+          {ageRatings.length > 0 && (
+            <FilterGroup title={t("ageRating")}>
+              <Select value={age === undefined ? "any" : String(age)} onValueChange={(v) => update({ age: v === "any" ? null : v })}>
+                <SelectTrigger aria-label={t("ageRating")} />
+                <SelectContent>
+                  <SelectItem index={0} value="any">
+                    {t("any")}
+                  </SelectItem>
+                  {ageRatings.map((n, i) => (
+                    <SelectItem key={n} index={i + 1} value={String(n)}>
+                      {t("ageUpTo", { n })}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </FilterGroup>
+          )}
+          <FilterGroup title={t("completion")}>
+            <Select
+              value={complete === undefined ? "any" : complete ? "yes" : "no"}
+              onValueChange={(v) => update({ complete: v === "yes" ? "1" : v === "no" ? "0" : null })}
+            >
+              <SelectTrigger aria-label={t("completion")} />
+              <SelectContent>
+                <SelectItem index={0} value="any">
+                  {t("any")}
+                </SelectItem>
+                <SelectItem index={1} value="yes">
+                  {t("completeYes")}
+                </SelectItem>
+                <SelectItem index={2} value="no">
+                  {t("completeNo")}
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </FilterGroup>
           <div className="flex justify-end md:col-span-3">
             <Button variant="ghost" onClick={clearAll}>
@@ -417,7 +619,15 @@ export default function Screen() {
         <>
           <CoverGrid>
             {series.map((s, i) => (
-              <SeriesCard key={s.id} series={s} priority={i < 8} />
+              <SelectTile
+                key={s.id}
+                selecting={sel.active}
+                selected={sel.has(s.id)}
+                label={s.title}
+                onToggle={(shift) => sel.toggle(s.id, shift)}
+              >
+                <SeriesCard series={s} priority={i < 8} />
+              </SelectTile>
             ))}
             {seriesList.hasMore && !seriesList.error && Array.from({ length: 6 }, (_, i) => <CoverSkeleton key={`more-${i}`} />)}
           </CoverGrid>
@@ -427,6 +637,25 @@ export default function Screen() {
             seriesList.hasMore && <LoadMore onVisible={seriesList.loadMore} shown={series.length} />
           )}
         </>
+      )}
+
+      <AnimatePresence>
+        {sel.active && (
+          <SelectionBar
+            key="selection"
+            count={sel.count}
+            busy={bulk.busy}
+            onSelectAll={sel.selectAll}
+            onCancel={sel.exit}
+            actions={selectionActions}
+          />
+        )}
+      </AnimatePresence>
+      {isAdmin && (
+        <AddToCollectionDialog seriesIds={sel.ids} open={collectionOpen} onOpenChange={setCollectionOpen} onAdded={afterBulk} />
+      )}
+      {isAdmin && (
+        <SeriesBulkDialog key={bulkRun} seriesIds={sel.ids} open={bulkOpen} onOpenChange={setBulkOpen} onDone={afterBulk} />
       )}
     </Page>
   );
@@ -454,8 +683,26 @@ function LoadMore({ onVisible, shown }: { onVisible: () => void; shown: number }
   return <div ref={ref} aria-hidden className="h-px" />;
 }
 
+/** Sorted copy of a facet list, in the UI's collation. */
+function sortedOptions(list: readonly string[] | undefined): string[] {
+  return [...(list ?? [])].sort((a, b) => a.localeCompare(b, intlLocale()));
+}
+
+/** A language tag as its name ("ja" to "日本語"); the tag itself when unknown. */
+function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames([intlLocale()], { type: "language" }).of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
 function list(raw: string | null): string[] {
   return raw ? raw.split(",").filter(Boolean) : [];
+}
+
+function parseAge(raw: string | null): number | undefined {
+  return raw && /^\d{1,3}$/.test(raw) ? Number(raw) : undefined;
 }
 
 function isSort(v: string | null): v is SeriesSort {
@@ -472,22 +719,4 @@ function isReadState(v: string): v is ReadState {
 
 function isStatus(v: string): v is SeriesStatus {
   return STATUSES.includes(v as SeriesStatus);
-}
-
-function FilterGroup({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <p className={cn(typeClass("caption"), "text-muted-foreground")}>{title}</p>
-      <div className="flex flex-col gap-2">{children}</div>
-    </div>
-  );
-}
-
-function CheckRow({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return (
-    <label className={cn(typeClass("body"), "flex min-h-9 cursor-pointer items-center gap-2 text-foreground")}>
-      <Checkbox checked={checked} onCheckedChange={onChange} />
-      {label}
-    </label>
-  );
 }

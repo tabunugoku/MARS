@@ -190,15 +190,19 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 	if b.ImportComicInfo != nil {
 		importCI = *b.ImportComicInfo
 	}
+	importArt := true // the column's default
+	if b.ImportLocalArtwork != nil {
+		importArt = *b.ImportLocalArtwork
+	}
 	watch := false
 	if b.Watch != nil {
 		watch = *b.Watch
 	}
 	id := ids.New()
 	_, err := s.DB.ExecContext(ctx, `
-		INSERT INTO libraries (id, name, root, kind, scan_interval, watch, import_comicinfo, exclude, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		id, name, root, string(b.Kind), string(interval), watch, importCI, jsonText(exclude), time.Now().UTC().Format(time.RFC3339Nano))
+		INSERT INTO libraries (id, name, root, kind, scan_interval, watch, import_comicinfo, import_local_artwork, exclude, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		id, name, root, string(b.Kind), string(interval), watch, importCI, importArt, jsonText(exclude), time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
 			return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.root_taken")}, nil
@@ -250,6 +254,9 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 	}
 	if b.ImportComicInfo != nil {
 		set, args = append(set, "import_comicinfo = ?"), append(args, *b.ImportComicInfo)
+	}
+	if b.ImportLocalArtwork != nil {
+		set, args = append(set, "import_local_artwork = ?"), append(args, *b.ImportLocalArtwork)
 	}
 	if b.Exclude != nil {
 		if bad := badPattern(*b.Exclude); bad != "" {

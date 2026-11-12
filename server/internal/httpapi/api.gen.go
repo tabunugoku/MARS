@@ -503,6 +503,27 @@ func (e SeriesStatus) Valid() bool {
 	}
 }
 
+// Defines values for SeriesThumbnailSource.
+const (
+	SeriesThumbnailSourceBook   SeriesThumbnailSource = "book"
+	SeriesThumbnailSourceLocal  SeriesThumbnailSource = "local"
+	SeriesThumbnailSourceUpload SeriesThumbnailSource = "upload"
+)
+
+// Valid indicates whether the value is a known member of the SeriesThumbnailSource enum.
+func (e SeriesThumbnailSource) Valid() bool {
+	switch e {
+	case SeriesThumbnailSourceBook:
+		return true
+	case SeriesThumbnailSourceLocal:
+		return true
+	case SeriesThumbnailSourceUpload:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ServerSettingsThumbnailFormat.
 const (
 	ServerSettingsThumbnailFormatAvif ServerSettingsThumbnailFormat = "avif"
@@ -745,16 +766,31 @@ type Book struct {
 	SeriesId    string        `json:"seriesId"`
 
 	// SeriesTitle Title of the book's series, so a list of books needs no series list
-	SeriesTitle  string   `json:"seriesTitle"`
-	SizeBytes    int64    `json:"sizeBytes"`
-	Summary      string   `json:"summary"`
-	Tags         []string `json:"tags"`
-	ThumbnailUrl string   `json:"thumbnailUrl"`
-	Title        string   `json:"title"`
+	SeriesTitle string   `json:"seriesTitle"`
+	SizeBytes   int64    `json:"sizeBytes"`
+	Summary     string   `json:"summary"`
+	Tags        []string `json:"tags"`
+
+	// ThumbnailUploaded The thumbnail is an uploaded image rather than made from the cover page
+	ThumbnailUploaded bool   `json:"thumbnailUploaded"`
+	ThumbnailUrl      string `json:"thumbnailUrl"`
+	Title             string `json:"title"`
+}
+
+// BookBulkUpdate defines model for BookBulkUpdate.
+type BookBulkUpdate struct {
+	AddTags    *[]string `json:"addTags,omitempty"`
+	BookIds    []string  `json:"bookIds"`
+	RemoveTags *[]string `json:"removeTags,omitempty"`
 }
 
 // BookFormat defines model for BookFormat.
 type BookFormat string
+
+// BookIdList defines model for BookIdList.
+type BookIdList struct {
+	BookIds []string `json:"bookIds"`
+}
 
 // BookUpdate Fields to change; locking works as in SeriesUpdate
 type BookUpdate struct {
@@ -769,6 +805,41 @@ type BookUpdate struct {
 	Summary     *string     `json:"summary,omitempty"`
 	Tags        *[]string   `json:"tags,omitempty"`
 	Title       *string     `json:"title,omitempty"`
+}
+
+// BooksReadState defines model for BooksReadState.
+type BooksReadState struct {
+	BookIds []string `json:"bookIds"`
+	Read    bool     `json:"read"`
+}
+
+// BulkResult defines model for BulkResult.
+type BulkResult struct {
+	Updated int `json:"updated"`
+}
+
+// CblEntry defines model for CblEntry.
+type CblEntry struct {
+	Number string `json:"number"`
+	Series string `json:"series"`
+	Volume string `json:"volume"`
+	Year   string `json:"year"`
+}
+
+// CblImportResult defines model for CblImportResult.
+type CblImportResult struct {
+	Matched []CblMatch `json:"matched"`
+
+	// Name The list's name from the file (Name element), or the default name
+	Name      string     `json:"name"`
+	ReadList  *ReadList  `json:"readList"`
+	Unmatched []CblEntry `json:"unmatched"`
+}
+
+// CblMatch defines model for CblMatch.
+type CblMatch struct {
+	Book  Book     `json:"book"`
+	Entry CblEntry `json:"entry"`
 }
 
 // Collection defines model for Collection.
@@ -886,10 +957,13 @@ type Library struct {
 
 // LibraryCreate defines model for LibraryCreate.
 type LibraryCreate struct {
-	Exclude         *[]string   `json:"exclude,omitempty"`
-	ImportComicInfo *bool       `json:"importComicInfo,omitempty"`
-	Kind            LibraryKind `json:"kind"`
-	Name            string      `json:"name"`
+	Exclude         *[]string `json:"exclude,omitempty"`
+	ImportComicInfo *bool     `json:"importComicInfo,omitempty"`
+
+	// ImportLocalArtwork Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover
+	ImportLocalArtwork *bool       `json:"importLocalArtwork,omitempty"`
+	Kind               LibraryKind `json:"kind"`
+	Name               string      `json:"name"`
 
 	// Root Absolute folder path on the server
 	Root         string        `json:"root"`
@@ -902,12 +976,15 @@ type LibraryKind string
 
 // LibraryUpdate defines model for LibraryUpdate.
 type LibraryUpdate struct {
-	Exclude         *[]string     `json:"exclude,omitempty"`
-	ImportComicInfo *bool         `json:"importComicInfo,omitempty"`
-	Kind            *LibraryKind  `json:"kind,omitempty"`
-	Name            *string       `json:"name,omitempty"`
-	ScanInterval    *ScanInterval `json:"scanInterval,omitempty"`
-	Watch           *bool         `json:"watch,omitempty"`
+	Exclude         *[]string `json:"exclude,omitempty"`
+	ImportComicInfo *bool     `json:"importComicInfo,omitempty"`
+
+	// ImportLocalArtwork Use cover/folder/poster .jpg/.jpeg/.png/.webp in a series folder as its cover
+	ImportLocalArtwork *bool         `json:"importLocalArtwork,omitempty"`
+	Kind               *LibraryKind  `json:"kind,omitempty"`
+	Name               *string       `json:"name,omitempty"`
+	ScanInterval       *ScanInterval `json:"scanInterval,omitempty"`
+	Watch              *bool         `json:"watch,omitempty"`
 }
 
 // Locale Interface language the user chose; empty follows the browser
@@ -1077,28 +1154,69 @@ type SearchResult struct {
 
 // Series defines model for Series.
 type Series struct {
-	AgeRating        *int             `json:"ageRating"`
-	AlternateTitles  []string         `json:"alternateTitles"`
-	Authors          []Author         `json:"authors"`
-	BookCount        int              `json:"bookCount"`
-	BooksInProgress  int              `json:"booksInProgress"`
-	BooksRead        int              `json:"booksRead"`
-	CreatedAt        string           `json:"createdAt"`
-	Genres           []string         `json:"genres"`
-	Id               string           `json:"id"`
-	Language         string           `json:"language"`
-	LibraryId        string           `json:"libraryId"`
-	LockedFields     []string         `json:"lockedFields"`
-	Publisher        string           `json:"publisher"`
-	ReadingDirection ReadingDirection `json:"readingDirection"`
-	Status           SeriesStatus     `json:"status"`
-	Summary          string           `json:"summary"`
-	Tags             []string         `json:"tags"`
-	ThumbnailUrl     string           `json:"thumbnailUrl"`
-	Title            string           `json:"title"`
-	TitleSort        string           `json:"titleSort"`
-	TotalBookCount   *int             `json:"totalBookCount"`
-	UpdatedAt        string           `json:"updatedAt"`
+	AgeRating       *int     `json:"ageRating"`
+	AlternateTitles []string `json:"alternateTitles"`
+	Authors         []Author `json:"authors"`
+	BookCount       int      `json:"bookCount"`
+	BooksInProgress int      `json:"booksInProgress"`
+	BooksRead       int      `json:"booksRead"`
+
+	// CoverBookId The book whose thumbnail is the series cover when no image is uploaded or found; null means the first book
+	CoverBookId      *string               `json:"coverBookId"`
+	CreatedAt        string                `json:"createdAt"`
+	Genres           []string              `json:"genres"`
+	Id               string                `json:"id"`
+	Language         string                `json:"language"`
+	LibraryId        string                `json:"libraryId"`
+	LockedFields     []string              `json:"lockedFields"`
+	Publisher        string                `json:"publisher"`
+	ReadingDirection ReadingDirection      `json:"readingDirection"`
+	Status           SeriesStatus          `json:"status"`
+	Summary          string                `json:"summary"`
+	Tags             []string              `json:"tags"`
+	ThumbnailSource  SeriesThumbnailSource `json:"thumbnailSource"`
+	ThumbnailUrl     string                `json:"thumbnailUrl"`
+	Title            string                `json:"title"`
+	TitleSort        string                `json:"titleSort"`
+	TotalBookCount   *int                  `json:"totalBookCount"`
+	UpdatedAt        string                `json:"updatedAt"`
+}
+
+// SeriesBulkUpdate Fields left out are not changed. Genres and tags are added and removed, not replaced.
+type SeriesBulkUpdate struct {
+	AddGenres *[]string `json:"addGenres,omitempty"`
+	AddTags   *[]string `json:"addTags,omitempty"`
+
+	// AgeRating null clears it
+	AgeRating        Opt[int]          `json:"ageRating,omitempty"`
+	Language         *string           `json:"language,omitempty"`
+	Publisher        *string           `json:"publisher,omitempty"`
+	ReadingDirection *ReadingDirection `json:"readingDirection,omitempty"`
+	RemoveGenres     *[]string         `json:"removeGenres,omitempty"`
+	RemoveTags       *[]string         `json:"removeTags,omitempty"`
+	SeriesIds        []string          `json:"seriesIds"`
+	Status           *SeriesStatus     `json:"status,omitempty"`
+}
+
+// SeriesFacets defines model for SeriesFacets.
+type SeriesFacets struct {
+	AgeRatings []int    `json:"ageRatings"`
+	Authors    []string `json:"authors"`
+	Genres     []string `json:"genres"`
+	Languages  []string `json:"languages"`
+	Publishers []string `json:"publishers"`
+	Tags       []string `json:"tags"`
+}
+
+// SeriesIdList defines model for SeriesIdList.
+type SeriesIdList struct {
+	SeriesIds []string `json:"seriesIds"`
+}
+
+// SeriesReadState defines model for SeriesReadState.
+type SeriesReadState struct {
+	Read      bool     `json:"read"`
+	SeriesIds []string `json:"seriesIds"`
 }
 
 // SeriesReadUpdate defines model for SeriesReadUpdate.
@@ -1112,12 +1230,18 @@ type SeriesSort string
 // SeriesStatus defines model for SeriesStatus.
 type SeriesStatus string
 
+// SeriesThumbnailSource defines model for SeriesThumbnailSource.
+type SeriesThumbnailSource string
+
 // SeriesUpdate Fields to change. Every field given here is also locked, so scans and ComicInfo.xml leave it alone; lockedFields, when given, replaces the lock list instead.
 type SeriesUpdate struct {
 	// AgeRating null clears it
-	AgeRating        Opt[int]          `json:"ageRating,omitempty"`
-	AlternateTitles  *[]string         `json:"alternateTitles,omitempty"`
-	Authors          *[]Author         `json:"authors,omitempty"`
+	AgeRating       Opt[int]  `json:"ageRating,omitempty"`
+	AlternateTitles *[]string `json:"alternateTitles,omitempty"`
+	Authors         *[]Author `json:"authors,omitempty"`
+
+	// CoverBookId A book of this series; null goes back to the first book. Not a locked field.
+	CoverBookId      Opt[string]       `json:"coverBookId,omitempty"`
 	Genres           *[]string         `json:"genres,omitempty"`
 	Language         *string           `json:"language,omitempty"`
 	LockedFields     *[]string         `json:"lockedFields,omitempty"`
@@ -1314,6 +1438,11 @@ type SetGlobalReaderPrefsParams struct {
 // SetGlobalReaderPrefsParamsProfile defines parameters for SetGlobalReaderPrefs.
 type SetGlobalReaderPrefsParamsProfile string
 
+// ImportReadListParams defines parameters for ImportReadList.
+type ImportReadListParams struct {
+	DryRun *bool `form:"dryRun,omitempty" json:"dryRun,omitempty"`
+}
+
 // ReorderReadListJSONBody defines parameters for ReorderReadList.
 type ReorderReadListJSONBody struct {
 	// BookIds Exactly the visible members, in the new order
@@ -1336,6 +1465,24 @@ type ListSeriesParams struct {
 	// Genres Any of these genres
 	Genres *[]string `form:"genres,omitempty" json:"genres,omitempty"`
 
+	// Tags Any of these tags
+	Tags *[]string `form:"tags,omitempty" json:"tags,omitempty"`
+
+	// Publishers Any of these publishers
+	Publishers *[]string `form:"publishers,omitempty" json:"publishers,omitempty"`
+
+	// Languages Any of these languages
+	Languages *[]string `form:"languages,omitempty" json:"languages,omitempty"`
+
+	// Authors Any of these author names (any role)
+	Authors *[]string `form:"authors,omitempty" json:"authors,omitempty"`
+
+	// AgeRatingMax Age rating at most this; series without one are included
+	AgeRatingMax *int `form:"ageRatingMax,omitempty" json:"ageRatingMax,omitempty"`
+
+	// Complete true: series whose total book count is known and reached; false: the others
+	Complete *bool `form:"complete,omitempty" json:"complete,omitempty"`
+
 	// ReadState For the caller
 	ReadState *[]ReadState `form:"readState,omitempty" json:"readState,omitempty"`
 	Sort      *SeriesSort  `form:"sort,omitempty" json:"sort,omitempty"`
@@ -1346,8 +1493,19 @@ type ListSeriesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// ListSeriesFacetsParams defines parameters for ListSeriesFacets.
+type ListSeriesFacetsParams struct {
+	LibraryId *string `form:"libraryId,omitempty" json:"libraryId,omitempty"`
+}
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
+
+// BulkUpdateBooksJSONRequestBody defines body for BulkUpdateBooks for application/json ContentType.
+type BulkUpdateBooksJSONRequestBody = BookBulkUpdate
+
+// SetBooksReadStateJSONRequestBody defines body for SetBooksReadState for application/json ContentType.
+type SetBooksReadStateJSONRequestBody = BooksReadState
 
 // UpdateBookJSONRequestBody defines body for UpdateBook for application/json ContentType.
 type UpdateBookJSONRequestBody = BookUpdate
@@ -1366,6 +1524,9 @@ type UpdateCollectionJSONRequestBody = CollectionUpdate
 
 // ReorderCollectionJSONRequestBody defines body for ReorderCollection for application/json ContentType.
 type ReorderCollectionJSONRequestBody ReorderCollectionJSONBody
+
+// AddCollectionSeriesManyJSONRequestBody defines body for AddCollectionSeriesMany for application/json ContentType.
+type AddCollectionSeriesManyJSONRequestBody = SeriesIdList
 
 // CreateLibraryJSONRequestBody defines body for CreateLibrary for application/json ContentType.
 type CreateLibraryJSONRequestBody = LibraryCreate
@@ -1400,8 +1561,17 @@ type CreateReadListJSONRequestBody = ReadListCreate
 // UpdateReadListJSONRequestBody defines body for UpdateReadList for application/json ContentType.
 type UpdateReadListJSONRequestBody = ReadListUpdate
 
+// AddReadListBooksJSONRequestBody defines body for AddReadListBooks for application/json ContentType.
+type AddReadListBooksJSONRequestBody = BookIdList
+
 // ReorderReadListJSONRequestBody defines body for ReorderReadList for application/json ContentType.
 type ReorderReadListJSONRequestBody ReorderReadListJSONBody
+
+// BulkUpdateSeriesJSONRequestBody defines body for BulkUpdateSeries for application/json ContentType.
+type BulkUpdateSeriesJSONRequestBody = SeriesBulkUpdate
+
+// SetSeriesReadStateJSONRequestBody defines body for SetSeriesReadState for application/json ContentType.
+type SetSeriesReadStateJSONRequestBody = SeriesReadState
 
 // UpdateSeriesJSONRequestBody defines body for UpdateSeries for application/json ContentType.
 type UpdateSeriesJSONRequestBody = SeriesUpdate
@@ -1429,6 +1599,12 @@ type ServerInterface interface {
 	// Logout End this session
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
+	// BulkUpdateBooks Add or remove tags on many books in one transaction; tags are locked (administrators only)
+	// (POST /books/bulk)
+	BulkUpdateBooks(w http.ResponseWriter, r *http.Request)
+	// SetBooksReadState Mark these books read or unread for the caller, in one transaction
+	// (POST /books/read-state)
+	SetBooksReadState(w http.ResponseWriter, r *http.Request)
 
 	// (GET /books/{bookId})
 	GetBook(w http.ResponseWriter, r *http.Request, bookId string)
@@ -1468,6 +1644,9 @@ type ServerInterface interface {
 	// GetBookThumbnail Cover thumbnail, JPEG
 	// (GET /books/{bookId}/thumbnail)
 	GetBookThumbnail(w http.ResponseWriter, r *http.Request, bookId string)
+	// UploadBookThumbnail Replace the book's thumbnail with an uploaded image until it is regenerated or its cover page is chosen again (administrators only)
+	// (PUT /books/{bookId}/thumbnail)
+	UploadBookThumbnail(w http.ResponseWriter, r *http.Request, bookId string)
 	// ListCollections Collections with at least one series the caller may see
 	// (GET /collections)
 	ListCollections(w http.ResponseWriter, r *http.Request)
@@ -1489,6 +1668,9 @@ type ServerInterface interface {
 
 	// (GET /collections/{collectionId}/series)
 	ListCollectionSeries(w http.ResponseWriter, r *http.Request, collectionId string)
+	// AddCollectionSeriesMany Append several members in the given order (ones already there stay where they are); hidden members are kept
+	// (POST /collections/{collectionId}/series)
+	AddCollectionSeriesMany(w http.ResponseWriter, r *http.Request, collectionId string)
 	// RemoveCollectionSeries Remove one member (no-op when absent); other members are kept
 	// (DELETE /collections/{collectionId}/series/{seriesId})
 	RemoveCollectionSeries(w http.ResponseWriter, r *http.Request, collectionId string, seriesId string)
@@ -1582,6 +1764,9 @@ type ServerInterface interface {
 
 	// (POST /read-lists)
 	CreateReadList(w http.ResponseWriter, r *http.Request)
+	// ImportReadList Create a read list from a ComicRack CBL file, matching its entries to books the caller may see
+	// (POST /read-lists/import)
+	ImportReadList(w http.ResponseWriter, r *http.Request, params ImportReadListParams)
 
 	// (DELETE /read-lists/{readListId})
 	DeleteReadList(w http.ResponseWriter, r *http.Request, readListId string)
@@ -1594,6 +1779,9 @@ type ServerInterface interface {
 
 	// (GET /read-lists/{readListId}/books)
 	ListReadListBooks(w http.ResponseWriter, r *http.Request, readListId string)
+	// AddReadListBooks Append several books in the given order (ones already there stay where they are); hidden members are kept
+	// (POST /read-lists/{readListId}/books)
+	AddReadListBooks(w http.ResponseWriter, r *http.Request, readListId string)
 	// RemoveReadListBook Remove one member (no-op when absent); other members are kept
 	// (DELETE /read-lists/{readListId}/books/{bookId})
 	RemoveReadListBook(w http.ResponseWriter, r *http.Request, readListId string, bookId string)
@@ -1609,6 +1797,15 @@ type ServerInterface interface {
 	// ListSeries Series the caller may see, filtered, sorted and paged
 	// (GET /series)
 	ListSeries(w http.ResponseWriter, r *http.Request, params ListSeriesParams)
+	// BulkUpdateSeries Change the same fields on many series in one transaction; every field changed is locked (administrators only)
+	// (POST /series/bulk)
+	BulkUpdateSeries(w http.ResponseWriter, r *http.Request)
+	// ListSeriesFacets Filter options over the series the caller may see
+	// (GET /series/facets)
+	ListSeriesFacets(w http.ResponseWriter, r *http.Request, params ListSeriesFacetsParams)
+	// SetSeriesReadState Mark every book of these series read or unread for the caller, in one transaction
+	// (POST /series/read-state)
+	SetSeriesReadState(w http.ResponseWriter, r *http.Request)
 
 	// (GET /series/{seriesId})
 	GetSeries(w http.ResponseWriter, r *http.Request, seriesId string)
@@ -1627,9 +1824,15 @@ type ServerInterface interface {
 	// RegenerateSeriesThumbnails Queue thumbnail regeneration for every book of the series (administrators only)
 	// (POST /series/{seriesId}/regenerate-thumbnails)
 	RegenerateSeriesThumbnails(w http.ResponseWriter, r *http.Request, seriesId string)
-	// GetSeriesThumbnail Cover of the series' first book, JPEG
+	// DeleteSeriesThumbnail Drop the uploaded series cover; local artwork or the cover book's thumbnail shows again (administrators only)
+	// (DELETE /series/{seriesId}/thumbnail)
+	DeleteSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string)
+	// GetSeriesThumbnail Cover of the series, JPEG: an uploaded image, else the local artwork file, else the cover book's thumbnail (see Series.thumbnailSource)
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string)
+	// UploadSeriesThumbnail Replace the series cover with an uploaded image (administrators only)
+	// (PUT /series/{seriesId}/thumbnail)
+	UploadSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string)
 	// GetSettings Server settings (administrators only)
 	// (GET /settings)
 	GetSettings(w http.ResponseWriter, r *http.Request)
@@ -1690,6 +1893,34 @@ func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BulkUpdateBooks operation middleware
+func (siw *ServerInterfaceWrapper) BulkUpdateBooks(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BulkUpdateBooks(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetBooksReadState operation middleware
+func (siw *ServerInterfaceWrapper) SetBooksReadState(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetBooksReadState(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2071,6 +2302,32 @@ func (siw *ServerInterfaceWrapper) GetBookThumbnail(w http.ResponseWriter, r *ht
 	handler.ServeHTTP(w, r)
 }
 
+// UploadBookThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) UploadBookThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "bookId" -------------
+	var bookId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "bookId", r.PathValue("bookId"), &bookId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "bookId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadBookThumbnail(w, r, bookId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListCollections operation middleware
 func (siw *ServerInterfaceWrapper) ListCollections(w http.ResponseWriter, r *http.Request) {
 
@@ -2220,6 +2477,32 @@ func (siw *ServerInterfaceWrapper) ListCollectionSeries(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListCollectionSeries(w, r, collectionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddCollectionSeriesMany operation middleware
+func (siw *ServerInterfaceWrapper) AddCollectionSeriesMany(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "collectionId" -------------
+	var collectionId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "collectionId", r.PathValue("collectionId"), &collectionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "collectionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddCollectionSeriesMany(w, r, collectionId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2941,6 +3224,39 @@ func (siw *ServerInterfaceWrapper) CreateReadList(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ImportReadList operation middleware
+func (siw *ServerInterfaceWrapper) ImportReadList(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ImportReadListParams
+
+	// ------------- Optional query parameter "dryRun" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "dryRun", r.URL.Query(), &params.DryRun, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "dryRun"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "dryRun", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ImportReadList(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteReadList operation middleware
 func (siw *ServerInterfaceWrapper) DeleteReadList(w http.ResponseWriter, r *http.Request) {
 
@@ -3036,6 +3352,32 @@ func (siw *ServerInterfaceWrapper) ListReadListBooks(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListReadListBooks(w, r, readListId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddReadListBooks operation middleware
+func (siw *ServerInterfaceWrapper) AddReadListBooks(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "readListId" -------------
+	var readListId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "readListId", r.PathValue("readListId"), &readListId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "readListId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddReadListBooks(w, r, readListId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3235,6 +3577,84 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// ------------- Optional query parameter "tags" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "tags", r.URL.Query(), &params.Tags, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tags"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tags", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "publishers" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "publishers", r.URL.Query(), &params.Publishers, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "publishers"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "publishers", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "languages" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "languages", r.URL.Query(), &params.Languages, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "languages"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "languages", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "authors" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", false, false, "authors", r.URL.Query(), &params.Authors, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "authors"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "authors", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "ageRatingMax" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "ageRatingMax", r.URL.Query(), &params.AgeRatingMax, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "ageRatingMax"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ageRatingMax", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "complete" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "complete", r.URL.Query(), &params.Complete, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "complete"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "complete", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "readState" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", false, false, "readState", r.URL.Query(), &params.ReadState, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
@@ -3302,6 +3722,67 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListSeries(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BulkUpdateSeries operation middleware
+func (siw *ServerInterfaceWrapper) BulkUpdateSeries(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BulkUpdateSeries(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSeriesFacets operation middleware
+func (siw *ServerInterfaceWrapper) ListSeriesFacets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSeriesFacetsParams
+
+	// ------------- Optional query parameter "libraryId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "libraryId", r.URL.Query(), &params.LibraryId, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "libraryId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "libraryId", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSeriesFacets(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSeriesReadState operation middleware
+func (siw *ServerInterfaceWrapper) SetSeriesReadState(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSeriesReadState(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3467,6 +3948,32 @@ func (siw *ServerInterfaceWrapper) RegenerateSeriesThumbnails(w http.ResponseWri
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteSeriesThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSeriesThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSeriesThumbnail(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetSeriesThumbnail operation middleware
 func (siw *ServerInterfaceWrapper) GetSeriesThumbnail(w http.ResponseWriter, r *http.Request) {
 
@@ -3484,6 +3991,32 @@ func (siw *ServerInterfaceWrapper) GetSeriesThumbnail(w http.ResponseWriter, r *
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSeriesThumbnail(w, r, seriesId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadSeriesThumbnail operation middleware
+func (siw *ServerInterfaceWrapper) UploadSeriesThumbnail(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "seriesId" -------------
+	var seriesId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "seriesId", r.PathValue("seriesId"), &seriesId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "seriesId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadSeriesThumbnail(w, r, seriesId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3803,10 +4336,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}", wrapper.GetSeries)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/series/{seriesId}", wrapper.UpdateSeries)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}/books", wrapper.ListSeriesBooks)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/series/{seriesId}/thumbnail", wrapper.DeleteSeriesThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/{seriesId}/thumbnail", wrapper.GetSeriesThumbnail)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/series/{seriesId}/thumbnail", wrapper.UploadSeriesThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}", wrapper.GetBook)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/books/{bookId}", wrapper.UpdateBook)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/thumbnail", wrapper.GetBookThumbnail)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/books/{bookId}/thumbnail", wrapper.UploadBookThumbnail)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/pages", wrapper.ListBookPages)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/pages/{page}", wrapper.GetBookPage)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/books/{bookId}/pages/{page}/thumbnail", wrapper.GetBookPageThumbnail)
@@ -3840,6 +4376,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collections/{collectionId}", wrapper.GetCollection)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/collections/{collectionId}", wrapper.UpdateCollection)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/collections/{collectionId}/series", wrapper.ListCollectionSeries)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collections/{collectionId}/series", wrapper.AddCollectionSeriesMany)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/collections/{collectionId}/series/{seriesId}", wrapper.RemoveCollectionSeries)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/collections/{collectionId}/series/{seriesId}", wrapper.AddCollectionSeries)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/collections/{collectionId}/order", wrapper.ReorderCollection)
@@ -3849,6 +4386,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/read-lists/{readListId}", wrapper.GetReadList)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/read-lists/{readListId}", wrapper.UpdateReadList)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/read-lists/{readListId}/books", wrapper.ListReadListBooks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/read-lists/{readListId}/books", wrapper.AddReadListBooks)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/read-lists/{readListId}/books/{bookId}", wrapper.RemoveReadListBook)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/read-lists/{readListId}/books/{bookId}", wrapper.AddReadListBook)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/read-lists/{readListId}/order", wrapper.ReorderReadList)
@@ -3868,6 +4406,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/books/{bookId}/cover", wrapper.SetBookCover)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/series/{seriesId}/regenerate-thumbnails", wrapper.RegenerateSeriesThumbnails)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/libraries/{libraryId}/regenerate-thumbnails", wrapper.RegenerateLibraryThumbnails)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/series/facets", wrapper.ListSeriesFacets)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/series/bulk", wrapper.BulkUpdateSeries)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/books/bulk", wrapper.BulkUpdateBooks)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/series/read-state", wrapper.SetSeriesReadState)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/books/read-state", wrapper.SetBooksReadState)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/read-lists/import", wrapper.ImportReadList)
 
 	return m
 }
@@ -3954,6 +4498,100 @@ type Logout204Response struct {
 func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
 	w.WriteHeader(204)
 	return nil
+}
+
+type BulkUpdateBooksRequestObject struct {
+	Body *BulkUpdateBooksJSONRequestBody
+}
+
+type BulkUpdateBooksResponseObject interface {
+	VisitBulkUpdateBooksResponse(w http.ResponseWriter) error
+}
+
+type BulkUpdateBooks200JSONResponse BulkResult
+
+func (response BulkUpdateBooks200JSONResponse) VisitBulkUpdateBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BulkUpdateBooks400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response BulkUpdateBooks400JSONResponse) VisitBulkUpdateBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BulkUpdateBooks404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response BulkUpdateBooks404JSONResponse) VisitBulkUpdateBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBooksReadStateRequestObject struct {
+	Body *SetBooksReadStateJSONRequestBody
+}
+
+type SetBooksReadStateResponseObject interface {
+	VisitSetBooksReadStateResponse(w http.ResponseWriter) error
+}
+
+type SetBooksReadState204Response struct {
+}
+
+func (response SetBooksReadState204Response) VisitSetBooksReadStateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetBooksReadState400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetBooksReadState400JSONResponse) VisitSetBooksReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetBooksReadState404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetBooksReadState404JSONResponse) VisitSetBooksReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetBookRequestObject struct {
@@ -4519,6 +5157,57 @@ func (response GetBookThumbnail404JSONResponse) VisitGetBookThumbnailResponse(w 
 	return err
 }
 
+type UploadBookThumbnailRequestObject struct {
+	BookId string `json:"bookId"`
+	Body   io.Reader
+}
+
+type UploadBookThumbnailResponseObject interface {
+	VisitUploadBookThumbnailResponse(w http.ResponseWriter) error
+}
+
+type UploadBookThumbnail200JSONResponse Book
+
+func (response UploadBookThumbnail200JSONResponse) VisitUploadBookThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadBookThumbnail400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UploadBookThumbnail400JSONResponse) VisitUploadBookThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadBookThumbnail404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UploadBookThumbnail404JSONResponse) VisitUploadBookThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListCollectionsRequestObject struct {
 }
 
@@ -4769,6 +5458,57 @@ func (response ListCollectionSeries200JSONResponse) VisitListCollectionSeriesRes
 type ListCollectionSeries404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response ListCollectionSeries404JSONResponse) VisitListCollectionSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCollectionSeriesManyRequestObject struct {
+	CollectionId string `json:"collectionId"`
+	Body         *AddCollectionSeriesManyJSONRequestBody
+}
+
+type AddCollectionSeriesManyResponseObject interface {
+	VisitAddCollectionSeriesManyResponse(w http.ResponseWriter) error
+}
+
+type AddCollectionSeriesMany200JSONResponse Collection
+
+func (response AddCollectionSeriesMany200JSONResponse) VisitAddCollectionSeriesManyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCollectionSeriesMany400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AddCollectionSeriesMany400JSONResponse) VisitAddCollectionSeriesManyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddCollectionSeriesMany404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AddCollectionSeriesMany404JSONResponse) VisitAddCollectionSeriesManyResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -5776,6 +6516,43 @@ func (response CreateReadList400JSONResponse) VisitCreateReadListResponse(w http
 	return err
 }
 
+type ImportReadListRequestObject struct {
+	Params ImportReadListParams
+	Body   io.Reader
+}
+
+type ImportReadListResponseObject interface {
+	VisitImportReadListResponse(w http.ResponseWriter) error
+}
+
+type ImportReadList200JSONResponse CblImportResult
+
+func (response ImportReadList200JSONResponse) VisitImportReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ImportReadList400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ImportReadList400JSONResponse) VisitImportReadListResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteReadListRequestObject struct {
 	ReadListId string `json:"readListId"`
 }
@@ -5918,6 +6695,57 @@ func (response ListReadListBooks200JSONResponse) VisitListReadListBooksResponse(
 type ListReadListBooks404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response ListReadListBooks404JSONResponse) VisitListReadListBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddReadListBooksRequestObject struct {
+	ReadListId string `json:"readListId"`
+	Body       *AddReadListBooksJSONRequestBody
+}
+
+type AddReadListBooksResponseObject interface {
+	VisitAddReadListBooksResponse(w http.ResponseWriter) error
+}
+
+type AddReadListBooks200JSONResponse ReadList
+
+func (response AddReadListBooks200JSONResponse) VisitAddReadListBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddReadListBooks400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response AddReadListBooks400JSONResponse) VisitAddReadListBooksResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddReadListBooks404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response AddReadListBooks404JSONResponse) VisitAddReadListBooksResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6104,6 +6932,122 @@ func (response ListSeries200JSONResponse) VisitListSeriesResponse(w http.Respons
 		w.Header().Set("X-Total-Count", fmt.Sprint(*response.Headers.XTotalCount))
 	}
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BulkUpdateSeriesRequestObject struct {
+	Body *BulkUpdateSeriesJSONRequestBody
+}
+
+type BulkUpdateSeriesResponseObject interface {
+	VisitBulkUpdateSeriesResponse(w http.ResponseWriter) error
+}
+
+type BulkUpdateSeries200JSONResponse BulkResult
+
+func (response BulkUpdateSeries200JSONResponse) VisitBulkUpdateSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BulkUpdateSeries400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response BulkUpdateSeries400JSONResponse) VisitBulkUpdateSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type BulkUpdateSeries404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response BulkUpdateSeries404JSONResponse) VisitBulkUpdateSeriesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSeriesFacetsRequestObject struct {
+	Params ListSeriesFacetsParams
+}
+
+type ListSeriesFacetsResponseObject interface {
+	VisitListSeriesFacetsResponse(w http.ResponseWriter) error
+}
+
+type ListSeriesFacets200JSONResponse SeriesFacets
+
+func (response ListSeriesFacets200JSONResponse) VisitListSeriesFacetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetSeriesReadStateRequestObject struct {
+	Body *SetSeriesReadStateJSONRequestBody
+}
+
+type SetSeriesReadStateResponseObject interface {
+	VisitSetSeriesReadStateResponse(w http.ResponseWriter) error
+}
+
+type SetSeriesReadState204Response struct {
+}
+
+func (response SetSeriesReadState204Response) VisitSetSeriesReadStateResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type SetSeriesReadState400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SetSeriesReadState400JSONResponse) VisitSetSeriesReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetSeriesReadState404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SetSeriesReadState404JSONResponse) VisitSetSeriesReadStateResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -6354,6 +7298,42 @@ func (response RegenerateSeriesThumbnails404JSONResponse) VisitRegenerateSeriesT
 	return err
 }
 
+type DeleteSeriesThumbnailRequestObject struct {
+	SeriesId string `json:"seriesId"`
+}
+
+type DeleteSeriesThumbnailResponseObject interface {
+	VisitDeleteSeriesThumbnailResponse(w http.ResponseWriter) error
+}
+
+type DeleteSeriesThumbnail200JSONResponse Series
+
+func (response DeleteSeriesThumbnail200JSONResponse) VisitDeleteSeriesThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteSeriesThumbnail404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DeleteSeriesThumbnail404JSONResponse) VisitDeleteSeriesThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetSeriesThumbnailRequestObject struct {
 	SeriesId string `json:"seriesId"`
 }
@@ -6382,6 +7362,57 @@ func (response GetSeriesThumbnail200ImageResponse) VisitGetSeriesThumbnailRespon
 type GetSeriesThumbnail404JSONResponse struct{ NotFoundJSONResponse }
 
 func (response GetSeriesThumbnail404JSONResponse) VisitGetSeriesThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadSeriesThumbnailRequestObject struct {
+	SeriesId string `json:"seriesId"`
+	Body     io.Reader
+}
+
+type UploadSeriesThumbnailResponseObject interface {
+	VisitUploadSeriesThumbnailResponse(w http.ResponseWriter) error
+}
+
+type UploadSeriesThumbnail200JSONResponse Series
+
+func (response UploadSeriesThumbnail200JSONResponse) VisitUploadSeriesThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadSeriesThumbnail400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response UploadSeriesThumbnail400JSONResponse) VisitUploadSeriesThumbnailResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadSeriesThumbnail404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response UploadSeriesThumbnail404JSONResponse) VisitUploadSeriesThumbnailResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -6732,6 +7763,12 @@ type StrictServerInterface interface {
 	// Logout End this session
 	// (POST /auth/logout)
 	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
+	// BulkUpdateBooks Add or remove tags on many books in one transaction; tags are locked (administrators only)
+	// (POST /books/bulk)
+	BulkUpdateBooks(ctx context.Context, request BulkUpdateBooksRequestObject) (BulkUpdateBooksResponseObject, error)
+	// SetBooksReadState Mark these books read or unread for the caller, in one transaction
+	// (POST /books/read-state)
+	SetBooksReadState(ctx context.Context, request SetBooksReadStateRequestObject) (SetBooksReadStateResponseObject, error)
 
 	// (GET /books/{bookId})
 	GetBook(ctx context.Context, request GetBookRequestObject) (GetBookResponseObject, error)
@@ -6771,6 +7808,9 @@ type StrictServerInterface interface {
 	// GetBookThumbnail Cover thumbnail, JPEG
 	// (GET /books/{bookId}/thumbnail)
 	GetBookThumbnail(ctx context.Context, request GetBookThumbnailRequestObject) (GetBookThumbnailResponseObject, error)
+	// UploadBookThumbnail Replace the book's thumbnail with an uploaded image until it is regenerated or its cover page is chosen again (administrators only)
+	// (PUT /books/{bookId}/thumbnail)
+	UploadBookThumbnail(ctx context.Context, request UploadBookThumbnailRequestObject) (UploadBookThumbnailResponseObject, error)
 	// ListCollections Collections with at least one series the caller may see
 	// (GET /collections)
 	ListCollections(ctx context.Context, request ListCollectionsRequestObject) (ListCollectionsResponseObject, error)
@@ -6792,6 +7832,9 @@ type StrictServerInterface interface {
 
 	// (GET /collections/{collectionId}/series)
 	ListCollectionSeries(ctx context.Context, request ListCollectionSeriesRequestObject) (ListCollectionSeriesResponseObject, error)
+	// AddCollectionSeriesMany Append several members in the given order (ones already there stay where they are); hidden members are kept
+	// (POST /collections/{collectionId}/series)
+	AddCollectionSeriesMany(ctx context.Context, request AddCollectionSeriesManyRequestObject) (AddCollectionSeriesManyResponseObject, error)
 	// RemoveCollectionSeries Remove one member (no-op when absent); other members are kept
 	// (DELETE /collections/{collectionId}/series/{seriesId})
 	RemoveCollectionSeries(ctx context.Context, request RemoveCollectionSeriesRequestObject) (RemoveCollectionSeriesResponseObject, error)
@@ -6885,6 +7928,9 @@ type StrictServerInterface interface {
 
 	// (POST /read-lists)
 	CreateReadList(ctx context.Context, request CreateReadListRequestObject) (CreateReadListResponseObject, error)
+	// ImportReadList Create a read list from a ComicRack CBL file, matching its entries to books the caller may see
+	// (POST /read-lists/import)
+	ImportReadList(ctx context.Context, request ImportReadListRequestObject) (ImportReadListResponseObject, error)
 
 	// (DELETE /read-lists/{readListId})
 	DeleteReadList(ctx context.Context, request DeleteReadListRequestObject) (DeleteReadListResponseObject, error)
@@ -6897,6 +7943,9 @@ type StrictServerInterface interface {
 
 	// (GET /read-lists/{readListId}/books)
 	ListReadListBooks(ctx context.Context, request ListReadListBooksRequestObject) (ListReadListBooksResponseObject, error)
+	// AddReadListBooks Append several books in the given order (ones already there stay where they are); hidden members are kept
+	// (POST /read-lists/{readListId}/books)
+	AddReadListBooks(ctx context.Context, request AddReadListBooksRequestObject) (AddReadListBooksResponseObject, error)
 	// RemoveReadListBook Remove one member (no-op when absent); other members are kept
 	// (DELETE /read-lists/{readListId}/books/{bookId})
 	RemoveReadListBook(ctx context.Context, request RemoveReadListBookRequestObject) (RemoveReadListBookResponseObject, error)
@@ -6912,6 +7961,15 @@ type StrictServerInterface interface {
 	// ListSeries Series the caller may see, filtered, sorted and paged
 	// (GET /series)
 	ListSeries(ctx context.Context, request ListSeriesRequestObject) (ListSeriesResponseObject, error)
+	// BulkUpdateSeries Change the same fields on many series in one transaction; every field changed is locked (administrators only)
+	// (POST /series/bulk)
+	BulkUpdateSeries(ctx context.Context, request BulkUpdateSeriesRequestObject) (BulkUpdateSeriesResponseObject, error)
+	// ListSeriesFacets Filter options over the series the caller may see
+	// (GET /series/facets)
+	ListSeriesFacets(ctx context.Context, request ListSeriesFacetsRequestObject) (ListSeriesFacetsResponseObject, error)
+	// SetSeriesReadState Mark every book of these series read or unread for the caller, in one transaction
+	// (POST /series/read-state)
+	SetSeriesReadState(ctx context.Context, request SetSeriesReadStateRequestObject) (SetSeriesReadStateResponseObject, error)
 
 	// (GET /series/{seriesId})
 	GetSeries(ctx context.Context, request GetSeriesRequestObject) (GetSeriesResponseObject, error)
@@ -6930,9 +7988,15 @@ type StrictServerInterface interface {
 	// RegenerateSeriesThumbnails Queue thumbnail regeneration for every book of the series (administrators only)
 	// (POST /series/{seriesId}/regenerate-thumbnails)
 	RegenerateSeriesThumbnails(ctx context.Context, request RegenerateSeriesThumbnailsRequestObject) (RegenerateSeriesThumbnailsResponseObject, error)
-	// GetSeriesThumbnail Cover of the series' first book, JPEG
+	// DeleteSeriesThumbnail Drop the uploaded series cover; local artwork or the cover book's thumbnail shows again (administrators only)
+	// (DELETE /series/{seriesId}/thumbnail)
+	DeleteSeriesThumbnail(ctx context.Context, request DeleteSeriesThumbnailRequestObject) (DeleteSeriesThumbnailResponseObject, error)
+	// GetSeriesThumbnail Cover of the series, JPEG: an uploaded image, else the local artwork file, else the cover book's thumbnail (see Series.thumbnailSource)
 	// (GET /series/{seriesId}/thumbnail)
 	GetSeriesThumbnail(ctx context.Context, request GetSeriesThumbnailRequestObject) (GetSeriesThumbnailResponseObject, error)
+	// UploadSeriesThumbnail Replace the series cover with an uploaded image (administrators only)
+	// (PUT /series/{seriesId}/thumbnail)
+	UploadSeriesThumbnail(ctx context.Context, request UploadSeriesThumbnailRequestObject) (UploadSeriesThumbnailResponseObject, error)
 	// GetSettings Server settings (administrators only)
 	// (GET /settings)
 	GetSettings(ctx context.Context, request GetSettingsRequestObject) (GetSettingsResponseObject, error)
@@ -7052,6 +8116,68 @@ func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(LogoutResponseObject); ok {
 		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BulkUpdateBooks operation middleware
+func (sh *strictHandler) BulkUpdateBooks(w http.ResponseWriter, r *http.Request) {
+	var request BulkUpdateBooksRequestObject
+
+	var body BulkUpdateBooksJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BulkUpdateBooks(ctx, request.(BulkUpdateBooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BulkUpdateBooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BulkUpdateBooksResponseObject); ok {
+		if err := validResponse.VisitBulkUpdateBooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetBooksReadState operation middleware
+func (sh *strictHandler) SetBooksReadState(w http.ResponseWriter, r *http.Request) {
+	var request SetBooksReadStateRequestObject
+
+	var body SetBooksReadStateJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetBooksReadState(ctx, request.(SetBooksReadStateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetBooksReadState")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetBooksReadStateResponseObject); ok {
+		if err := validResponse.VisitSetBooksReadStateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -7421,6 +8547,34 @@ func (sh *strictHandler) GetBookThumbnail(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// UploadBookThumbnail operation middleware
+func (sh *strictHandler) UploadBookThumbnail(w http.ResponseWriter, r *http.Request, bookId string) {
+	var request UploadBookThumbnailRequestObject
+
+	request.BookId = bookId
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadBookThumbnail(ctx, request.(UploadBookThumbnailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadBookThumbnail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadBookThumbnailResponseObject); ok {
+		if err := validResponse.VisitUploadBookThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListCollections operation middleware
 func (sh *strictHandler) ListCollections(w http.ResponseWriter, r *http.Request) {
 	var request ListCollectionsRequestObject
@@ -7613,6 +8767,39 @@ func (sh *strictHandler) ListCollectionSeries(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListCollectionSeriesResponseObject); ok {
 		if err := validResponse.VisitListCollectionSeriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddCollectionSeriesMany operation middleware
+func (sh *strictHandler) AddCollectionSeriesMany(w http.ResponseWriter, r *http.Request, collectionId string) {
+	var request AddCollectionSeriesManyRequestObject
+
+	request.CollectionId = collectionId
+
+	var body AddCollectionSeriesManyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddCollectionSeriesMany(ctx, request.(AddCollectionSeriesManyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddCollectionSeriesMany")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddCollectionSeriesManyResponseObject); ok {
+		if err := validResponse.VisitAddCollectionSeriesManyResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8473,6 +9660,34 @@ func (sh *strictHandler) CreateReadList(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
+// ImportReadList operation middleware
+func (sh *strictHandler) ImportReadList(w http.ResponseWriter, r *http.Request, params ImportReadListParams) {
+	var request ImportReadListRequestObject
+
+	request.Params = params
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ImportReadList(ctx, request.(ImportReadListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ImportReadList")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ImportReadListResponseObject); ok {
+		if err := validResponse.VisitImportReadListResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteReadList operation middleware
 func (sh *strictHandler) DeleteReadList(w http.ResponseWriter, r *http.Request, readListId string) {
 	var request DeleteReadListRequestObject
@@ -8577,6 +9792,39 @@ func (sh *strictHandler) ListReadListBooks(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListReadListBooksResponseObject); ok {
 		if err := validResponse.VisitListReadListBooksResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddReadListBooks operation middleware
+func (sh *strictHandler) AddReadListBooks(w http.ResponseWriter, r *http.Request, readListId string) {
+	var request AddReadListBooksRequestObject
+
+	request.ReadListId = readListId
+
+	var body AddReadListBooksJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddReadListBooks(ctx, request.(AddReadListBooksRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddReadListBooks")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddReadListBooksResponseObject); ok {
+		if err := validResponse.VisitAddReadListBooksResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8716,6 +9964,94 @@ func (sh *strictHandler) ListSeries(w http.ResponseWriter, r *http.Request, para
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSeriesResponseObject); ok {
 		if err := validResponse.VisitListSeriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// BulkUpdateSeries operation middleware
+func (sh *strictHandler) BulkUpdateSeries(w http.ResponseWriter, r *http.Request) {
+	var request BulkUpdateSeriesRequestObject
+
+	var body BulkUpdateSeriesJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.BulkUpdateSeries(ctx, request.(BulkUpdateSeriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "BulkUpdateSeries")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(BulkUpdateSeriesResponseObject); ok {
+		if err := validResponse.VisitBulkUpdateSeriesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSeriesFacets operation middleware
+func (sh *strictHandler) ListSeriesFacets(w http.ResponseWriter, r *http.Request, params ListSeriesFacetsParams) {
+	var request ListSeriesFacetsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSeriesFacets(ctx, request.(ListSeriesFacetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSeriesFacets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSeriesFacetsResponseObject); ok {
+		if err := validResponse.VisitListSeriesFacetsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetSeriesReadState operation middleware
+func (sh *strictHandler) SetSeriesReadState(w http.ResponseWriter, r *http.Request) {
+	var request SetSeriesReadStateRequestObject
+
+	var body SetSeriesReadStateJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetSeriesReadState(ctx, request.(SetSeriesReadStateRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetSeriesReadState")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetSeriesReadStateResponseObject); ok {
+		if err := validResponse.VisitSetSeriesReadStateResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -8893,6 +10229,32 @@ func (sh *strictHandler) RegenerateSeriesThumbnails(w http.ResponseWriter, r *ht
 	}
 }
 
+// DeleteSeriesThumbnail operation middleware
+func (sh *strictHandler) DeleteSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request DeleteSeriesThumbnailRequestObject
+
+	request.SeriesId = seriesId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSeriesThumbnail(ctx, request.(DeleteSeriesThumbnailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSeriesThumbnail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSeriesThumbnailResponseObject); ok {
+		if err := validResponse.VisitDeleteSeriesThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetSeriesThumbnail operation middleware
 func (sh *strictHandler) GetSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string) {
 	var request GetSeriesThumbnailRequestObject
@@ -8912,6 +10274,34 @@ func (sh *strictHandler) GetSeriesThumbnail(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSeriesThumbnailResponseObject); ok {
 		if err := validResponse.VisitGetSeriesThumbnailResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadSeriesThumbnail operation middleware
+func (sh *strictHandler) UploadSeriesThumbnail(w http.ResponseWriter, r *http.Request, seriesId string) {
+	var request UploadSeriesThumbnailRequestObject
+
+	request.SeriesId = seriesId
+
+	request.Body = r.Body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadSeriesThumbnail(ctx, request.(UploadSeriesThumbnailRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadSeriesThumbnail")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadSeriesThumbnailResponseObject); ok {
+		if err := validResponse.VisitUploadSeriesThumbnailResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -9198,146 +10588,172 @@ func (sh *strictHandler) UpdateUser(w http.ResponseWriter, r *http.Request, user
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"3BWow79QBiGJ1J19obPoJMKad0c3L6L7T/f/fwA=",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

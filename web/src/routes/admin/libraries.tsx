@@ -34,6 +34,7 @@ type LibForm = {
   kind: Kind;
   scanInterval: Interval;
   importComicInfo: boolean;
+  importLocalArtwork: boolean;
   watch: boolean;
   exclude: string;
 };
@@ -78,6 +79,8 @@ const m = defineMessages({
     typeField: "種別",
     scanInterval: "スキャン間隔",
     readComicInfo: "ComicInfo.xml を読み込む",
+    useLocalArtwork: "フォルダ内の表紙画像を使う",
+    useLocalArtworkNote: "シリーズのフォルダにある cover・folder・poster という名前の画像を、シリーズの表紙にします。",
     watchFiles: "ファイルの変更を監視して自動でスキャンする",
     watchNote: "ネットワーク共有（SMB/NFS）のフォルダでは変更を検知できないことがあります。定期スキャンと併用してください。",
     exclude: "除外パターン",
@@ -130,6 +133,8 @@ const m = defineMessages({
     typeField: "Type",
     scanInterval: "Scan interval",
     readComicInfo: "Read ComicInfo.xml",
+    useLocalArtwork: "Use cover images in series folders",
+    useLocalArtworkNote: "cover, folder or poster images in a series folder become its cover",
     watchFiles: "Watch for file changes and scan automatically",
     watchNote: "Changes may not be detected on network shares (SMB/NFS). Use it together with scheduled scans.",
     exclude: "Exclude patterns",
@@ -151,6 +156,7 @@ const BLANK: LibForm = {
   kind: "manga",
   scanInterval: "daily",
   importComicInfo: true,
+  importLocalArtwork: true,
   watch: false,
   exclude: "",
 };
@@ -161,6 +167,7 @@ const toForm = (l: Library): LibForm => ({
   kind: l.kind,
   scanInterval: l.scanInterval,
   importComicInfo: l.importComicInfo,
+  importLocalArtwork: l.importLocalArtwork,
   watch: l.watch,
   exclude: l.exclude.join("\n"),
 });
@@ -217,6 +224,7 @@ export default function Screen() {
           if (form.kind !== original.kind) changes.kind = form.kind;
           if (form.scanInterval !== original.scanInterval) changes.scanInterval = form.scanInterval;
           if (form.importComicInfo !== original.importComicInfo) changes.importComicInfo = form.importComicInfo;
+          if (form.importLocalArtwork !== original.importLocalArtwork) changes.importLocalArtwork = form.importLocalArtwork;
           if (form.watch !== original.watch) changes.watch = form.watch;
           if (!sameList(exclude, original.exclude)) changes.exclude = exclude;
         }
@@ -231,6 +239,7 @@ export default function Screen() {
           kind: form.kind,
           scanInterval: form.scanInterval,
           importComicInfo: form.importComicInfo,
+          importLocalArtwork: form.importLocalArtwork,
           watch: form.watch,
           exclude,
         };
@@ -417,6 +426,14 @@ export default function Screen() {
                 checked={form.importComicInfo}
                 onToggle={() => set({ importComicInfo: !form.importComicInfo })}
               />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Switch
+                label={t("useLocalArtwork")}
+                checked={form.importLocalArtwork}
+                onToggle={() => set({ importLocalArtwork: !form.importLocalArtwork })}
+              />
+              <FieldDescription>{t("useLocalArtworkNote")}</FieldDescription>
             </div>
             <div className="flex flex-col gap-1.5">
               <Switch label={t("watchFiles")} checked={form.watch} onToggle={() => set({ watch: !form.watch })} />

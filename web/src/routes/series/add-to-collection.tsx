@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, type Collection } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
+import { chunked } from "@/components/media/selection-state";
 import { Block } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,6 +21,7 @@ const m = defineMessages({
     name: "名前",
     create: "作成",
     created: "コレクションを作成しました",
+    added: ({ n }) => `${n} 件を追加しました`,
   },
   en: {
     title: "Add to collection",
@@ -28,19 +30,27 @@ const m = defineMessages({
     name: "Name",
     create: "Create",
     created: "Collection created",
+    added: ({ n }) => `Added ${n}`,
   },
 });
 
-/** Adds this series to collections or takes it out. Each checkbox saves at once.
- *  Administrators only: the caller shows the menu item to them alone. */
+/** Adds series to collections. With `seriesId` (the series page) each checkbox
+ *  adds or takes out that one series at once. With `seriesIds` (a library
+ *  selection) each row adds all of them in one go. Administrators only: the
+ *  caller shows the menu item to them alone. */
 export function AddToCollectionDialog({
   seriesId,
+  seriesIds,
   open,
   onOpenChange,
+  onAdded,
 }: {
-  seriesId: string;
+  seriesId?: string;
+  seriesIds?: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Many mode: runs after the series were added; the dialog then closes. */
+  onAdded?: () => void;
 }) {
   const t = useT(m);
   return (
@@ -49,9 +59,126 @@ export function AddToCollectionDialog({
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
-        <CollectionChecks seriesId={seriesId} open={open} />
+        {seriesIds ? (
+          <CollectionAddMany
+            ids={seriesIds}
+            open={open}
+            onDone={() => {
+              onAdded?.();
+              onOpenChange(false);
+            }}
+          />
+        ) : (
+          <CollectionChecks seriesId={seriesId ?? ""} open={open} />
+        )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+/** Many series: a row click appends all of them to that collection; a new name
+ *  creates a collection holding them. */
+function CollectionAddMany({ ids, open, onDone }: { ids: string[]; open: boolean; onDone: () => void }) {
+  const t = useT(m);
+  const [lists, setLists] = useState<Collection[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [name, setName] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    let live = true;
+    api
+      .collections()
+      .then((cs) => {
+        if (live) setLists(cs);
+      })
+      .catch((err: unknown) => live && setError(errorMessage(err)));
+    return () => {
+      live = false;
+    };
+  }, [open, attempt]);
+
+  // The server takes at most 1000 ids per call; the chunks go one after another.
+  const addTo = async (c: Collection) => {
+    setBusy(true);
+    try {
+      for (const chunk of chunked(ids)) await api.addCollectionSeriesMany(c.id, chunk);
+      toast.success(t("added", { n: ids.length }));
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const create = async () => {
+    const n = name.trim();
+    if (!n || busy) return;
+    setBusy(true);
+    try {
+      const [first = [], ...rest] = chunked(ids);
+      const created = await api.createCollection({ name: n, ordered: false, seriesIds: first });
+      for (const chunk of rest) await api.addCollectionSeriesMany(created.id, chunk);
+      toast.success(t("created"));
+      onDone();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (error) return <LoadError message={error} onRetry={() => { setError(null); setAttempt((n) => n + 1); }} />;
+  if (!lists) return <Block className="h-24 w-full" />;
+
+  return (
+    <div className="flex flex-col gap-4">
+      {lists.length === 0 ? (
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("empty")}</p>
+      ) : (
+        <ul className="flex max-h-[50dvh] flex-col overflow-y-auto">
+          {lists.map((c) => (
+            <li key={c.id}>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => addTo(c)}
+                className={cn(
+                  typeClass("body"),
+                  "flex min-h-11 w-full cursor-pointer items-center gap-3 py-1 text-left text-foreground outline-none ring-[var(--focus-ring)] focus-visible:ring-2 disabled:cursor-progress",
+                )}
+              >
+                <span className="min-w-0 flex-1 truncate">{c.name}</span>
+                <span className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{c.seriesIds.length}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <Field>
+        <FieldLabel htmlFor="add-to-collection-new">{t("newCollection")}</FieldLabel>
+        <div className="flex items-center gap-2">
+          <Input
+            id="add-to-collection-new"
+            className="min-w-0 flex-1"
+            value={name}
+            placeholder={t("name")}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing && e.keyCode !== 229) create();
+            }}
+          />
+          <Button variant="secondary" disabled={!name.trim() || busy} onClick={create}>
+            {t("create")}
+          </Button>
+        </div>
+      </Field>
+    </div>
   );
 }
 

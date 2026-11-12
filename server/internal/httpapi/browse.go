@@ -46,10 +46,43 @@ func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (L
 			args = append(args, string(v))
 		}
 	}
-	if p.Genres != nil && len(*p.Genres) > 0 {
-		where = append(where, `EXISTS (SELECT 1 FROM json_each(s.genres) g WHERE g.value IN (`+placeholders(len(*p.Genres))+`))`)
-		for _, v := range *p.Genres {
+	// anyOf adds a condition that holds when the value (the one ?LIST
+	// placeholder stands for the list) is one of vals. Empty lists are not
+	// filters.
+	anyOf := func(tmpl string, vals []string) {
+		if len(vals) == 0 {
+			return
+		}
+		where = append(where, strings.Replace(tmpl, "?LIST", placeholders(len(vals)), 1))
+		for _, v := range vals {
 			args = append(args, v)
+		}
+	}
+	if p.Genres != nil {
+		anyOf(`EXISTS (SELECT 1 FROM json_each(s.genres) g WHERE g.value IN (?LIST))`, *p.Genres)
+	}
+	if p.Tags != nil {
+		anyOf(`EXISTS (SELECT 1 FROM json_each(s.tags) t WHERE t.value IN (?LIST))`, *p.Tags)
+	}
+	if p.Authors != nil {
+		anyOf(`EXISTS (SELECT 1 FROM json_each(s.authors) a WHERE json_extract(a.value, '$.name') IN (?LIST))`, *p.Authors)
+	}
+	if p.Publishers != nil {
+		anyOf(`s.publisher IN (?LIST)`, *p.Publishers)
+	}
+	if p.Languages != nil {
+		anyOf(`s.language IN (?LIST)`, *p.Languages)
+	}
+	if p.AgeRatingMax != nil {
+		where, args = append(where, `(s.age_rating IS NULL OR s.age_rating <= ?)`), append(args, *p.AgeRatingMax)
+	}
+	if p.Complete != nil {
+		// Known total reached: the book count is at least the total.
+		reached := `(s.total_book_count IS NOT NULL AND ` + seriesTotalBooks + ` >= s.total_book_count)`
+		if *p.Complete {
+			where = append(where, reached)
+		} else {
+			where = append(where, `NOT `+reached)
 		}
 	}
 	if p.ReadState != nil && len(*p.ReadState) > 0 {

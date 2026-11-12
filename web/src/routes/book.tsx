@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
@@ -12,6 +12,8 @@ import { DotTrack } from "@/components/media/dot-track";
 import { EmptyState, Page, SectionTitle } from "@/components/media/layout";
 import { Block } from "@/components/media/skeletons";
 import { AddToReadListDialog } from "@/routes/readlists/add-to-readlist";
+import { BookEditDialog } from "@/routes/book-edit-dialog";
+import { ConfirmDialog } from "@/routes/admin/_parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
@@ -62,6 +64,12 @@ const m = defineMessages({
     markUnread: "未読にする",
     markRead: "既読にする",
     more: "その他",
+    editMetadata: "メタデータを編集",
+    uploadThumbnail: "表紙の画像をアップロード",
+    thumbTooLarge: "画像は 20 MB 以下にしてください",
+    thumbUploaded: "表紙の画像を差し替えました",
+    regenerateTitle: "表紙を作り直しますか",
+    regenerateUploadedBody: "アップロードした画像を、ページから作った表紙に置き換えます。",
     analysisPending: "解析が終わっていません",
     releaseDate: "発売日",
     notSet: "未設定",
@@ -119,6 +127,12 @@ const m = defineMessages({
     markUnread: "Mark as unread",
     markRead: "Mark as read",
     more: "More",
+    editMetadata: "Edit metadata",
+    uploadThumbnail: "Upload thumbnail",
+    thumbTooLarge: "Images must be 20 MB or smaller",
+    thumbUploaded: "Thumbnail replaced",
+    regenerateTitle: "Regenerate the thumbnail?",
+    regenerateUploadedBody: "This replaces the uploaded image with a thumbnail made from a page.",
     analysisPending: "Analysis is not finished yet",
     releaseDate: "Release date",
     notSet: "Not set",
@@ -140,6 +154,8 @@ const m = defineMessages({
 });
 
 const PREVIEW_PAGES = 24;
+// The API's limit for an uploaded thumbnail.
+const MAX_THUMBNAIL_BYTES = 20 * 1024 * 1024;
 
 export default function Screen() {
   const { bookId = "" } = useParams();
@@ -176,6 +192,10 @@ function BookPage({ id }: { id: string }) {
   // The read-list dialog is remounted per open so its lists are fetched fresh.
   const [addOpen, setAddOpen] = useState(false);
   const [addKey, setAddKey] = useState(0);
+  // The metadata dialog is remounted per open so its form starts fresh.
+  const [editOpen, setEditOpen] = useState(false);
+  const [editKey, setEditKey] = useState(0);
+  const [confirmRegen, setConfirmRegen] = useState(false);
 
   if (error) {
     return (
@@ -277,8 +297,18 @@ function BookPage({ id }: { id: string }) {
       },
     });
   }
+  if (isAdmin) {
+    menu.push({
+      label: t("editMetadata"),
+      onSelect: () => {
+        setEditKey((k) => k + 1);
+        setEditOpen(true);
+      },
+    });
+  }
   if (isAdmin && book.mediaStatus === "ready") {
-    menu.push({ label: t("regenerate"), onSelect: regenerate });
+    // An uploaded thumbnail is replaced by regenerating, so ask first.
+    menu.push({ label: t("regenerate"), onSelect: book.thumbnailUploaded ? () => setConfirmRegen(true) : regenerate });
     menu.push({
       label: t("choosePage"),
       onSelect: () => {
@@ -287,6 +317,33 @@ function BookPage({ id }: { id: string }) {
       },
     });
   }
+  if (isAdmin) {
+    menu.push({ label: t("uploadThumbnail"), onSelect: () => document.getElementById("book-thumb-input")?.click() });
+  }
+
+  const uploadThumbnail = async (file: File) => {
+    if (file.size > MAX_THUMBNAIL_BYTES) {
+      toast.error(t("thumbTooLarge"));
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.uploadBookThumbnail(book.id, file);
+      bumpCover(book.id, book.seriesId); // the <img> fetches the new image
+      toast.success(t("thumbUploaded"));
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onThumbPicked = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // so picking the same file again still fires
+    if (file) void uploadThumbnail(file);
+  };
 
   const toggleRead = async () => {
     setBusy(true);
@@ -398,6 +455,28 @@ function BookPage({ id }: { id: string }) {
             </DropdownMenu>
           </div>
           {isAdmin && <AddToReadListDialog key={addKey} bookId={book.id} open={addOpen} onOpenChange={setAddOpen} />}
+          {isAdmin && (
+            <>
+              <input
+                id="book-thumb-input"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                tabIndex={-1}
+                aria-hidden
+                hidden
+                onChange={onThumbPicked}
+              />
+              <BookEditDialog key={editKey} book={book} open={editOpen} onOpenChange={setEditOpen} onSaved={reload} />
+              <ConfirmDialog
+                open={confirmRegen}
+                onOpenChange={setConfirmRegen}
+                title={t("regenerateTitle")}
+                body={t("regenerateUploadedBody")}
+                confirmLabel={t("regenerate")}
+                onConfirm={regenerate}
+              />
+            </>
+          )}
           {!canMarkRead && book.mediaStatus === "outdated" && (
             <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("analysisPending")}</p>
           )}
