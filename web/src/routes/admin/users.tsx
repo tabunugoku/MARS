@@ -296,7 +296,7 @@ export default function Screen() {
                     </TableCell>
                     <TableCell className="whitespace-nowrap">{u.lastActive ? relTime(u.lastActive) : t("none")}</TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
+                      <div className="flex gap-1">
                         <IconAction label={t("edit")} icon={SquarePen} onClick={() => !busy && openEdit(u)} />
                         <IconAction
                           label={t("delete")}
