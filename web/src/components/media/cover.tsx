@@ -1,4 +1,5 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
+import { onCoverRetry } from "@/lib/cover-retry";
 import { cn } from "@/lib/utils";
 
 export interface CoverProps {
@@ -22,6 +23,8 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
   // A book without a thumbnail yet (not analysed, or no image) answers 404.
   const [failed, setFailed] = useState<string | null>(null);
   const missing = !src || failed === src;
+  // Try again once books have been analysed (see live events).
+  useEffect(() => (missing && src ? onCoverRetry(() => setFailed(null)) : undefined), [missing, src]);
   return (
     <div
       className={cn("relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-muted", className)}

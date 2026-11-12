@@ -4,6 +4,7 @@
 // screens (lazy chunks), never from the shell, so the initial bundle stays
 // as it is.
 import { useEffect, useRef, useState } from "react";
+import { retryCovers } from "@/lib/cover-retry";
 import type { components } from "./schema";
 
 type S = components["schemas"];
@@ -36,8 +37,17 @@ let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const enabled = () => import.meta.env.VITE_API !== "mock" && typeof EventSource !== "undefined";
 
+let coverTimer: ReturnType<typeof setTimeout> | undefined;
+
 function emit(e: LiveEvent) {
   for (const l of [...listeners]) l(e);
+  // New thumbnails: covers that had none try again, at most every 2 s.
+  if ((e.type === "book" || e.type === "reconnect") && !coverTimer) {
+    coverTimer = setTimeout(() => {
+      coverTimer = undefined;
+      retryCovers();
+    }, 2000);
+  }
 }
 
 function setUp(v: boolean) {
