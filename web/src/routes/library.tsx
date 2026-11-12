@@ -12,7 +12,7 @@ import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { KindIcon } from "@/components/media/kind-icon";
 import { SelectionBar, SelectTile, type BarAction } from "@/components/media/selection";
-import { inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
+import { BULK_LIMIT, inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
 import { CoverSkeleton, GridSkeleton } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
@@ -84,6 +84,8 @@ const m = defineMessages({
     markedUnreadN: ({ n }) => `${n} 件を未読にしました`,
     addToCollection: "コレクションに追加",
     bulkEdit: "一括編集",
+    selectAllLoaded: ({ n }) => `読み込み済みの ${n} 件を選択`,
+    selectAllLoading: ({ n, total }) => `読み込み中 ${n} / ${total}`,
   },
   en: {
     allLibraries: "All libraries",
@@ -142,6 +144,8 @@ const m = defineMessages({
     markedUnreadN: ({ n }) => `Marked ${n} as unread`,
     addToCollection: "Add to collection",
     bulkEdit: "Edit series",
+    selectAllLoaded: ({ n }) => `Select the ${n} loaded`,
+    selectAllLoading: ({ n, total }) => `Loading ${n} of ${total}`,
   },
 });
 
@@ -279,6 +283,34 @@ export default function Screen() {
   // Selection ends when the list changes (library, sort or filter): the key says which list it is.
   const selKey = JSON.stringify([scope ?? null, sort, desc, read, status, genre, tag, publisher, language, author, age ?? null, complete ?? null]);
   const sel = useSelection(series?.map((s) => s.id) ?? [], selKey);
+
+  // Select all must not miss pages not loaded yet. When the whole list fits under
+  // the bulk ceiling, the remaining pages load first (one page at a time, shown as
+  // progress); above it, the bar says it selects only the loaded series. The key
+  // ties the loading to this list, so a new sort or filter drops it.
+  const [loadAllFor, setLoadAllFor] = useState<string | null>(null);
+  // The list that finished loading for select all; stops the selection from being redone.
+  const loadedAllFor = useRef<string | null>(null);
+  const canLoadAll = seriesList.total <= BULK_LIMIT;
+  // Loading is over when the last page arrives or an error stops it (a retry resumes).
+  const loadingAll = loadAllFor === selKey && seriesList.hasMore && !seriesList.error;
+  const selectEverything = () => {
+    if (seriesList.hasMore && canLoadAll) {
+      loadedAllFor.current = null;
+      setLoadAllFor(selKey);
+    } else sel.selectAll();
+  };
+  const { hasMore, loading, error, loadMore } = seriesList;
+  const { active, selectAll } = sel;
+  useEffect(() => {
+    if (loadAllFor !== selKey || !active || loading || error) return;
+    if (hasMore) {
+      loadMore();
+    } else if (loadedAllFor.current !== selKey) {
+      loadedAllFor.current = selKey;
+      selectAll();
+    }
+  }, [loadAllFor, selKey, active, hasMore, loading, error, loadMore, selectAll]);
   // After a bulk action the visible data reloads; the selection clears only when
   // the action worked, so a failed one can be retried with the same series.
   const afterBulk = (ok = true) => {
@@ -484,7 +516,15 @@ export default function Screen() {
         <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
         <div className="flex items-center gap-2">
           {!sel.active && series.length > 0 && (
-            <Button variant="secondary" onClick={sel.enter} leadingIcon={ListChecks as IconComponent}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                // A load left over from an earlier selection must not select everything now.
+                setLoadAllFor(null);
+                sel.enter();
+              }}
+              leadingIcon={ListChecks as IconComponent}
+            >
               {t("select")}
             </Button>
           )}
@@ -643,7 +683,15 @@ export default function Screen() {
             key="selection"
             count={sel.count}
             busy={bulk.busy}
-            onSelectAll={sel.selectAll}
+            onSelectAll={selectEverything}
+            selectAllLabel={
+              loadingAll
+                ? t("selectAllLoading", { n: series.length, total: seriesList.total })
+                : seriesList.hasMore && !canLoadAll
+                  ? t("selectAllLoaded", { n: series.length })
+                  : undefined
+            }
+            selectAllBusy={loadingAll}
             onCancel={sel.exit}
             actions={selectionActions}
           />

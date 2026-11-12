@@ -120,10 +120,13 @@ func settingsProblem(v ServerSettings) string {
 	return ""
 }
 
-// loadSettings returns the stored settings merged over the defaults. A
-// stored value that does not parse or validate counts as corrupt: the
-// defaults are returned instead.
-func loadSettings(ctx context.Context, q queryRower) (ServerSettings, error) {
+// errSettingsCorrupt means a stored settings value does not parse or validate.
+var errSettingsCorrupt = errors.New("stored server settings are corrupt")
+
+// readSettings returns the stored settings merged over the defaults. With an
+// error, the defaults come back too: errSettingsCorrupt for a stored value that
+// does not parse or validate, or the database error.
+func readSettings(ctx context.Context, q queryRower) (ServerSettings, error) {
 	var raw string
 	err := q.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = 'server'`).Scan(&raw)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -134,9 +137,28 @@ func loadSettings(ctx context.Context, q queryRower) (ServerSettings, error) {
 	}
 	v := defaultSettings()
 	if json.Unmarshal([]byte(raw), &v) != nil || settingsProblem(v) != "" {
-		return defaultSettings(), nil
+		return defaultSettings(), errSettingsCorrupt
 	}
 	return v, nil
+}
+
+// loadSettings returns the stored settings merged over the defaults. A
+// stored value that does not parse or validate counts as corrupt: the
+// defaults are returned instead.
+func loadSettings(ctx context.Context, q queryRower) (ServerSettings, error) {
+	v, err := readSettings(ctx, q)
+	if errors.Is(err, errSettingsCorrupt) {
+		return v, nil
+	}
+	return v, err
+}
+
+// ReadServerSettings returns the stored server settings like LoadServerSettings,
+// but also reports why they could not be read: a database error or corrupt
+// stored values. The defaults come back with the error, so a caller can log it
+// and carry on.
+func ReadServerSettings(ctx context.Context, db *sql.DB) (ServerSettings, error) {
+	return readSettings(ctx, db)
 }
 
 // LoadServerSettings returns the stored server settings for the server

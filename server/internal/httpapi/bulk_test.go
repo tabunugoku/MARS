@@ -275,3 +275,27 @@ func TestAddReadListBooks(t *testing.T) {
 		t.Fatalf("books after refusals %v", got.BookIds)
 	}
 }
+
+// TestAddReadListBooksKeepsOrderAndSkips: new books are appended in the order
+// given, numbered after the last position, while a book already in the list
+// keeps its place and is not added again. Books from two series are used.
+func TestAddReadListBooksKeepsOrderAndSkips(t *testing.T) {
+	e, a, b := progressEnv(t)
+	alpha := seriesBooks(t, e.admin, libSeries(t, e.admin, a.Id).Id)
+	beta := seriesBooks(t, e.admin, libSeries(t, e.admin, b.Id).Id)
+	all := append(slices.Clone(alpha), beta...)
+	if len(all) != 3 {
+		t.Fatalf("books %d, want 3", len(all))
+	}
+	var l ReadList
+	e.admin.json("POST", "/api/v1/read-lists", map[string]any{"name": "順番と重複", "bookIds": []string{all[2].Id}}, 201, &l)
+
+	e.admin.json("POST", "/api/v1/read-lists/"+l.Id+"/books", map[string]any{"bookIds": []string{all[1].Id, all[2].Id, all[0].Id}}, 200, &l)
+	if want := []string{all[2].Id, all[1].Id, all[0].Id}; !slices.Equal(l.BookIds, want) {
+		t.Fatalf("books %v, want %v", l.BookIds, want)
+	}
+	e.admin.json("POST", "/api/v1/read-lists/"+l.Id+"/books", map[string]any{"bookIds": []string{all[0].Id, all[1].Id}}, 200, &l)
+	if want := []string{all[2].Id, all[1].Id, all[0].Id}; !slices.Equal(l.BookIds, want) {
+		t.Fatalf("books after repeats %v, want %v", l.BookIds, want)
+	}
+}

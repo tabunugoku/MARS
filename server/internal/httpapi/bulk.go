@@ -431,8 +431,15 @@ func (s *server) SetBooksReadState(ctx context.Context, req SetBooksReadStateReq
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
+	// One event per series, not per book: the book and series pages reload
+	// on a series-level event, and no consumer needs the single book.
+	seen := make(map[string]bool, len(rows))
 	for _, r := range rows {
-		s.progressChanged(ctx, events.Progress{LibraryID: r.libraryID, SeriesID: r.seriesID, BookID: r.id})
+		if seen[r.seriesID] {
+			continue
+		}
+		seen[r.seriesID] = true
+		s.progressChanged(ctx, events.Progress{LibraryID: r.libraryID, SeriesID: r.seriesID})
 	}
 	return SetBooksReadState204Response{}, nil
 }
@@ -454,21 +461,45 @@ func (s *server) addMany(ctx context.Context, l listLink, listID string, members
 	if !ok {
 		return l.notFound, nil
 	}
-	for _, id := range members {
-		ok, err := l.memberVisible(ctx, tx, id)
-		if err != nil {
-			return "", err
-		}
-		if !ok {
-			return l.noMember, nil
-		}
+	visible, err := l.countVisible(ctx, tx, members)
+	if err != nil {
+		return "", err
 	}
-	for _, id := range members {
-		if err := l.add(ctx, tx, listID, id); err != nil {
-			return "", err
-		}
+	if visible != len(members) {
+		return l.noMember, nil
+	}
+	if err := l.addAll(ctx, tx, listID, members); err != nil {
+		return "", err
 	}
 	return "", tx.Commit()
+}
+
+// countVisible counts the given members the caller can see, in one query.
+// members must be distinct, so a count below len(members) means one is hidden
+// or missing.
+func (l listLink) countVisible(ctx context.Context, tx *sql.Tx, members []string) (int, error) {
+	cond, args := libScope(ctx, l.alias+".library_id")
+	var n int
+	err := tx.QueryRowContext(ctx, `SELECT COUNT(*) FROM `+l.member+` `+l.alias+` WHERE `+l.alias+`.deleted_at IS NULL AND `+cond+
+		` AND `+l.alias+`.id IN (`+placeholders(len(members))+`)`,
+		append(args, anyStrings(members)...)...).Scan(&n)
+	return n, err
+}
+
+// addAll appends the members that are not in the list yet, in the given order,
+// after the current last position. Members already in the list keep their
+// place. json_each gives each id its index, and ROW_NUMBER numbers only the new
+// ones, so the positions stay contiguous, as one add per id would leave them.
+func (l listLink) addAll(ctx context.Context, tx *sql.Tx, listID string, members []string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO `+l.link+` (`+l.listCol+`, `+l.memberCol+`, position)
+		SELECT ?, n.id, base.start + n.rn - 1
+		FROM (SELECT j.value AS id, ROW_NUMBER() OVER (ORDER BY j.key) AS rn FROM json_each(?) j
+			WHERE j.value NOT IN (SELECT `+l.memberCol+` FROM `+l.link+` WHERE `+l.listCol+` = ?)) n,
+			(SELECT COALESCE(MAX(position) + 1, 0) AS start FROM `+l.link+` WHERE `+l.listCol+` = ?) base
+		WHERE TRUE
+		ON CONFLICT(`+l.listCol+`, `+l.memberCol+`) DO NOTHING`,
+		listID, jsonText(members), listID, listID)
+	return err
 }
 
 // AddCollectionSeriesMany appends several series to a collection, in order.

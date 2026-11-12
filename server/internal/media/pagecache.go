@@ -235,15 +235,17 @@ func writePages(ctx context.Context, dir string, archivePath archive.Path, pages
 	}
 	written := make(map[string]int, len(want))
 
-	a, _, err := archive.OpenPath(archivePath)
+	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
+	defer cancel()
+	// OpenPathContext, not OpenPath: parsing a PDF is the slow part and must
+	// stop when the timeout or the request ends.
+	a, _, err := archive.OpenPathContext(ctx, archivePath)
 	if err != nil {
 		return nil, err
 	}
 	defer a.Close()
 
 	var total int64
-	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
-	defer cancel()
 	err = archive.WalkLimited(a, archive.Limit{Ctx: ctx, MaxBytes: MaxDecompressed}, func(e archive.Entry, r io.Reader) error {
 		if err := ctx.Err(); err != nil {
 			return err

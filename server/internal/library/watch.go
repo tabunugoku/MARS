@@ -34,6 +34,10 @@ var (
 // watcher. Tests use it to count attempts.
 var watchStartHook func(libraryID string)
 
+// watchScanHook, when set, is called in place of queueing a scan for a
+// library's watcher. Tests use it to count the scans watchers request.
+var watchScanHook func(libraryID string)
+
 // watchBackoff returns the wait after the given number of consecutive failed starts.
 func watchBackoff(failures int) time.Duration {
 	d := watchRetryFirst
@@ -90,6 +94,10 @@ func (st *watchState) halt() {
 type watchSet struct {
 	mu     sync.Mutex
 	states map[string]*watchState // library id -> state
+	// seen marks the libraries that have had a watcher state (running or
+	// failed) since the server started. A start of such a library may have
+	// missed changes, so it queues a catch-up scan.
+	seen map[string]bool
 }
 
 // watchSets keeps the watcher state of each Service, so the Service struct
@@ -97,7 +105,7 @@ type watchSet struct {
 var watchSets sync.Map // *Service -> *watchSet
 
 func (s *Service) watches() *watchSet {
-	v, _ := watchSets.LoadOrStore(s, &watchSet{states: map[string]*watchState{}})
+	v, _ := watchSets.LoadOrStore(s, &watchSet{states: map[string]*watchState{}, seen: map[string]bool{}})
 	return v.(*watchSet)
 }
 
@@ -170,6 +178,7 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 
 		ws.mu.Lock()
 		st := ws.states[w.id]
+		seenBefore := ws.seen[w.id]
 		ws.mu.Unlock()
 		if st != nil && st.sig == sig {
 			if st.running() {
@@ -194,8 +203,7 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 		next := &watchState{sig: sig}
 		id := w.id
 		scanFn := func() { s.queueWatchScan(ctx, id) }
-		var fail func(error)
-		fail = func(err error) { // called from the watcher goroutine
+		fail := func(err error) { // called from the watcher goroutine
 			msg := watchErrMessage(err)
 			slog.Warn("watch library", "library", id, "err", err)
 			ws.mu.Lock()
@@ -225,7 +233,13 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 		}
 		ws.mu.Lock()
 		ws.states[w.id] = next
+		ws.seen[w.id] = true
 		ws.mu.Unlock()
+		if err == nil && seenBefore {
+			// The library was (or was meant to be) watched before: changes
+			// made while it was not watched are picked up now.
+			scanFn()
+		}
 	}
 
 	ws.mu.Lock()
@@ -244,6 +258,10 @@ func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
 // queueWatchScan queues a library scan for a watcher. The queue already
 // merges a scan that is still waiting, so at most one is pending.
 func (s *Service) queueWatchScan(ctx context.Context, libraryID string) {
+	if watchScanHook != nil {
+		watchScanHook(libraryID)
+		return
+	}
 	if _, err := s.QueueScan(ctx, libraryID); err != nil && ctx.Err() == nil {
 		slog.Error("watch scan", "library", libraryID, "err", err)
 	}
@@ -260,7 +278,8 @@ func watchErrMessage(err error) string {
 // until the returned cancel is called or ctx ends. Each change that could
 // matter to the library calls scan once the library has been quiet for
 // watchDelay. A failure while watching calls fail and ends the watcher (done
-// closes). A failure to start returns err.
+// closes); a change still waiting for its quiet period is passed to scan
+// first, so the failure does not drop it. A failure to start returns err.
 func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(), fail func(error)) (context.CancelFunc, chan struct{}, error) {
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -284,6 +303,15 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 			timer = time.NewTimer(watchDelay)
 			fire = timer.C
 		}
+		// flush queues the scan for a change still waiting for its quiet
+		// period. Called on the way out of a failure, since nothing else will.
+		flush := func() {
+			if timer != nil {
+				timer.Stop()
+				timer, fire = nil, nil
+				onQuiet()
+			}
+		}
 		for {
 			select {
 			case <-ctx.Done():
@@ -293,10 +321,12 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 				return
 			case ev, ok := <-w.Events:
 				if !ok {
+					flush()
 					return
 				}
 				dirty, err := handleWatchEvent(w, root, ev, exclude)
 				if err != nil && !errors.Is(err, fs.ErrNotExist) {
+					flush()
 					fail(err)
 					return
 				}
@@ -305,12 +335,14 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 				}
 			case _, ok := <-w.Errors:
 				if !ok {
+					flush()
 					return
 				}
 				// Events may have been lost (for example an inotify queue
 				// overflow): pick up folders made meanwhile, then scan to
 				// be safe.
 				if err := rescanTree(w, root, exclude); err != nil {
+					flush()
 					fail(err)
 					return
 				}

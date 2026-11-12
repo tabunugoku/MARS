@@ -45,8 +45,9 @@ func TestErrorsFollowAcceptLanguage(t *testing.T) {
 		t.Fatalf("en message %q", enErr.Message)
 	}
 
-	// Other languages, and no header at all, give Japanese.
-	fr := e.admin.do("GET", "/api/v1/libraries/nope", nil, "Accept-Language", "fr, en;q=0.5")
+	// Other languages, and no header at all, give Japanese. English weighted
+	// below a French tag still counts: "fr, en;q=0.5" would give English.
+	fr := e.admin.do("GET", "/api/v1/libraries/nope", nil, "Accept-Language", "fr, de;q=0.5")
 	if got := errorBody(t, fr.Body.Bytes()).Message; got != jaErr.Message {
 		t.Fatalf("fr message %q, want Japanese", got)
 	}

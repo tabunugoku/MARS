@@ -89,12 +89,18 @@ export function SelectionBar({
   count,
   busy,
   onSelectAll,
+  selectAllLabel,
+  selectAllBusy = false,
   onCancel,
   actions,
 }: {
   count: number;
   busy: boolean;
   onSelectAll: () => void;
+  /** Overrides the select-all label (e.g. "読み込み済みの N 件を選択"). */
+  selectAllLabel?: string;
+  /** Disables select-all while the screen loads what it needs for it. */
+  selectAllBusy?: boolean;
   onCancel: () => void;
   actions: BarAction[];
 }) {
@@ -113,8 +119,8 @@ export function SelectionBar({
         <p className={cn(typeClass("body"), "mr-1 shrink-0 tabular-nums")}>{t("count", { n: count })}</p>
 
         <div className="hidden items-center gap-1 md:flex">
-          <Button variant="ghost" className="pointer-coarse:h-11" disabled={busy} onClick={onSelectAll}>
-            {t("selectAll")}
+          <Button variant="ghost" className="pointer-coarse:h-11" disabled={busy || selectAllBusy} onClick={onSelectAll}>
+            {selectAllLabel ?? t("selectAll")}
           </Button>
           {actions.map((a) => (
             <Button
@@ -133,7 +139,7 @@ export function SelectionBar({
         <DropdownMenu>
           <DropdownTrigger render={<Button variant="secondary" className="pointer-coarse:h-11 md:hidden" disabled={busy}>{t("more")}</Button>} />
           <DropdownContent align="end" sideOffset={4}>
-            <MenuItem index={0} label={t("selectAll")} onSelect={onSelectAll} />
+            <MenuItem index={0} label={selectAllLabel ?? t("selectAll")} disabled={selectAllBusy} onSelect={onSelectAll} />
             {actions.map((a, i) => (
               <MenuItem key={a.key} index={i + 1} label={a.label} icon={a.icon} disabled={busy} onSelect={a.onSelect} />
             ))}

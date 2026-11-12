@@ -44,6 +44,26 @@ export function useSelection(visible: string[], scopeKey: string) {
     setState((s) => (s.on && s.key === scopeKey ? { ...s, picked: new Set(visible) } : s));
   }, [scopeKey, visible]);
 
+  // A pick whose id left the loaded data (a scan removed the series or book) is
+  // dropped: the bulk calls fail whole on a missing id. Only ids that were visible
+  // on the last render and are gone now count, so a pick outside the loaded
+  // window stays. A new scope already ended the selection above.
+  const lastVisible = useRef<Set<string> | null>(null);
+  useEffect(() => {
+    const now = new Set(visible);
+    const before = lastVisible.current;
+    lastVisible.current = now;
+    if (!before) return;
+    const gone = [...before].filter((id) => !now.has(id));
+    if (gone.length === 0) return;
+    setState((s) => {
+      if (!gone.some((id) => s.picked.has(id))) return s;
+      const next = new Set(s.picked);
+      for (const id of gone) next.delete(id);
+      return { ...s, picked: next };
+    });
+  }, [visible]);
+
   const toggle = (id: string, shift = false) => {
     const from = anchor.current?.key === scopeKey ? anchor.current.id : null;
     const fromIndex = from ? visible.indexOf(from) : -1;

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 )
 
@@ -116,7 +117,15 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 		return err
 	}
 	s.removeThumb(sr.thumb)
+	s.seriesChanged(sr.libraryID)
 	return nil
+}
+
+// seriesChanged announces that a series' cover changed. There is no series
+// event: a "library" event makes open screens of the library refetch, which
+// includes the series covers (see queueScan).
+func (s *Service) seriesChanged(libraryID string) {
+	s.Events.Publish(events.Event{Type: "library", LibraryID: libraryID, Data: events.Library{LibraryID: libraryID}})
 }
 
 // DropSeriesUpload removes an uploaded series cover. Local artwork is picked
@@ -141,11 +150,15 @@ func (s *Service) DropSeriesUpload(ctx context.Context, seriesID string) error {
 	}
 	s.removeThumb(sr.thumb)
 	sr.thumb, sr.source, sr.sig = "", "", ""
+	s.seriesChanged(sr.libraryID)
 	l, err := s.load(ctx, sr.libraryID)
 	if err != nil {
 		return err
 	}
-	_, err = s.syncSeriesArt(ctx, l, sr)
+	changed, err := s.syncSeriesArt(ctx, l, sr)
+	if changed {
+		s.seriesChanged(sr.libraryID) // local artwork came back
+	}
 	return err
 }
 

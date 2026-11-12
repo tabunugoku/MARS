@@ -281,3 +281,91 @@ func TestRescanTreeMissingRootIsNotAnError(t *testing.T) {
 		t.Fatalf("missing root: %v, want nil", err)
 	}
 }
+
+// A failure ends the watcher, but a change still waiting for its quiet
+// period is queued first.
+func TestWatchTreeFailureQueuesPendingChange(t *testing.T) {
+	old := watchDelay
+	watchDelay = time.Hour // the quiet period never ends during the test
+	defer func() { watchDelay = old }()
+
+	root := filepath.Join(t.TempDir(), "lib")
+	testMkdir(t, root, "a")
+	var scans atomic.Int32
+	cancel, done, err := watchTree(context.Background(), root, nil,
+		func() { scans.Add(1) }, func(error) {})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+	testWriteFile(t, root, "a/book.cbz")
+	time.Sleep(300 * time.Millisecond) // the event is seen; the quiet timer runs
+	if n := scans.Load(); n != 0 {
+		t.Fatalf("%d scans before the quiet period, want 0", n)
+	}
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("watcher did not end after its root was removed")
+	}
+	if n := scans.Load(); n != 1 {
+		t.Fatalf("failure with a change pending: %d scans, want 1", n)
+	}
+}
+
+// A library whose watcher is restarted (here by a settings change) queues one
+// catch-up scan. Its first start after the server boots does not.
+func TestWatchRestartQueuesCatchUpScan(t *testing.T) {
+	ctx := context.Background()
+	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx,
+		`INSERT INTO libraries (id, name, root, kind, watch, created_at) VALUES ('lib1', 'L', ?, 'manga', 1, '2026-01-01T00:00:00Z')`,
+		t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+
+	var scans atomic.Int32
+	watchScanHook = func(id string) {
+		if id == "lib1" {
+			scans.Add(1)
+		}
+	}
+	defer func() { watchScanHook = nil }()
+
+	s := &Service{DB: conn}
+	ws := s.watches()
+	defer func() {
+		ws.mu.Lock()
+		defer ws.mu.Unlock()
+		for _, st := range ws.states {
+			st.halt()
+		}
+	}()
+	check := func(step string, want int32) {
+		t.Helper()
+		if n := scans.Load(); n != want {
+			t.Fatalf("%s: %d catch-up scans, want %d", step, n, want)
+		}
+	}
+
+	s.reconcileWatches(ctx, ws)
+	check("first start after boot", 0)
+
+	// A pass with nothing changed leaves the running watcher alone.
+	s.reconcileWatches(ctx, ws)
+	check("unchanged pass", 0)
+
+	// A settings change restarts the watcher: one catch-up scan.
+	if _, err := conn.ExecContext(ctx, `UPDATE libraries SET exclude = '["x"]' WHERE id = 'lib1'`); err != nil {
+		t.Fatal(err)
+	}
+	s.reconcileWatches(ctx, ws)
+	check("restart after settings change", 1)
+}
