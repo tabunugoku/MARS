@@ -22,9 +22,9 @@ func placeholders(n int) string {
 // the caller's user id as its one argument.
 const (
 	seriesTotalBooks = `(SELECT count(*) FROM books b WHERE b.series_id = s.id AND b.deleted_at IS NULL)`
-	seriesReadBooks  = `(SELECT count(*) FROM books b JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	seriesReadBooks  = `(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 1)`
-	seriesTouched = `EXISTS (SELECT 1 FROM books b JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	seriesTouched = `EXISTS (SELECT 1 FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL)`
 )
 
@@ -118,6 +118,31 @@ func (s *server) ListSeries(ctx context.Context, req ListSeriesRequestObject) (L
 	return ListSeries200JSONResponse{Body: out, Headers: ListSeries200ResponseHeaders{XTotalCount: &total}}, nil
 }
 
+// ListGenres lists the distinct genres of the series the caller may see:
+// the genre filter's options, without sending every series to the client.
+func (s *server) ListGenres(ctx context.Context, req ListGenresRequestObject) (ListGenresResponseObject, error) {
+	scope, args := libScope(ctx, "s.library_id")
+	q := `SELECT DISTINCT g.value FROM series s, json_each(s.genres) g WHERE s.deleted_at IS NULL AND ` + scope
+	if req.Params.LibraryId != nil {
+		q += ` AND s.library_id = ?`
+		args = append(args, *req.Params.LibraryId)
+	}
+	rows, err := s.DB.QueryContext(ctx, q+` ORDER BY g.value`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := ListGenres200JSONResponse{}
+	for rows.Next() {
+		var g string
+		if err := rows.Scan(&g); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}
+
 func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksRequestObject) (GetAdjacentBooksResponseObject, error) {
 	cur, ok, err := s.oneBook(ctx, req.BookId)
 	if err != nil {
@@ -148,19 +173,25 @@ func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksReque
 
 // onDeckWhere selects the first unread book b of a series when the book
 // before it is finished, the series has no book in progress, and no earlier
-// book is still unread. The caller's user id is bound three times, then once
-// more in the ORDER BY (see GetDashboard).
+// book is still unread. With nothing in progress and nothing earlier unread,
+// every earlier book is finished, so "the book before it is finished" is
+// just "there is an earlier book".
+//
+// The query starts from the caller's finished books: for each series that
+// has one, it takes that series' first unread book, then checks the rest.
+// Testing every unread book of the library instead cost 5 s at 37,000 books
+// (docs/perf-large-library.md). The caller's user id is bound three times,
+// then once more in the ORDER BY (see GetDashboard).
 const onDeckWhere = ` AND rp.book_id IS NULL
-  AND EXISTS (SELECT 1 FROM books p JOIN read_progress pr ON pr.book_id = p.id AND pr.user_id = ?
-    WHERE p.series_id = b.series_id AND p.deleted_at IS NULL AND pr.completed = 1
-    AND (p.number_sort, p.path) < (b.number_sort, b.path)
-    AND NOT EXISTS (SELECT 1 FROM books m WHERE m.series_id = b.series_id AND m.deleted_at IS NULL
-      AND (m.number_sort, m.path) > (p.number_sort, p.path) AND (m.number_sort, m.path) < (b.number_sort, b.path)))
-  AND NOT EXISTS (SELECT 1 FROM books u LEFT JOIN read_progress ur ON ur.book_id = u.id AND ur.user_id = ?
-    WHERE u.series_id = b.series_id AND u.deleted_at IS NULL AND ur.book_id IS NULL
-    AND (u.number_sort, u.path) < (b.number_sort, b.path))
-  AND NOT EXISTS (SELECT 1 FROM books q JOIN read_progress qr ON qr.book_id = q.id AND qr.user_id = ?
-    WHERE q.series_id = b.series_id AND q.deleted_at IS NULL AND qr.completed = 0)`
+  AND b.id IN (SELECT (SELECT u.id FROM books u LEFT JOIN read_progress ur ON ur.book_id = u.id AND ur.user_id = ?
+      WHERE u.series_id = c.series_id AND u.deleted_at IS NULL AND ur.book_id IS NULL
+      ORDER BY u.number_sort, u.path LIMIT 1)
+    FROM (SELECT DISTINCT f.series_id FROM read_progress fr CROSS JOIN books f ON f.id = fr.book_id
+      WHERE fr.user_id = ? AND fr.completed = 1) c)
+  AND NOT EXISTS (SELECT 1 FROM books q CROSS JOIN read_progress qr ON qr.book_id = q.id AND qr.user_id = ?
+    WHERE q.series_id = b.series_id AND q.deleted_at IS NULL AND qr.completed = 0)
+  AND EXISTS (SELECT 1 FROM books p WHERE p.series_id = b.series_id AND p.deleted_at IS NULL
+    AND (p.number_sort, p.path) < (b.number_sort, b.path))`
 
 func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject) (GetDashboardResponseObject, error) {
 	uid := currentUser(ctx).ID
@@ -183,7 +214,7 @@ func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject
 		return nil, err
 	}
 	if d.OnDeck, err = books(onDeckWhere, `ORDER BY (SELECT max(sr.read_at) FROM books sb
-	  JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
+	  CROSS JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
 	  WHERE sb.series_id = b.series_id AND sb.deleted_at IS NULL) DESC, b.id LIMIT 20`, uid, uid, uid, uid); err != nil {
 		return nil, err
 	}

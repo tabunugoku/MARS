@@ -19,8 +19,12 @@ let nextId = 1;
 const newId = (p: string) => `${p}-new-${nextId++}`;
 
 const series = (s: db.MockSeries): Series => ({ ...s, thumbnailUrl: coverArt(s.coverSeed, s.title) });
-const book = (b: db.MockBook): Book => ({ ...b, thumbnailUrl: coverArt(b.coverSeed, b.title, String(b.number)) });
 const findSeries = (id: string) => db.series.find((s) => s.id === id);
+const book = (b: db.MockBook): Book => ({
+  ...b,
+  seriesTitle: findSeries(b.seriesId)?.title ?? b.seriesTitle,
+  thumbnailUrl: coverArt(b.coverSeed, b.title, String(b.number)),
+});
 const findBook = (id: string) => db.books.find((b) => b.id === id);
 const seriesBooks = (id: string) => db.books.filter((b) => b.seriesId === id).sort((a, b) => a.numberSort - b.numberSort);
 
@@ -146,14 +150,22 @@ export const mockApi: Api = {
     if (i >= 0) db.libraries.splice(i, 1);
     return delay(undefined);
   },
-  scanLibrary: (id) =>
-    delay({ id: newId("t"), kind: "scan" as const, label: "スキャン", libraryId: id, state: "queued" as const, progress: 0, startedAt: null, error: "" }),
+  scanLibrary: (id, deep = false) =>
+    delay({ id: newId("t"), kind: "scan" as const, label: deep ? "詳細スキャン" : "スキャン", libraryId: id, state: "queued" as const, progress: 0, startedAt: null, error: "" }),
+  regenerateLibraryThumbnails: (id) =>
+    delay({ id: newId("t"), kind: "thumbnail" as const, label: "表紙を作り直す", libraryId: id, state: "queued" as const, progress: 0, startedAt: null, error: "" }),
   markLibraryRead: (id, completed) => {
     markRead(db.books.filter((b) => b.libraryId === id), completed);
     return delay(undefined);
   },
 
-  series: (q = {}) => delay(filterSeries(q).map(series)),
+  seriesPage: (q) =>
+    delay({
+      items: filterSeries(q).map(series),
+      total: filterSeries({ ...q, limit: undefined, offset: undefined }).length,
+    }),
+  genres: (libraryId) =>
+    delay([...new Set(db.series.filter((s) => !libraryId || s.libraryId === libraryId).flatMap((s) => s.genres))].sort()),
   seriesById: (id) => {
     const s = findSeries(id);
     return delay(s ? series(s) : null);
@@ -222,6 +234,16 @@ export const mockApi: Api = {
   },
   analyzeBook: (bookId) =>
     delay({ id: newId("t"), kind: "analyze" as const, label: "解析", libraryId: findBook(bookId)?.libraryId ?? null, state: "queued" as const, progress: 0, startedAt: null, error: "" }),
+  regenerateBookThumbnail: (bookId) => (findBook(bookId) ? delay(undefined) : fail(404, "本が見つかりません")),
+  setBookCover: (bookId, page) => {
+    const b = findBook(bookId);
+    if (!b) return fail(404, "本が見つかりません");
+    if (page < 1 || page > b.pageCount) return fail(400, "そのページはありません");
+    b.coverPage = page;
+    return delay(book(b));
+  },
+  regenerateSeriesThumbnails: (seriesId) =>
+    delay({ id: newId("t"), kind: "thumbnail" as const, label: "表紙を作り直す", libraryId: findSeries(seriesId)?.libraryId ?? null, state: "queued" as const, progress: 0, startedAt: null, error: "" }),
 
   dashboard: (libraryId) => {
     const bs = db.books.filter((b) => !libraryId || b.libraryId === libraryId);

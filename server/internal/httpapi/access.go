@@ -27,15 +27,19 @@ var opAccess = map[string]access{
 	"GetReaderPrefs": anyone, "SetGlobalReaderPrefs": anyone,
 	"SetSeriesReaderPrefs": anyone, "DeleteSeriesReaderPrefs": anyone,
 	"SetBookReaderPrefs": anyone, "DeleteBookReaderPrefs": anyone,
+	// Live changes; each event is filtered per user in serveEvents (eventFor).
+	"StreamEvents": anyone,
 
 	// Reading (always within libScope)
 	"ListLibraries": anyone, "GetLibrary": anyone,
-	"ListSeries": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
+	"ListSeries": anyone, "ListGenres": anyone, "GetSeries": anyone, "ListSeriesBooks": anyone, "GetSeriesThumbnail": anyone,
 	"GetBook": anyone, "GetBookThumbnail": anyone, "ListBookPages": anyone, "GetBookPage": anyone,
 	"GetAdjacentBooks": anyone, "GetDashboard": anyone, "Search": anyone,
 	"SetBookProgress": anyone, "MarkLibraryRead": anyone, "ClearBookProgress": anyone, "MarkSeriesRead": anyone,
 	"ListCollections": anyone, "GetCollection": anyone, "ListCollectionSeries": anyone,
 	"ListReadLists": anyone, "GetReadList": anyone, "ListReadListBooks": anyone,
+	// Hand-routed downloads: the handlers check canDownload after visibility.
+	"DownloadBook": anyone, "DownloadSeries": anyone,
 
 	// Administration
 	"CreateLibrary": adminOnly, "UpdateLibrary": adminOnly, "DeleteLibrary": adminOnly, "ScanLibrary": adminOnly,
@@ -43,6 +47,8 @@ var opAccess = map[string]access{
 	"ListUsers": adminOnly, "CreateUser": adminOnly, "UpdateUser": adminOnly, "DeleteUser": adminOnly,
 	"GetSettings": adminOnly, "UpdateSettings": adminOnly,
 	"UpdateSeries": adminOnly, "UpdateBook": adminOnly,
+	"RegenerateBookThumbnail": adminOnly, "SetBookCover": adminOnly,
+	"RegenerateSeriesThumbnails": adminOnly, "RegenerateLibraryThumbnails": adminOnly,
 	"CreateCollection": adminOnly, "UpdateCollection": adminOnly, "DeleteCollection": adminOnly,
 	"CreateReadList": adminOnly, "UpdateReadList": adminOnly, "DeleteReadList": adminOnly,
 }
@@ -98,4 +104,11 @@ func (s *server) visible(ctx context.Context, table, id string) (bool, error) {
 func canStream(ctx context.Context) bool {
 	u := currentUser(ctx)
 	return u.IsAdmin() || u.CanStream
+}
+
+// canDownload reports whether the caller may download book files
+// (ファイルのダウンロード). Administrators always may.
+func canDownload(ctx context.Context) bool {
+	u := currentUser(ctx)
+	return u.IsAdmin() || u.CanDownload
 }

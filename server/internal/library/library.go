@@ -12,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"os"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -20,6 +19,8 @@ import (
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/cominavi/server/internal/events"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 	"github.com/tabunugoku/cominavi/server/internal/scan"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -36,13 +37,27 @@ type Service struct {
 	Queue    *task.Queue
 	ThumbDir string
 	Pages    *media.PageCache
+	Events   *events.Hub // may be nil
 
-	scanLocks sync.Map // library id -> *sync.Mutex; one walk+sync at a time per library
+	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library
+	coverLocks sync.Map // book id -> ctxMutex; see coverLock
+	scans      scanGate // every scan sync against PauseScans
 }
 
-func (s *Service) scanLock(id string) *sync.Mutex {
-	m, _ := s.scanLocks.LoadOrStore(id, &sync.Mutex{})
-	return m.(*sync.Mutex)
+// coverLock orders the writers of a book's cover: an analysis, a cover
+// choice and a thumbnail regeneration each read cover_page, write the
+// thumbnail file and store the result under it, so a slow analysis cannot
+// put back the page an admin just replaced.
+// Waiting for it ends with the caller's ctx, so a cancelled request or
+// analysis does not sit behind a slow archive read.
+func (s *Service) coverLock(bookID string) ctxMutex {
+	m, _ := s.coverLocks.LoadOrStore(bookID, newCtxMutex())
+	return m.(ctxMutex)
+}
+
+func (s *Service) scanLock(id string) ctxMutex {
+	m, _ := s.scanLocks.LoadOrStore(id, newCtxMutex())
+	return m.(ctxMutex)
 }
 
 type lib struct {
@@ -70,27 +85,50 @@ func (s *Service) load(ctx context.Context, id string) (lib, error) {
 // QueueScan queues a scan of the library; when it finishes it queues the
 // analysis of new and changed books.
 func (s *Service) QueueScan(ctx context.Context, libraryID string) (task.Task, error) {
+	return s.queueScan(ctx, libraryID, false)
+}
+
+// QueueDeepScan is QueueScan followed by the analysis of every book of the
+// library, changed or not (a deep scan). Books stay readable meanwhile: each
+// one is updated in place when its analysis finishes.
+func (s *Service) QueueDeepScan(ctx context.Context, libraryID string) (task.Task, error) {
+	return s.queueScan(ctx, libraryID, true)
+}
+
+func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (task.Task, error) {
 	l, err := s.load(ctx, libraryID)
 	if err != nil {
 		return task.Task{}, err
 	}
-	return s.Queue.Submit(ctx, "scan", l.name+" をスキャン", l.id, func(ctx context.Context, progress func(float64)) error {
+	key, label := "scan", l.name+" をスキャン"
+	if deep {
+		key, label = "scan:deep", l.name+" を詳細スキャン"
+	}
+	return s.Queue.SubmitKey(ctx, "scan", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
 		l, err := s.load(ctx, libraryID) // settings may have changed while queued
 		if err != nil {
 			return err
 		}
 		// A running scan is not deduplicated by the queue, so two can overlap;
 		// the lock keeps an older walk from being committed after a newer one.
+		if err := s.scans.enter(ctx); err != nil {
+			return err
+		}
 		mu := s.scanLock(l.id)
-		mu.Lock()
+		if err := mu.Lock(ctx); err != nil {
+			s.scans.leave()
+			return err
+		}
 		found, err := scan.Walk(ctx, l.root, l.exclude)
 		if err != nil {
 			mu.Unlock()
+			s.scans.leave()
 			return fmt.Errorf("フォルダを読めません: %w", err)
 		}
 		progress(0.5)
 		st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
 		mu.Unlock()
+		s.scans.leave()
 		if err != nil {
 			return err
 		}
@@ -98,24 +136,41 @@ func (s *Service) QueueScan(ctx context.Context, libraryID string) (task.Task, e
 			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
-		_, err = s.QueueAnalyze(context.WithoutCancel(ctx), l.id)
+		if st != (scan.Stats{}) {
+			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
+				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
+				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
+				Restored: st.Restored,
+			}})
+		}
+		_, err = s.queueAnalyze(context.WithoutCancel(ctx), l.id, deep)
 		return err
 	})
 }
 
 // QueueAnalyze queues the analysis of every live book still 'outdated'.
 func (s *Service) QueueAnalyze(ctx context.Context, libraryID string) (task.Task, error) {
+	return s.queueAnalyze(ctx, libraryID, false)
+}
+
+// queueAnalyze with deep analyses every live book, whatever its status. It
+// has its own queue key, so it is never folded into a queued normal one.
+func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool) (task.Task, error) {
 	l, err := s.load(ctx, libraryID)
 	if err != nil {
 		return task.Task{}, err
 	}
-	return s.Queue.Submit(ctx, "analyze", l.name+" の解析", l.id, func(ctx context.Context, progress func(float64)) error {
+	key, label, which := "analyze", l.name+" の解析", ` AND media_status = 'outdated'`
+	if deep {
+		key, label, which = "analyze:deep", l.name+" の詳細解析", ""
+	}
+	return s.Queue.SubmitKey(ctx, "analyze", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
 		l, err := s.load(ctx, libraryID)
 		if err != nil {
 			return err
 		}
 		rows, err := s.DB.QueryContext(ctx,
-			`SELECT id FROM books WHERE library_id = ? AND deleted_at IS NULL AND media_status = 'outdated' ORDER BY path`, l.id)
+			`SELECT id FROM books WHERE library_id = ? AND deleted_at IS NULL`+which+` ORDER BY path`, l.id)
 		if err != nil {
 			return err
 		}
@@ -149,23 +204,43 @@ func (s *Service) QueueAnalyze(ctx context.Context, libraryID string) (task.Task
 		if len(todo) == 0 {
 			return nil
 		}
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
 		// Series fields come from the first book, chosen only now that every
-		// book's number (possibly from its own ComicInfo) is final.
+		// book's number (possibly from its own ComicInfo) is final. One
+		// series is one unit; the batch commits every few dozen so progress
+		// writes never wait behind the whole library.
+		b := &db.Batch{DB: s.DB}
+		defer b.Close()
 		ts := time.Now().UTC().Format(time.RFC3339Nano)
 		for seriesID, byBook := range infos {
+			tx, err := b.Tx(ctx)
+			if err != nil {
+				return err
+			}
 			if err := applySeriesInfo(ctx, tx, seriesID, byBook, ts); err != nil {
 				return err
 			}
+			// Index in the same transaction: a cancel between the two
+			// would leave new titles that search cannot find, and a
+			// re-run finds nothing left to analyse to repair it.
+			if err := scan.IndexSeries(ctx, tx, seriesID); err != nil {
+				return err
+			}
+			if err := b.Step(ctx); err != nil {
+				return err
+			}
 		}
-		if err := scan.RebuildSearch(ctx, tx, l.id); err != nil {
+		if err := b.Flush(); err != nil {
 			return err
 		}
-		return tx.Commit()
+		if err := scan.SyncSearch(ctx, s.DB, b, l.id); err != nil {
+			return err
+		}
+		if err := b.Flush(); err != nil {
+			return err
+		}
+		// Series titles and fields may have changed from ComicInfo.
+		s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{LibraryID: l.id, BooksChanged: len(todo)}})
+		return nil
 	})
 }
 
@@ -184,38 +259,21 @@ type version struct {
 func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string, *scan.ComicInfo, error) {
 	var rel, seriesID, lockedJSON string
 	var v version
-	if err := s.DB.QueryRowContext(ctx, `SELECT path, series_id, locked_fields, size_bytes, mtime FROM books WHERE id = ?`, bookID).
-		Scan(&rel, &seriesID, &lockedJSON, &v.size, &v.mtime); err != nil {
+	var coverPage int
+	if err := s.DB.QueryRowContext(ctx, `SELECT path, series_id, locked_fields, size_bytes, mtime, cover_page FROM books WHERE id = ?`, bookID).
+		Scan(&rel, &seriesID, &lockedJSON, &v.size, &v.mtime, &coverPage); err != nil {
 		return "", nil, err
 	}
 	full, err := resolve(l.root, rel)
 	if err != nil {
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
-	a, err := media.AnalyzeContext(ctx, full)
+	a, err := media.AnalyzeCover(ctx, full, coverPage)
 	switch {
 	case errors.Is(err, archive.ErrUnsupported):
-		return seriesID, nil, s.markBook(ctx, bookID, v, "unsupported", err.Error())
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "unsupported", err.Error())
 	case err != nil:
-		return seriesID, nil, s.markBook(ctx, bookID, v, "error", err.Error())
-	}
-
-	thumb := ""
-	if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
-		if err := os.MkdirAll(s.ThumbDir, 0o755); err != nil {
-			return "", nil, err
-		}
-		name := bookID + ".jpg"
-		tmp := filepath.Join(s.ThumbDir, name+".tmp")
-		if err := os.WriteFile(tmp, jpg, 0o644); err != nil {
-			return "", nil, err
-		}
-		if err := os.Rename(tmp, filepath.Join(s.ThumbDir, name)); err != nil {
-			return "", nil, err
-		}
-		thumb = name
-	} else {
-		slog.Warn("thumbnail", "book", bookID, "err", err)
+		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
 
 	var ci *scan.ComicInfo
@@ -227,16 +285,46 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		}
 	}
 
+	// From here to the commit the book's cover is ours: a cover choice made
+	// while the archive was being read wins over the page we read then.
+	mu := s.coverLock(bookID)
+	if err := mu.Lock(ctx); err != nil {
+		return "", nil, err
+	}
+	defer mu.Unlock()
+	var nowCover int
+	if err := s.DB.QueryRowContext(ctx, `SELECT cover_page FROM books WHERE id = ?`, bookID).Scan(&nowCover); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return seriesID, nil, nil
+		}
+		return "", nil, err
+	}
+	coverChanged := nowCover != coverPage && nowCover >= 1 && nowCover <= len(a.Pages)
+
+	thumb := ""
+	if !coverChanged {
+		if jpg, err := media.Thumbnail(a.Cover, thumbW, thumbH); err == nil {
+			if thumb, err = s.writeThumb(bookID, jpg); err != nil {
+				return "", nil, err
+			}
+		} else {
+			slog.Warn("thumbnail", "book", bookID, "err", err)
+		}
+	}
+
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return "", nil, err
 	}
 	defer tx.Rollback()
 	ts := time.Now().UTC().Format(time.RFC3339Nano)
+	// A changed cover keeps its page and the thumbnail its choice made.
 	res, err := tx.ExecContext(ctx, `
-		UPDATE books SET page_count = ?, media_status = 'ready', media_error = '', thumbnail = ?, updated_at = ?
+		UPDATE books SET page_count = ?, media_status = 'ready', media_error = '',
+			thumbnail = CASE WHEN ? THEN thumbnail ELSE ? END,
+			cover_page = CASE WHEN ? THEN cover_page ELSE ? END, updated_at = ?
 		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
-		len(a.Pages), thumb, ts, bookID, v.size, v.mtime)
+		len(a.Pages), coverChanged, thumb, coverChanged, a.CoverPage, ts, bookID, v.size, v.mtime)
 	if err != nil {
 		return "", nil, err
 	}
@@ -246,10 +334,13 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
 		return "", nil, err
 	}
+	ins, err := tx.PrepareContext(ctx, `INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return "", nil, err
+	}
+	defer ins.Close()
 	for _, p := range a.Pages {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`,
-			bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
+		if _, err := ins.ExecContext(ctx, bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
 			return "", nil, err
 		}
 	}
@@ -257,8 +348,31 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		if err := applyBookInfo(ctx, tx, bookID, lockedJSON, *ci, ts); err != nil {
 			return "", nil, err
 		}
+		if err := scan.IndexBook(ctx, tx, bookID); err != nil {
+			return "", nil, err
+		}
 	}
-	return seriesID, ci, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return "", nil, err
+	}
+	s.bookChanged(l.id, seriesID, bookID, "ready")
+	return seriesID, ci, nil
+}
+
+// marked is markBook followed by a "book" event.
+func (s *Service) marked(ctx context.Context, libraryID, seriesID, bookID string, v version, status, msg string) error {
+	if err := s.markBook(ctx, bookID, v, status, msg); err != nil {
+		return err
+	}
+	s.bookChanged(libraryID, seriesID, bookID, status)
+	return nil
+}
+
+// bookChanged announces that a book's analysis or thumbnail changed.
+func (s *Service) bookChanged(libraryID, seriesID, bookID, status string) {
+	s.Events.Publish(events.Event{Type: "book", LibraryID: libraryID, Data: events.Book{
+		BookID: bookID, SeriesID: seriesID, LibraryID: libraryID, MediaStatus: status,
+	}})
 }
 
 func (s *Service) markBook(ctx context.Context, bookID string, v version, status, msg string) error {
@@ -576,4 +690,13 @@ func (s *Service) Schedule(ctx context.Context) {
 			tick(false)
 		}
 	}
+}
+
+// PauseScans waits for every running scan sync to finish and keeps new ones
+// from starting, in any library, until the returned func is called. A scan
+// commits in batches and remembers the rows it read, so a hard delete in
+// between (emptying the trash) would make its later updates miss rows that
+// are gone. When ctx ends first it gives up and holds nothing.
+func (s *Service) PauseScans(ctx context.Context) (func(), error) {
+	return s.scans.pause(ctx)
 }

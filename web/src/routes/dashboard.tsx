@@ -1,6 +1,7 @@
 import { Link } from "react-router";
 import { Play } from "@keyline-icons/react";
 import { api, useApi, type Book, type Series } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { BookCard, SeriesCard } from "@/components/media/cards";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -22,9 +23,9 @@ const ymd = (iso: string) => {
 };
 
 export default function Screen() {
-  const { data } = useApi(
+  const { data, reload } = useApi(
     async () => {
-      const [d, all] = await Promise.all([api.dashboard(), api.series()]);
+      const d = await api.dashboard();
       return {
         keep: d.keepReading,
         deck: d.onDeck,
@@ -32,11 +33,12 @@ export default function Screen() {
         addedSeries: d.recentlyAddedSeries,
         updatedSeries: d.recentlyUpdatedSeries,
         read: d.recentlyRead,
-        titles: new Map(all.map((s) => [s.id, s.title])),
       };
     },
     [],
   );
+  // New books and reading elsewhere; quieter than the library screens.
+  useLiveReload(reload, (e) => e.type === "library" || e.type === "progress", { quiet: 2000, maxWait: 15000 });
 
   if (!data) {
     return (
@@ -71,7 +73,6 @@ export default function Screen() {
   }
 
   const hero = data.keep[0];
-  const titles = data.titles;
   const rows: Row[] = [
     { title: "読みかけ", books: data.keep.slice(1) },
     { title: "次に読む", books: data.deck },
@@ -94,7 +95,7 @@ export default function Screen() {
     );
   }
 
-  const heroSeriesTitle = hero ? (titles.get(hero.seriesId) ?? hero.title) : "";
+  const heroSeriesTitle = hero ? hero.seriesTitle || hero.title : "";
   const heroPage = hero?.progress?.page ?? 0;
   const heroPct = hero ? Math.min(100, Math.round((heroPage / hero.pageCount) * 100)) : 0;
 
@@ -140,7 +141,7 @@ export default function Screen() {
           {row.books
             ? row.books.map((b, i) => (
                 <ShelfItem key={b.id}>
-                  <BookCard book={b} seriesTitle={titles.get(b.seriesId)} priority={ri === 0 && i < 4} />
+                  <BookCard book={b} seriesTitle={b.seriesTitle} priority={ri === 0 && i < 4} />
                 </ShelfItem>
               ))
             : row.series?.map((s, i) => (

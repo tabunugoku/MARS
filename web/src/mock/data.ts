@@ -102,6 +102,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
     const b: MockBook = {
       id: `${id}-b${n}`,
       seriesId: id,
+      seriesTitle: s.title,
       libraryId,
       title: webtoon ? `第${n}話` : western ? `Issue #${n}` : `第${n}巻`,
       number: n,
@@ -120,6 +121,7 @@ function addSeries(libraryId: string, title: string, idx: number, webtoon = fals
       coverSeed: s.coverSeed + n * 7,
       thumbnailUrl: "",
       lockedFields: [],
+      coverPage: 1,
       createdAt: daysAgo(updated + (bookCount - n) * 3),
     };
     books.push(b);

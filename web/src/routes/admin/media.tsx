@@ -18,9 +18,9 @@ type Row = { issue: MediaIssue; book: Book; series: string };
 
 export default function Screen() {
   const { data, error, reload } = useApi(async () => {
-    const [issues, series] = await Promise.all([api.mediaIssues(), api.series()]);
+    const issues = await api.mediaIssues();
     const books = await api.booksByIds(issues.map((i) => i.bookId));
-    return { issues, books, titles: new Map(series.map((s) => [s.id, s.title])) };
+    return { issues, books };
   }, []);
 
   const [tab, setTab] = useState(0);
@@ -49,7 +49,7 @@ export default function Screen() {
     for (const issue of data.issues) {
       const book = data.books.find((b) => b.id === issue.bookId);
       if (!book || !kinds.includes(issue.kind)) continue;
-      out.push({ issue, book, series: data.titles.get(book.seriesId) ?? book.title });
+      out.push({ issue, book, series: book.seriesTitle || book.title });
     }
     return out;
   };

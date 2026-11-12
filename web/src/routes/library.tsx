@@ -1,15 +1,16 @@
 import type { IconComponent } from "@/lib/icon-context";
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router";
 import { toast } from "@yusufceng1z/ding-react";
 import { ArrowUpDown, Circle, CircleCheck, MoreHorizontal, Scan, Settings, SlidersHorizontal, X } from "@keyline-icons/react";
-import { api, errorMessage, formatBytes, statusLabel, useApi, type SeriesSort, type SeriesStatus } from "@/api";
+import { api, errorMessage, formatBytes, statusLabel, useApi, usePagedApi, type SeriesSort, type SeriesStatus } from "@/api";
+import { useLiveReload } from "@/api/live";
 import { LoadError } from "@/components/shell/load-error";
 import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { KindIcon } from "@/components/media/kind-icon";
-import { GridSkeleton } from "@/components/media/skeletons";
+import { CoverSkeleton, GridSkeleton } from "@/components/media/skeletons";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownContent, DropdownMenu, DropdownTrigger } from "@/components/ui/dropdown";
@@ -76,25 +77,36 @@ export default function Screen() {
   const libs = useApi(() => (isAll ? api.libraries() : Promise.resolve([])), [isAll]);
   // One library by id: null when it does not exist or is hidden from the caller.
   const one = useApi(() => (isAll ? Promise.resolve(undefined) : api.library(libraryId)), [libraryId]);
-  // Unfiltered list of this scope: source for the genre options.
-  const scoped = useApi(() => api.series({ libraryId: scope }), [scope]);
-  const seriesList = useApi(
-    () =>
-      api.series({
+  // Genre options of this scope, from the server (not from a full list).
+  const genreList = useApi(() => api.genres(scope), [scope]);
+  const genres = [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, "ja"));
+  // A page at a time; a new scope, sort or filter starts again from the top.
+  const seriesList = usePagedApi(
+    (offset, limit) =>
+      api.seriesPage({
         libraryId: scope,
         sort,
         desc,
         readState: read.length ? read : undefined,
         status: status.length ? status : undefined,
         genres: genre.length ? genre : undefined,
+        limit,
+        offset,
       }),
     [scope, sort, desc, read.join(), status.join(), genre.join()],
   );
-  const series = seriesList.data;
+  const series = seriesList.items;
 
-  const genres = useMemo(
-    () => [...new Set((scoped.data ?? []).flatMap((s) => s.genres))].sort((a, b) => a.localeCompare(b, "ja")),
-    [scoped.data],
+  // Scans, analysis and reading elsewhere change what this list shows.
+  useLiveReload(
+    () => {
+      seriesList.reload();
+      genreList.reload();
+      if (isAll) libs.reload();
+      else one.reload();
+    },
+    (e) => e.type !== "task" && (isAll || e.data.libraryId === libraryId),
+    { quiet: 1500, maxWait: 8000 },
   );
 
   const library = isAll ? undefined : (one.data ?? undefined);
@@ -196,12 +208,13 @@ export default function Screen() {
     );
   }
 
-  const failed = one.error ?? seriesList.error;
+  // A failed first page replaces the grid; a failed later page shows under it.
+  const failed = one.error ?? (series ? null : seriesList.error);
   if (failed) {
     return (
       <Page>
         {header}
-        <LoadError message={failed} onRetry={() => { one.reload(); seriesList.reload(); }} />
+        <LoadError message={failed} onRetry={() => { one.reload(); seriesList.retry(); }} />
       </Page>
     );
   }
@@ -220,7 +233,7 @@ export default function Screen() {
       {header}
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
-        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{series.length} シリーズ</p>
+        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{seriesList.total} シリーズ</p>
         <div className="flex items-center gap-2">
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
             <SelectTrigger aria-label="並び順" />
@@ -312,14 +325,44 @@ export default function Screen() {
           <EmptyState title="シリーズがありません" body="ライブラリをスキャンすると、ここに表示されます" />
         )
       ) : (
-        <CoverGrid>
-          {series.map((s, i) => (
-            <SeriesCard key={s.id} series={s} priority={i < 8} />
-          ))}
-        </CoverGrid>
+        <>
+          <CoverGrid>
+            {series.map((s, i) => (
+              <SeriesCard key={s.id} series={s} priority={i < 8} />
+            ))}
+            {seriesList.hasMore && !seriesList.error && Array.from({ length: 6 }, (_, i) => <CoverSkeleton key={`more-${i}`} />)}
+          </CoverGrid>
+          {seriesList.error ? (
+            <LoadError message={seriesList.error} onRetry={seriesList.retry} />
+          ) : (
+            seriesList.hasMore && <LoadMore onVisible={seriesList.loadMore} shown={series.length} />
+          )}
+        </>
       )}
     </Page>
   );
+}
+
+/** Asks for the next page when the end of the grid comes within a screen of
+ *  view. It observes again whenever the list grows, so a page too short to
+ *  fill the screen is followed by the next one at once. */
+function LoadMore({ onVisible, shown }: { onVisible: () => void; shown: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const cb = useRef(onVisible);
+  useEffect(() => {
+    cb.current = onVisible;
+  });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver((entries) => entries.some((e) => e.isIntersecting) && cb.current(), {
+      root: document.getElementById("cn-scroll"),
+      rootMargin: "800px 0px",
+    });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [shown]);
+  return <div ref={ref} aria-hidden className="h-px" />;
 }
 
 function list(raw: string | null): string[] {

@@ -99,7 +99,12 @@ func TestWalkAndSync(t *testing.T) {
 		t.Fatal(err)
 	}
 	write(t, root, "夜更けの測量士/夜更けの測量士 第01巻.cbz", "changed")
-	os.Remove(filepath.Join(root, "読み切り.cbz"))
+	oneshot := filepath.Join(root, "読み切り.cbz")
+	before, err := os.Stat(oneshot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	os.Remove(oneshot)
 	found, _ = Walk(ctx, root, []string{"skipme"})
 	st, err = Sync(ctx, d, "L", "manga", found, time.Now())
 	if err != nil {
@@ -111,13 +116,32 @@ func TestWalkAndSync(t *testing.T) {
 	if n := count(t, d, `SELECT count(*) FROM books WHERE media_status = 'outdated'`); n != 1 {
 		t.Fatalf("outdated %d", n)
 	}
+	if n := count(t, d, `SELECT count(*) FROM search_index WHERE search_index MATCH '読み切り'`); n != 0 {
+		t.Fatalf("trashed oneshot still found %d times", n)
+	}
+	// Put back as it was (same size and time): nothing to analyse, but the
+	// series and book are back and must be reported.
 	write(t, root, "読み切り.cbz", "e")
-	found, _ = Walk(ctx, root, []string{"skipme"})
-	if _, err := Sync(ctx, d, "L", "manga", found, time.Now()); err != nil {
+	if err := os.Chtimes(oneshot, before.ModTime(), before.ModTime()); err != nil {
 		t.Fatal(err)
+	}
+	found, _ = Walk(ctx, root, []string{"skipme"})
+	st, err = Sync(ctx, d, "L", "manga", found, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if st != (Stats{Restored: 2}) {
+		t.Fatalf("restore sync %+v", st)
 	}
 	if n := count(t, d, `SELECT count(*) FROM series WHERE deleted_at IS NULL`); n != 3 {
 		t.Fatalf("live series after restore %d", n)
+	}
+	if n := count(t, d, `SELECT count(*) FROM search_index WHERE search_index MATCH '読み切り'`); n != 2 {
+		t.Fatalf("restored oneshot found %d times, want series and book", n)
+	}
+	// The FTS index matches search_rows exactly.
+	if _, err := d.Exec(`INSERT INTO search_index (search_index, rank) VALUES ('integrity-check', 1)`); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -179,4 +203,13 @@ func TestSyncUnreadableAndRenumber(t *testing.T) {
 	if st.BooksRemoved != 0 || st.SeriesRemoved != 0 {
 		t.Fatalf("unreadable folder was trashed: %+v", st)
 	}
+}
+
+// TestSyncOneWritePerTransaction runs the sync tests again with a commit
+// after every write, so every batch boundary is crossed.
+func TestSyncOneWritePerTransaction(t *testing.T) {
+	syncBatch = 1
+	t.Cleanup(func() { syncBatch = 0 })
+	t.Run("WalkAndSync", TestWalkAndSync)
+	t.Run("UnreadableAndRenumber", TestSyncUnreadableAndRenumber)
 }

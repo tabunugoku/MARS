@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -83,11 +84,22 @@ func (s Store) loadUser(ctx context.Context, id string) (User, error) {
 }
 
 // touchUser sets last_active to now, but only if it is unset or at least
-// touchEvery old, so most requests do not write.
+// touchEvery old, so most requests do not write. The age is checked with a
+// read first: an UPDATE takes the database's write lock even when it
+// matches no row, so every signed-in request would otherwise queue behind
+// a scan's write transactions.
 func (s Store) touchUser(ctx context.Context, id string, now time.Time) error {
+	cutoff := stamp(now.Add(-touchEvery))
+	var last sql.NullString
+	if err := s.DB.QueryRowContext(ctx, `SELECT last_active FROM users WHERE id = ?`, id).Scan(&last); err != nil {
+		return fmt.Errorf("auth: touch user: %w", err)
+	}
+	if last.Valid && last.String > cutoff {
+		return nil
+	}
 	_, err := s.DB.ExecContext(ctx,
 		`UPDATE users SET last_active = ? WHERE id = ? AND (last_active IS NULL OR last_active <= ?)`,
-		stamp(now), id, stamp(now.Add(-touchEvery)))
+		stamp(now), id, cutoff)
 	if err != nil {
 		return fmt.Errorf("auth: touch user: %w", err)
 	}
@@ -174,8 +186,9 @@ func (s Store) UserBySession(ctx context.Context, token string) (User, error) {
 	if err != nil {
 		return User{}, err
 	}
+	// last_active is informational: a failed write must not fail the request.
 	if err := s.touchUser(ctx, userID, now); err != nil {
-		return User{}, err
+		slog.Warn("touch user", "err", err)
 	}
 	return u, nil
 }
@@ -258,7 +271,8 @@ func (s Store) UserByAPIKey(ctx context.Context, key string) (User, error) {
 	}
 	hash := HashToken(strings.TrimPrefix(key, apiKeyPrefix))
 	var userID string
-	err := s.DB.QueryRowContext(ctx, `SELECT user_id FROM api_keys WHERE key_hash = ?`, hash).Scan(&userID)
+	var lastUsed sql.NullString
+	err := s.DB.QueryRowContext(ctx, `SELECT user_id, last_used FROM api_keys WHERE key_hash = ?`, hash).Scan(&userID, &lastUsed)
 	if errors.Is(err, sql.ErrNoRows) {
 		return User{}, ErrUnauthorized
 	}
@@ -266,10 +280,13 @@ func (s Store) UserByAPIKey(ctx context.Context, key string) (User, error) {
 		return User{}, fmt.Errorf("auth: api key: %w", err)
 	}
 	now := time.Now()
-	if _, err := s.DB.ExecContext(ctx,
-		`UPDATE api_keys SET last_used = ? WHERE key_hash = ? AND (last_used IS NULL OR last_used <= ?)`,
-		stamp(now), hash, stamp(now.Add(-touchEvery))); err != nil {
-		return User{}, fmt.Errorf("auth: touch api key: %w", err)
+	// Written only when stale, and never fatal (see touchUser).
+	if cutoff := stamp(now.Add(-touchEvery)); !lastUsed.Valid || lastUsed.String <= cutoff {
+		if _, err := s.DB.ExecContext(ctx,
+			`UPDATE api_keys SET last_used = ? WHERE key_hash = ? AND (last_used IS NULL OR last_used <= ?)`,
+			stamp(now), hash, cutoff); err != nil {
+			slog.Warn("touch api key", "err", err)
+		}
 	}
 	return s.loadUser(ctx, userID)
 }

@@ -2,7 +2,9 @@ import { useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, errorMessage, formatBytes, formatDate, useApi, type Author, type MediaStatus } from "@/api";
+import { api, bookFileUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
+import { useLiveReload } from "@/api/live";
+import { bumpCover } from "@/lib/cover-retry";
 import { LoadError } from "@/components/shell/load-error";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -50,9 +52,22 @@ function BookPage({ id }: { id: string }) {
     const [series, adjacent, pages] = await Promise.all([api.seriesById(book.seriesId), api.adjacentBooks(id), api.pages(id).catch(() => [])]);
     return { book, series, adjacent, pages };
   }, [id]);
+  // Analysis or a new cover of this book, and reading on another tab or device.
+  const shown = data?.book;
+  useLiveReload(reload, (e) => {
+    if (e.type === "book") return e.data.bookId === id;
+    if (e.type !== "progress" || !shown) return false;
+    if (e.data.bookId) return e.data.bookId === id;
+    if (e.data.seriesId) return e.data.seriesId === shown.seriesId;
+    return e.data.libraryId === shown.libraryId;
+  });
 
   const [allPages, setAllPages] = useState(false);
   const [busy, setBusy] = useState(false);
+  const { data: me } = useApi(() => api.me(), []);
+  const isAdmin = me?.role === "admin";
+  const canDownload = isAdmin || !!me?.canDownload;
+  const [picking, setPicking] = useState(false);
 
   if (error) {
     return (
@@ -96,6 +111,47 @@ function BookPage({ id }: { id: string }) {
   const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
   // Marking read needs the page count and a readable archive.
   const canMarkRead = book.pageCount > 0 && book.mediaStatus === "ready";
+
+  const regenerate = async () => {
+    try {
+      await api.regenerateBookThumbnail(book.id);
+      bumpCover(book.id, book.seriesId); // the <img> fetches it anew
+      toast.success("表紙を作り直しました");
+    } catch (err) {
+      toast.error(errorMessage(err));
+    }
+  };
+
+  const chooseCover = async (n: number) => {
+    setBusy(true);
+    try {
+      await api.setBookCover(book.id, n);
+      setPicking(false);
+      bumpCover(book.id, book.seriesId);
+      toast.success(`${n}ページ目を表紙にしました`);
+      reload();
+    } catch (err) {
+      toast.error(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // その他 menu, numbered in the order shown.
+  const menu: { label: string; onSelect: () => void }[] = [
+    { label: "シークレットモードで読む", onSelect: () => navigate(`/read/${book.id}?incognito=1`) },
+  ];
+  if (canDownload) menu.push({ label: "ファイルをダウンロード", onSelect: () => startDownload(bookFileUrl(book.id)) });
+  if (isAdmin && book.mediaStatus === "ready") {
+    menu.push({ label: "表紙を作り直す", onSelect: regenerate });
+    menu.push({
+      label: "表紙のページを選ぶ",
+      onSelect: () => {
+        setPicking(true);
+        document.getElementById("pages")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      },
+    });
+  }
 
   const toggleRead = async () => {
     setBusy(true);
@@ -188,7 +244,9 @@ function BookPage({ id }: { id: string }) {
             <DropdownMenu>
               <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
-                <MenuItem index={0} label="シークレットモードで読む" onSelect={() => navigate(`/read/${book.id}?incognito=1`)} />
+                {menu.map((m, i) => (
+                  <MenuItem key={m.label} index={i} label={m.label} onSelect={m.onSelect} />
+                ))}
               </DropdownContent>
             </DropdownMenu>
           </div>
@@ -202,14 +260,23 @@ function BookPage({ id }: { id: string }) {
         </div>
       </div>
 
-      <section className="mt-10">
+      <section id="pages" className="mt-10 scroll-mt-20">
         <SectionTitle>ページ</SectionTitle>
+        {picking && (
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className={cn(typeClass("body"), "text-muted-foreground")}>表紙にするページを選んでください</p>
+            <Button variant="ghost" size="compact" className="pointer-coarse:h-11" onClick={() => setPicking(false)}>
+              やめる
+            </Button>
+          </div>
+        )}
         <div className="grid grid-cols-[repeat(auto-fill,minmax(96px,1fr))] gap-3">
           {Array.from({ length: shownPages }, (_, i) => i + 1).map((n) => (
-            <Link
+            <PageTile
               key={n}
-              to={`/read/${book.id}?page=${n}`}
-              className="group block rounded-[6px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              to={picking ? undefined : `/read/${book.id}?page=${n}`}
+              onPick={picking && !busy ? () => chooseCover(n) : undefined}
+              label={picking ? `${n}ページ目を表紙にする` : undefined}
             >
               <img
                 src={data.pages[n - 1].url}
@@ -220,8 +287,11 @@ function BookPage({ id }: { id: string }) {
                 className="aspect-[2/3] w-full rounded-[6px] bg-muted object-cover transition-transform duration-160 ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 motion-reduce:transform-none"
                 style={{ boxShadow: "var(--cover-shadow)" }}
               />
-              <span className={cn(typeClass("micro"), "mt-1 block text-center text-muted-foreground tabular-nums")}>{n}</span>
-            </Link>
+              <span className={cn(typeClass("micro"), "mt-1 block text-center text-muted-foreground tabular-nums")}>
+                {n}
+                {n === book.coverPage && "・表紙"}
+              </span>
+            </PageTile>
           ))}
         </div>
         {!allPages && book.pageCount > PREVIEW_PAGES && (
@@ -254,6 +324,26 @@ function BookPage({ id }: { id: string }) {
         </dl>
       </section>
     </Page>
+  );
+}
+
+const tileClass =
+  "group block w-full rounded-[6px] text-left outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+/** A page in the preview grid: a link into the reader, or, while choosing
+ *  a cover, a button that makes it the cover. */
+function PageTile({ to, onPick, label, children }: { to?: string; onPick?: () => void; label?: string; children: ReactNode }) {
+  if (to) {
+    return (
+      <Link to={to} className={tileClass}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <button type="button" className={cn(tileClass, "cursor-pointer disabled:cursor-default")} disabled={!onPick} aria-label={label} onClick={onPick}>
+      {children}
+    </button>
   );
 }
 

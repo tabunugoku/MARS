@@ -86,7 +86,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Queue a scan (then analysis of new and changed books) */
+        /** Queue a scan (then analysis of new and changed books; with deep, of every book) */
         post: operations["scanLibrary"];
         delete?: never;
         options?: never;
@@ -122,6 +122,26 @@ export interface paths {
         };
         /** Series the caller may see, filtered, sorted and paged */
         get: operations["listSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/genres": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Genre names of the series the caller may see, sorted
+         * @description The options for the genre filter, without loading every series.
+         */
+        get: operations["listGenres"];
         put?: never;
         post?: never;
         delete?: never;
@@ -254,6 +274,26 @@ export interface paths {
         };
         /** One page image as stored in the archive (ETag, long private cache) */
         get: operations["getBookPage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live changes as server-sent events (text/event-stream)
+         * @description One long-lived stream per app. Each message has an event name and a JSON data line: `task` (TaskEvent, administrators only), `library` (LibraryEvent), `book` (BookEvent) and `progress` (ProgressEvent, the caller's own reading progress). Library, book and progress events are sent only for libraries the caller may see. A comment line is sent about every 25 seconds as a heartbeat. When the client falls behind the stream is closed; on reconnecting, refetch what is shown. A user may hold 16 streams and the server 512; past that the request is answered 429 with Retry-After.
+         */
+        get: operations["streamEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -814,6 +854,120 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/books/{bookId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        /** The book's original file (needs the download permission; Range supported) */
+        get: operations["downloadBook"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/{seriesId}/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        /** Every book of the series as one ZIP, streamed and stored without recompression (needs the download permission) */
+        get: operations["downloadSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/regenerate-thumbnail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Make the book's thumbnail again from its cover page (administrators only) */
+        post: operations["regenerateBookThumbnail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/books/{bookId}/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        /** Choose the page the book's thumbnail is made from, and make it (administrators only) */
+        put: operations["setBookCover"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/series/{seriesId}/regenerate-thumbnails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue thumbnail regeneration for every book of the series (administrators only) */
+        post: operations["regenerateSeriesThumbnails"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/libraries/{libraryId}/regenerate-thumbnails": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue thumbnail regeneration for every book of the library (administrators only) */
+        post: operations["regenerateLibraryThumbnails"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -903,6 +1057,8 @@ export interface components {
         Book: {
             id: string;
             seriesId: string;
+            /** @description Title of the book's series, so a list of books needs no series list */
+            seriesTitle: string;
             libraryId: string;
             title: string;
             /** Format: double */
@@ -924,6 +1080,11 @@ export interface components {
             thumbnailUrl: string;
             createdAt: string;
             lockedFields: string[];
+            /** @description Page the thumbnail is made from (1 unless an administrator chose another) */
+            coverPage: number;
+        };
+        CoverUpdate: {
+            page: number;
         };
         Page: {
             number: number;
@@ -946,6 +1107,33 @@ export interface components {
             progress: number;
             startedAt: string | null;
             error: string;
+        };
+        /** @description Data of a `task` event; the task as listTasks returns it */
+        TaskEvent: components["schemas"]["Task"];
+        /** @description Data of a `library` event, sent when a scan or analysis changed the library's series or books */
+        LibraryEvent: {
+            libraryId: string;
+            seriesAdded: number;
+            seriesRemoved: number;
+            booksAdded: number;
+            booksChanged: number;
+            booksRemoved: number;
+            /** @description Series and unchanged books back from the trash, and unchanged books moved to another series */
+            restored: number;
+        };
+        /** @description Data of a `book` event, sent when a book was analysed (pages, thumbnail, metadata) */
+        BookEvent: {
+            bookId: string;
+            seriesId: string;
+            libraryId: string;
+            mediaStatus: components["schemas"]["MediaStatus"];
+        };
+        /** @description Data of a `progress` event: the caller's reading progress changed on one book (bookId), a whole series (seriesId) or a library. writer is the writer the change came from, when it had one. */
+        ProgressEvent: {
+            libraryId: string;
+            seriesId?: string;
+            bookId?: string;
+            writer?: string;
         };
         /** @enum {string} */
         Role: "admin" | "user";
@@ -1439,7 +1627,10 @@ export interface operations {
     };
     scanLibrary: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Analyse every book again, even when its file is unchanged */
+                deep?: boolean;
+            };
             header?: never;
             path: {
                 libraryId: string;
@@ -1516,6 +1707,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Series"][];
+                };
+            };
+        };
+    };
+    listGenres: {
+        parameters: {
+            query?: {
+                libraryId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Distinct genre names */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": string[];
                 };
             };
         };
@@ -1719,6 +1932,26 @@ export interface operations {
                 content?: never;
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    streamEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Event stream */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
+            };
         };
     };
     listTasks: {
@@ -2740,6 +2973,150 @@ export interface operations {
         requestBody?: never;
         responses: {
             200: components["responses"]["Image"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description File bytes, Content-Disposition attachment with an RFC 5987 UTF-8 filename */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    downloadSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ZIP bytes (no Content-Length), Content-Disposition attachment */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/zip": string;
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    regenerateBookThumbnail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Done */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setBookCover: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CoverUpdate"];
+            };
+        };
+        responses: {
+            /** @description The book with its new cover page */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Book"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    regenerateSeriesThumbnails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    regenerateLibraryThumbnails: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                libraryId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Queued */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Task"];
+                };
+            };
             404: components["responses"]["NotFound"];
         };
     };

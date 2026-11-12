@@ -16,7 +16,7 @@
    - 「新しいシリーズ」: `recentlyAddedSeries()`、`SeriesCard`
    - 「最近更新されたシリーズ」: `recentlyUpdatedSeries()`、`SeriesCard`
    - 「最近読んだ巻」: `recentlyRead()`、`BookCard` に `seriesTitle`
-   シリーズ名は1回 `api.series()` を呼んで id→title の Map にする（N+1 にしない）。
+   シリーズ名は巻の `seriesTitle` を使う（シリーズ一覧は読まない）。
 3. 全棚が空のとき（ライブラリ未登録想定）: `EmptyState` 「まだ本がありません」「管理 → ライブラリ設定でフォルダを追加すると、ここに表示されます」、ボタン「ライブラリを追加」→ `/admin/libraries`。
 
 ## 状態

@@ -63,6 +63,13 @@ func Analyze(path string) (Analysis, error) {
 // AnalyzeContext is Analyze that stops when ctx ends, after AnalyzeTimeout,
 // or once the book has decompressed MaxDecompressed bytes.
 func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
+	return AnalyzeCover(ctx, path, 1)
+}
+
+// AnalyzeCover is AnalyzeContext that keeps page coverPage (1-based) as the
+// cover instead of page 1. A page past the end falls back to page 1;
+// Analysis.CoverPage says which page was used.
+func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analysis, error) {
 	ctx, cancel := context.WithTimeout(ctx, AnalyzeTimeout)
 	defer cancel()
 	a, format, err := archive.OpenPath(path)
@@ -105,6 +112,10 @@ func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
 		pages[i] = Page{Number: i + 1, Entry: name, MediaType: mediaTypes[name]}
 	}
 
+	coverIdx := coverPage - 1
+	if coverIdx < 0 || coverIdx >= len(names) {
+		coverIdx = 0
+	}
 	var (
 		cover    []byte
 		ciBytes  []byte
@@ -132,7 +143,7 @@ func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
 		}
 		pageSeen[i] = true
 		var coverBuf *bytes.Buffer
-		if i == 0 {
+		if i == coverIdx {
 			coverBuf = &bytes.Buffer{}
 		}
 		w, h, err := readPageConfig(e, r, coverBuf)
@@ -153,7 +164,7 @@ func AnalyzeContext(ctx context.Context, path archive.Path) (Analysis, error) {
 			return Analysis{}, fmt.Errorf("media: page %d not found while reading archive", i+1)
 		}
 	}
-	return Analysis{Format: format, Pages: pages, ComicInfo: ciBytes, Cover: cover}, nil
+	return Analysis{Format: format, Pages: pages, ComicInfo: ciBytes, Cover: cover, CoverPage: coverIdx + 1}, nil
 }
 
 // readPageConfig reads the header of one page entry and checks its limits.
@@ -183,4 +194,72 @@ func readPageConfig(e archive.Entry, r io.Reader, cover *bytes.Buffer) (int, int
 		return 0, 0, ErrTooLarge
 	}
 	return cfg.Width, cfg.Height, nil
+}
+
+// ReadEntry returns the bytes of one entry, at most MaxEntryBytes. Archives
+// with cheap random access open the entry directly; solid ones are walked
+// up to it under the usual decompression budget and timeout.
+func ReadEntry(ctx context.Context, path archive.Path, name string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
+	defer cancel()
+	a, _, err := archive.OpenPath(path)
+	if err != nil {
+		return nil, err
+	}
+	defer a.Close()
+	read := func(r io.Reader) ([]byte, error) {
+		data, err := io.ReadAll(io.LimitReader(r, MaxEntryBytes+1))
+		if err == nil && len(data) > MaxEntryBytes {
+			err = ErrTooLarge
+		}
+		return data, err
+	}
+	if a.RandomAccess() {
+		rc, err := a.Open(name)
+		if err != nil {
+			return nil, err
+		}
+		defer rc.Close()
+		data, err := read(ctxReader{ctx, rc})
+		if err == nil {
+			err = ctx.Err()
+		}
+		return data, err
+	}
+	var data []byte
+	found := false
+	err = archive.WalkLimited(a, archive.Limit{Ctx: ctx, MaxBytes: MaxDecompressed}, func(e archive.Entry, r io.Reader) error {
+		if e.Name != name {
+			return nil
+		}
+		found = true
+		var rerr error
+		data, rerr = read(r)
+		if rerr != nil {
+			return rerr
+		}
+		return archive.SkipRest
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !found {
+		return nil, archive.ErrNotExist
+	}
+	return data, nil
+}
+
+// ctxReader stops a read once ctx is done, so a cancelled task or the
+// extraction timeout also ends a direct (random-access) entry read, which
+// otherwise runs to the end of the entry.
+type ctxReader struct {
+	ctx context.Context
+	r   io.Reader
+}
+
+func (c ctxReader) Read(p []byte) (int, error) {
+	if err := c.ctx.Err(); err != nil {
+		return 0, err
+	}
+	return c.r.Read(p)
 }
