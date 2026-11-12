@@ -119,8 +119,10 @@ func komgaTachiReadListProgress(books []Book) komgaTachiProgressV1 {
 }
 
 // komgaTachiReadList reports whether the caller may see the read list, and
-// its visible books in list order. A list whose members are all hidden is not
-// visible to a non-administrator, as in the main API.
+// its books in list order, exactly the books the browse endpoint lists by
+// default (READY only), so Mihon's chapter numbers match the tracker's. A list
+// whose members are all hidden is not visible to a non-administrator, as in
+// the main API.
 func (s *server) komgaTachiReadList(ctx context.Context, id string) (bool, []Book, error) {
 	ls, err := s.readLists(ctx, " WHERE id = ?", id)
 	if err != nil {
@@ -129,10 +131,8 @@ func (s *server) komgaTachiReadList(ctx context.Context, id string) (bool, []Boo
 	if len(ls) == 0 {
 		return false, nil, nil
 	}
-	books, err := s.listBooks(ctx,
-		` AND b.id IN (SELECT book_id FROM read_list_books WHERE read_list_id = ?)`,
-		`ORDER BY (SELECT position FROM read_list_books WHERE read_list_id = ? AND book_id = b.id)`,
-		id, id)
+	where, args, tail, tailArgs := komgaReadListBookQuery(id, nil)
+	books, _, err := s.komgaBooks(ctx, where, args, tail, tailArgs, komgaPaging{unpaged: true})
 	return true, books, err
 }
 
@@ -160,7 +160,8 @@ func (s *server) komgaTachiSeriesGet(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusNotFound, "not_found.series")
 		return
 	}
-	books, err := s.listBooks(ctx, " AND b.series_id = ?", "ORDER BY b.number_sort, b.id", id)
+	where, args, tail, tailArgs := komgaSeriesBookQuery(id, nil)
+	books, _, err := s.komgaBooks(ctx, where, args, tail, tailArgs, komgaPaging{unpaged: true})
 	if err != nil {
 		komgaTachiFail(ctx, w, err)
 		return
@@ -191,7 +192,7 @@ func (s *server) komgaTachiSeriesPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	if err := setReadState(ctx, tx, true, "b.series_id = ? AND b.number_sort <= ?",
+	if err := setReadState(ctx, tx, true, "b.series_id = ? AND b.number_sort <= ? AND b.media_status = 'ready'",
 		[]any{id, *body.LastBookNumberSortRead}); err != nil {
 		komgaTachiFail(ctx, w, err)
 		return

@@ -21,7 +21,9 @@ answers 404.
   the `cn_compat` cookie. No credentials → 401 with
   `WWW-Authenticate: Basic`. The first Basic sign-in starts a 30-day session
   and sets `cn_compat`; Mihon's tracker sends no credentials and relies on it.
-  `cn_compat` does not work on `/api/v1`.
+  A sign-in with an API key (any of the three ways) sets `cn_compat_key` to
+  that key instead, checked as a key on every use, so deleting the key ends
+  it. Neither cookie works on `/api/v1`.
 - Handlers read the caller with `currentUser(ctx)` and must read series and
   books only through `seriesQuery`/`bookQuery`/`listSeries`/`listBooks`
   (`query.go`) or `libScope`/`visible` (`access.go`). Anything the caller

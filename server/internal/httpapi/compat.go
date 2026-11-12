@@ -34,10 +34,16 @@ import (
 // no credentials of its own) and which spares clients that keep cookies a
 // password check per request. The compat cookie is not the web app's
 // session cookie, so it cannot drive /api/v1.
+//
+// A client that signed in with an API key gets the key back in its own
+// cookie (cn_compat_key), checked as a key on every use, so the tracker works
+// for key users too and deleting the key ends it. Key-shaped and session
+// tokens live in separate cookies so neither is ever checked as the other.
 
 const (
-	compatCookie  = "cn_compat"
-	compatSession = 30 * 24 * time.Hour
+	compatCookie    = "cn_compat"
+	compatKeyCookie = "cn_compat_key"
+	compatSession   = 30 * 24 * time.Hour
 	// compatBody caps request bodies (only small JSON progress updates).
 	compatBody = 64 << 10
 	// basicCacheTTL is how long a checked Basic credential maps to its
@@ -106,15 +112,27 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 			return u, ok
 		}
 	}
+	if c, err := r.Cookie(compatKeyCookie); err == nil && c.Value != "" {
+		if u, ok, done := try(s.Auth.UserByAPIKey(ctx, c.Value)); ok || done {
+			return u, ok
+		}
+	}
+	// byKey checks an API key and, on success, hands it back as a cookie.
+	byKey := func(k string) (auth.User, bool, bool) {
+		u, ok, done := try(s.Auth.UserByAPIKey(ctx, k))
+		if ok {
+			s.setCompatKeyCookie(w, r, k)
+		}
+		return u, ok, done
+	}
 	if k := r.Header.Get("X-API-Key"); k != "" {
-		if u, ok, done := try(s.Auth.UserByAPIKey(ctx, k)); ok || done {
+		if u, ok, done := byKey(k); ok || done {
 			return u, ok
 		}
 	}
 	h := r.Header.Get("Authorization")
 	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
-		k := h[7:]
-		if u, ok, done := try(s.Auth.UserByAPIKey(ctx, k)); ok || done {
+		if u, ok, done := byKey(h[7:]); ok || done {
 			return u, ok
 		}
 	}
@@ -122,7 +140,7 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 		// An API key as the password; anything else (including a real
 		// password that happens to look like a key) is checked as a password.
 		if strings.HasPrefix(pass, "cn_") {
-			if u, ok, done := try(s.Auth.UserByAPIKey(ctx, pass)); ok || done {
+			if u, ok, done := byKey(pass); ok || done {
 				return u, ok
 			}
 		}
@@ -218,6 +236,19 @@ func (s *server) setCompatCookie(w http.ResponseWriter, r *http.Request, token s
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: compatCookie, Value: token, Path: "/", MaxAge: int(compatSession / time.Second),
+		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
+	})
+}
+
+// setCompatKeyCookie hands an API key that just worked back to the client,
+// unless the request already carries it. The key is checked again on every
+// use, so deleting it ends the cookie too.
+func (s *server) setCompatKeyCookie(w http.ResponseWriter, r *http.Request, key string) {
+	if c, err := r.Cookie(compatKeyCookie); err == nil && c.Value == key {
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name: compatKeyCookie, Value: key, Path: "/", MaxAge: int(compatSession / time.Second),
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
 	})
 }

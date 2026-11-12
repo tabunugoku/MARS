@@ -2,8 +2,12 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
+	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"hash/crc32"
 	"image"
 	"image/color"
 	"image/jpeg"
@@ -15,6 +19,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/auth"
 	"github.com/tabunugoku/cominavi/server/internal/library"
@@ -650,6 +655,93 @@ func TestKomgaPagesOneBasedAndConvert(t *testing.T) {
 	var broken []map[string]any
 	f.get(r, "/komga/api/v1/books/"+f.alphaBooks[3].Id+"/pages", 200, &broken)
 	mustEqual(t, "unreadable book pages", len(broken), 0)
+}
+
+// pngHeaderOnly is a PNG that is a signature, an IHDR of w by h 8-bit RGB and
+// an IEND: its header claims the size, and there is no pixel data.
+func pngHeaderOnly(w, h uint32) []byte {
+	chunk := func(typ string, data []byte) []byte {
+		var b bytes.Buffer
+		_ = binary.Write(&b, binary.BigEndian, uint32(len(data)))
+		b.WriteString(typ)
+		b.Write(data)
+		_ = binary.Write(&b, binary.BigEndian, crc32.ChecksumIEEE(append([]byte(typ), data...)))
+		return b.Bytes()
+	}
+	ihdr := make([]byte, 13)
+	binary.BigEndian.PutUint32(ihdr[0:4], w)
+	binary.BigEndian.PutUint32(ihdr[4:8], h)
+	ihdr[8], ihdr[9] = 8, 2
+	out := []byte("\x89PNG\r\n\x1a\n")
+	out = append(out, chunk("IHDR", ihdr)...)
+	return append(out, chunk("IEND", nil)...)
+}
+
+func TestKomgaConvertGuards(t *testing.T) {
+	small := pngBytes(t, 3, 2, color.RGBA{1, 2, 3, 255})
+	out, err := komgaConvertPNG(small)
+	if err != nil {
+		t.Fatalf("small page: %v", err)
+	}
+	if cfg, err := png.DecodeConfig(bytes.NewReader(out)); err != nil || cfg.Width != 3 || cfg.Height != 2 {
+		t.Fatalf("small page output: %+v %v", cfg, err)
+	}
+	// 20000 x 20000 is 4e8 pixels, over media.MaxPixels: refused from the header.
+	if _, err := komgaConvertPNG(pngHeaderOnly(20000, 20000)); !errors.Is(err, errPageTooLarge) {
+		t.Fatalf("huge header: %v, want errPageTooLarge", err)
+	}
+	if _, err := komgaConvertPNG([]byte("not an image")); !errors.Is(err, errPageFormat) {
+		t.Fatalf("garbage: %v, want errPageFormat", err)
+	}
+}
+
+func TestKomgaConvertSlots(t *testing.T) {
+	f := newKomgaFix(t)
+	r := komgaReader
+	page := "/komga/api/v1/books/" + f.alphaBooks[0].Id + "/pages/1?convert=png"
+
+	// Five conversions in a row all answer, so each one gives its slot back.
+	for i := range 5 {
+		rec := f.do(r, page)
+		if rec.Code != http.StatusOK || rec.Header().Get("Content-Type") != "image/png" {
+			t.Fatalf("convert %d: %d %q", i, rec.Code, rec.Header().Get("Content-Type"))
+		}
+	}
+	mustEqual(t, "slots in use after 5 converts", len(convertSlots), 0)
+
+	// With every slot taken a conversion waits. A client that goes away while
+	// it waits gets no page, and the slots it never took stay as they were.
+	for range komgaConvertSlots {
+		convertSlots <- struct{}{}
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	req := httptest.NewRequest(http.MethodGet, page, nil).WithContext(ctx)
+	req.SetBasicAuth(r.mail, r.pass)
+	rec := httptest.NewRecorder()
+	done := make(chan struct{})
+	go func() {
+		f.h.ServeHTTP(rec, req)
+		close(done)
+	}()
+	select {
+	case <-done:
+		t.Fatal("a conversion ran with every slot taken")
+	case <-time.After(100 * time.Millisecond):
+	}
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("a waiting conversion did not return after its client left")
+	}
+	if rec.Header().Get("Content-Type") == "image/png" {
+		t.Fatal("a client that left was sent a page")
+	}
+	for range komgaConvertSlots {
+		<-convertSlots
+	}
+	mustEqual(t, "slots in use at the end", len(convertSlots), 0)
 }
 
 // ─── Access ──────────────────────────────────────────────────────────────────

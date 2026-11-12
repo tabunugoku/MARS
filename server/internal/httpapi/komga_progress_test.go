@@ -238,6 +238,38 @@ func TestKomgaProgressReadListTachiyomi(t *testing.T) {
 	}
 }
 
+// The tracker numbers a list's books as the browse endpoint does: an
+// unreadable book is not a chapter, so lastBookRead=1 marks the ready book
+// after it, not the unreadable one before it.
+func TestKomgaProgressReadListSkipsUnreadable(t *testing.T) {
+	f := newKomgaProgressFix(t)
+	rd := f.as("reader@example.com", "reader pass")
+	var l ReadList
+	f.e.admin.json("POST", "/api/v1/read-lists", map[string]any{"name": "壊れた巻", "bookIds": []string{f.alphaBks[1].Id, f.alphaBks[0].Id}}, 201, &l)
+	if _, err := f.e.db.Exec(`UPDATE books SET media_status = 'error' WHERE id = ?`, f.alphaBks[1].Id); err != nil {
+		t.Fatal(err)
+	}
+	url := "/komga/api/v1/readlists/" + l.Id + "/read-progress/tachiyomi"
+
+	var p komgaTachiProgressV1
+	rd.getJSON(url, &p)
+	if p.BooksCount != 1 || p.BooksReadCount != 0 || p.LastReadContinuousIndex != 0 {
+		t.Fatalf("fresh list: %+v", p)
+	}
+
+	rd.want("PUT", url, `{"lastBookRead":1}`, http.StatusNoContent)
+	rd.getJSON(url, &p)
+	if p.BooksCount != 1 || p.BooksReadCount != 1 || p.LastReadContinuousIndex != 1 {
+		t.Fatalf("after lastBookRead=1: %+v", p)
+	}
+	if n := f.readCount(f.readerID, f.alphaBks[0]); n != 1 {
+		t.Fatal("the ready book was not marked read")
+	}
+	if n := f.readCount(f.readerID, f.alphaBks[1]); n != 0 {
+		t.Fatal("the unreadable book was marked read")
+	}
+}
+
 func TestKomgaProgressNoAccess(t *testing.T) {
 	f := newKomgaProgressFix(t)
 	rd := f.as("reader@example.com", "reader pass")

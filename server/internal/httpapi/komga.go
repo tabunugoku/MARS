@@ -6,6 +6,7 @@ import (
 	"errors"
 	"image"
 	"image/png"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/url"
@@ -14,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/cominavi/server/internal/media"
 
 	// Decoders for convert=png: the page formats ComiNavi reads.
 	_ "golang.org/x/image/webp"
@@ -372,6 +374,25 @@ func (s *server) komgaBooks(ctx context.Context, where string, whereArgs []any, 
 	return out, total, rows.Err()
 }
 
+// komgaSeriesBookQuery is the condition and order of a series' books as the
+// browse endpoint lists them (READY only unless media_status says otherwise).
+// The series progress tracker uses it too, so both count the same books in
+// the same order.
+func komgaSeriesBookQuery(seriesID string, q url.Values) (where string, args []any, tail string, tailArgs []any) {
+	mw, margs := komgaMediaFilter(q)
+	return ` AND b.series_id = ?` + mw, append([]any{seriesID}, margs...), `ORDER BY b.number_sort, b.path`, nil
+}
+
+// komgaReadListBookQuery is the condition and order of a read list's books as
+// the browse endpoint lists them (READY only unless media_status says
+// otherwise, in list order). The read list progress tracker uses it too.
+func komgaReadListBookQuery(listID string, q url.Values) (where string, args []any, tail string, tailArgs []any) {
+	mw, margs := komgaMediaFilter(q)
+	where = ` AND b.id IN (SELECT book_id FROM read_list_books WHERE read_list_id = ?)` + mw
+	tail = `ORDER BY (SELECT position FROM read_list_books WHERE read_list_id = ? AND book_id = b.id)`
+	return where, append([]any{listID}, margs...), tail, []any{listID}
+}
+
 func (s *server) komgaSeriesBooks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := r.PathValue("seriesId")
@@ -387,9 +408,8 @@ func (s *server) komgaSeriesBooks(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, komgaWrap([]KomgaBookDto{}, 0, pg))
 		return
 	}
-	mw, margs := komgaMediaFilter(r.URL.Query())
-	items, total, err := s.komgaBooks(ctx, ` AND b.series_id = ?`+mw, append([]any{id}, margs...),
-		`ORDER BY b.number_sort, b.path`, nil, pg)
+	where, args, tail, tailArgs := komgaSeriesBookQuery(id, r.URL.Query())
+	items, total, err := s.komgaBooks(ctx, where, args, tail, tailArgs, pg)
 	if err != nil {
 		s.komgaFail(w, r, err)
 		return
@@ -495,9 +515,46 @@ func (s *server) komgaPages(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
+// komgaConvertSlots is the number of PNG conversions that may run at once,
+// server-wide. A conversion holds a page in memory while it decodes.
+const komgaConvertSlots = 2
+
+var convertSlots = make(chan struct{}, komgaConvertSlots)
+
+var (
+	errPageTooLarge = errors.New("komga: page over the conversion limit")
+	errPageFormat   = errors.New("komga: page format not readable")
+)
+
+// komgaConvertPNG re-encodes a page as PNG. The header is read before any
+// pixel is decoded, so a page over media.MaxPixels is refused cheaply.
+func komgaConvertPNG(data []byte) ([]byte, error) {
+	if len(data) > media.MaxEntryBytes {
+		return nil, errPageTooLarge
+	}
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, errPageFormat
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > media.MaxPixels {
+		return nil, errPageTooLarge
+	}
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, errPageFormat
+	}
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
 // komgaPage serves page {page} (1-based) of a book. Without convert=png it is
 // the main API's page, unchanged. With it the page is decoded and re-encoded
-// as PNG; a page no decoder reads answers 415.
+// as PNG: a page no decoder reads answers 415, one over the pixel limit 413.
+// At most komgaConvertSlots conversions run at once; a client that leaves
+// while waiting gets no answer.
 func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("convert") != "png" {
 		s.servePage(w, r)
@@ -508,6 +565,13 @@ func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	select {
+	case convertSlots <- struct{}{}:
+	case <-ctx.Done():
+		return
+	}
+	defer func() { <-convertSlots }()
+
 	p, err := s.Library.OpenPage(ctx, r.PathValue("bookId"), n)
 	if errors.Is(err, library.ErrNotFound) {
 		writeError(ctx, w, http.StatusNotFound, "not_found.page")
@@ -518,22 +582,29 @@ func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer p.Close()
-	img, _, err := image.Decode(p.Body)
+	data, err := io.ReadAll(io.LimitReader(p.Body, media.MaxEntryBytes+1))
 	if err != nil {
-		writeError(ctx, w, http.StatusUnsupportedMediaType, "unsupported.page_convert")
+		writeError(ctx, w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
+	out, err := komgaConvertPNG(data)
+	switch {
+	case errors.Is(err, errPageTooLarge):
+		writeError(ctx, w, http.StatusRequestEntityTooLarge, "too_large.page_convert")
+		return
+	case errors.Is(err, errPageFormat):
+		writeError(ctx, w, http.StatusUnsupportedMediaType, "unsupported.page_convert")
+		return
+	case err != nil:
 		writeError(ctx, w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
 	h := w.Header()
 	h.Set("Content-Type", "image/png")
-	h.Set("Content-Length", strconv.Itoa(buf.Len()))
+	h.Set("Content-Length", strconv.Itoa(len(out)))
 	h.Set("Cache-Control", "private, no-cache")
 	h.Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(buf.Bytes())
+	_, _ = w.Write(out)
 }
 
 // ─── Read lists ──────────────────────────────────────────────────────────────
@@ -594,10 +665,8 @@ func (s *server) komgaReadListBooks(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, komgaWrap([]KomgaBookDto{}, 0, pg))
 		return
 	}
-	mw, margs := komgaMediaFilter(r.URL.Query())
-	where := ` AND b.id IN (SELECT book_id FROM read_list_books WHERE read_list_id = ?)` + mw
-	items, total, err := s.komgaBooks(ctx, where, append([]any{l.Id}, margs...),
-		`ORDER BY (SELECT position FROM read_list_books WHERE read_list_id = ? AND book_id = b.id)`, []any{l.Id}, pg)
+	where, args, tail, tailArgs := komgaReadListBookQuery(l.Id, r.URL.Query())
+	items, total, err := s.komgaBooks(ctx, where, args, tail, tailArgs, pg)
 	if err != nil {
 		s.komgaFail(w, r, err)
 		return

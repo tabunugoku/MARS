@@ -139,6 +139,65 @@ func TestCompatAPIKeys(t *testing.T) {
 	}
 }
 
+// A client that signed in with an API key gets it back as a cookie, so
+// Mihon's tracker (which sends no credentials) works for key users too, and
+// deleting the key ends the cookie.
+func TestCompatAPIKeyCookie(t *testing.T) {
+	e, h, _ := compatEnv(t, true)
+	p := compatPaths[1]
+	reader := e.login("読者", "reader pass")
+	var created ApiKeyCreated
+	reader.json("POST", "/api/v1/me/api-keys", map[string]any{"name": "Mihon"}, 201, &created)
+
+	for name, set := range map[string]func(*http.Request){
+		"X-API-Key": header("X-API-Key", created.Key),
+		"Bearer":    header("Authorization", "Bearer "+created.Key),
+		"Basic key": basicAuth("anything", created.Key),
+	} {
+		rec := compatGet(h, p, set)
+		if rec.Code != 200 {
+			t.Fatalf("%s: %d", name, rec.Code)
+		}
+		var got string
+		for _, ck := range rec.Result().Cookies() {
+			if ck.Name == compatKeyCookie {
+				got = ck.Value
+				if !ck.HttpOnly || ck.Path != "/" {
+					t.Fatalf("%s: cookie attributes %+v", name, ck)
+				}
+			}
+		}
+		if got != created.Key {
+			t.Fatalf("%s: set no %s cookie", name, compatKeyCookie)
+		}
+		if compatCookieFrom(rec) != "" {
+			t.Fatalf("%s: a key sign-in started a session", name)
+		}
+	}
+
+	keyCookie := func(r *http.Request) { r.AddCookie(&http.Cookie{Name: compatKeyCookie, Value: created.Key}) }
+	if rec := compatGet(h, p, keyCookie); rec.Code != 200 {
+		t.Fatalf("key cookie alone: %d", rec.Code)
+	}
+	// The cookie does not reach /api/v1.
+	if rec := compatGet(e.h, "/api/v1/me", keyCookie); rec.Code != 401 {
+		t.Fatalf("key cookie on /api/v1/me: %d", rec.Code)
+	}
+	// A session token in the key cookie is not a key.
+	rec := compatGet(h, compatPaths[0], basicAuth("読者", "reader pass"))
+	token := compatCookieFrom(rec)
+	if rec := compatGet(h, p, func(r *http.Request) {
+		r.AddCookie(&http.Cookie{Name: compatKeyCookie, Value: token})
+	}); rec.Code != 401 {
+		t.Fatalf("session token as key cookie: %d", rec.Code)
+	}
+
+	reader.json("DELETE", "/api/v1/me/api-keys/"+created.Id, nil, 204, nil)
+	if rec := compatGet(h, p, keyCookie); rec.Code != 401 {
+		t.Fatalf("key cookie after the key was deleted: %d", rec.Code)
+	}
+}
+
 func TestCompatPasswordChangeEndsCache(t *testing.T) {
 	e, h, readerID := compatEnv(t, true)
 	p := compatPaths[0]
