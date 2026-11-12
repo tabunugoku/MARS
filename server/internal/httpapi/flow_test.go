@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"image"
 	"image/color"
+	"image/jpeg"
 	"image/png"
 	"io"
 	"net/http"
@@ -131,6 +132,7 @@ type env struct {
 	gate  *SetupGate
 	hub   *events.Hub
 	admin client
+	data  string // the data folder (database, caches)
 }
 
 // newEnv starts a server on a fresh database and runs first-run setup, so
@@ -161,10 +163,10 @@ func newEnvAt(t *testing.T, data string) *env {
 	if err != nil {
 		t.Fatal(err)
 	}
-	lib := &library.Service{DB: d, Queue: q, ThumbDir: filepath.Join(data, "thumbs"), Pages: &media.PageCache{Dir: filepath.Join(data, "pages"), MaxBytes: 1 << 30}, Events: hub}
+	lib := &library.Service{DB: d, Queue: q, ThumbDir: filepath.Join(data, "thumbs"), Pages: &media.PageCache{Dir: filepath.Join(data, "pages"), MaxBytes: 1 << 30}, PageThumbDir: filepath.Join(data, "page-thumbs"), Events: hub}
 	h := http.StripPrefix("/api/v1", New(Deps{DB: d, Version: "test", Library: lib, Tasks: q,
 		Auth: auth.Store{DB: d}, Limiter: &auth.Limiter{}, Gate: gate, Events: hub, Heartbeat: 50 * time.Millisecond}))
-	e := &env{t: t, h: h, db: d, gate: gate, hub: hub}
+	e := &env{t: t, h: h, db: d, gate: gate, hub: hub, data: data}
 	anon := e.anon()
 	rec := anon.do("POST", "/api/v1/setup", map[string]any{"token": gate.token, "name": "管理人", "email": "admin@example.com", "password": "correct horse"})
 	if rec.Code != 201 {
@@ -213,7 +215,8 @@ func (e *env) waitTasks() {
 // TestScanAndServe registers a library, lets the scan and analysis run, then
 // reads series, books, pages and covers back through the API.
 func TestScanAndServe(t *testing.T) {
-	c := newEnv(t).admin
+	e := newEnv(t)
+	c := e.admin
 	root := t.TempDir()
 	red, blue := pngBytes(t, 60, 90, color.RGBA{200, 0, 0, 255}), pngBytes(t, 120, 90, color.RGBA{0, 0, 200, 255})
 	info := []byte(`<?xml version="1.0"?><ComicInfo><Series>夜更けの測量士</Series><Number>1</Number><Writer>北条 灯</Writer><Manga>YesAndRightToLeft</Manga></ComicInfo>`)
@@ -290,6 +293,39 @@ func TestScanAndServe(t *testing.T) {
 	if rec := c.do("GET", "/api/v1/books/"+books[0].Id+"/pages/9", nil); rec.Code != 404 {
 		t.Fatalf("missing page: %d", rec.Code)
 	}
+	// Page thumbnails: a small JPEG, made once, then served from disk.
+	if !strings.HasPrefix(pages[2].ThumbnailUrl, "/api/v1/books/"+books[0].Id+"/pages/3/thumbnail?v=") {
+		t.Fatalf("page thumbnail url %q", pages[2].ThumbnailUrl)
+	}
+	rec = c.do("GET", pages[2].ThumbnailUrl, nil)
+	if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/jpeg" || !strings.Contains(rec.Header().Get("Cache-Control"), "immutable") {
+		t.Fatalf("page thumbnail: %d %q %q", rec.Code, rec.Header().Get("Content-Type"), rec.Header().Get("Cache-Control"))
+	}
+	if cfg, err := jpeg.DecodeConfig(bytes.NewReader(rec.Body.Bytes())); err != nil || cfg.Width > 320 || cfg.Height > 480 {
+		t.Fatalf("page thumbnail image %+v %v", cfg, err)
+	}
+	if rec := c.do("GET", pages[2].ThumbnailUrl, nil, "If-None-Match", rec.Header().Get("ETag")); rec.Code != 304 {
+		t.Fatalf("page thumbnail revalidate: %d", rec.Code)
+	}
+	if rec := c.do("GET", "/api/v1/books/"+books[0].Id+"/pages/9/thumbnail", nil); rec.Code != 404 {
+		t.Fatalf("missing page thumbnail: %d", rec.Code)
+	}
+	if n, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg")); len(n) != 1 {
+		t.Fatalf("page thumbnail files %v", n)
+	}
+	// The book file changes: the next thumbnail is made for the new version
+	// and the old version's file goes.
+	oldFiles, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg"))
+	if _, err := e.db.Exec(`UPDATE books SET mtime = '2001-01-01T00:00:00Z' WHERE id = ?`, books[0].Id); err != nil {
+		t.Fatal(err)
+	}
+	if rec := c.do("GET", "/api/v1/books/"+books[0].Id+"/pages/3/thumbnail", nil); rec.Code != 200 || rec.Header().Get("ETag") == "" {
+		t.Fatalf("page thumbnail after change: %d", rec.Code)
+	}
+	if n, _ := filepath.Glob(filepath.Join(e.data, "page-thumbs", books[0].Id, "*.jpg")); len(n) != 1 || n[0] == oldFiles[0] {
+		t.Fatalf("page thumbnail files after change %v (before %v)", n, oldFiles)
+	}
+
 	for _, u := range []string{books[0].ThumbnailUrl, yofuke.ThumbnailUrl} {
 		rec := c.do("GET", u, nil)
 		if rec.Code != 200 || rec.Header().Get("Content-Type") != "image/jpeg" {

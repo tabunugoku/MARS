@@ -37,6 +37,11 @@ type Service struct {
 	Queue    *task.Queue
 	ThumbDir string
 	Pages    *media.PageCache
+	// PageThumbDir keeps page thumbnails (see PageThumbnail), at most
+	// PageThumbMax bytes (512 MiB when zero). Empty turns them off.
+	PageThumbDir string
+	PageThumbMax int64
+	pageThumbs   pageThumbs
 	Events   *events.Hub // may be nil
 
 	scanLocks  sync.Map // library id -> ctxMutex; one walk+sync at a time per library

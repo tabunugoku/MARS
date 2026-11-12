@@ -71,11 +71,12 @@ func run() error {
 		return err
 	}
 	lib := &library.Service{
-		DB:       database,
-		Queue:    queue,
-		ThumbDir: cfg.ThumbnailDir(),
-		Pages:    &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
-		Events:   hub,
+		DB:           database,
+		Queue:        queue,
+		ThumbDir:     cfg.ThumbnailDir(),
+		Pages:        &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
+		PageThumbDir: cfg.PageThumbDir(),
+		Events:       hub,
 	}
 	go lib.Schedule(ctx)
 

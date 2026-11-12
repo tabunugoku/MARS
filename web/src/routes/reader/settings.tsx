@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "motion/react";
 import { Link } from "react-router";
-import { BG_LABEL, DIRECTION_LABEL, FIT_LABEL, SPREAD_LABEL, type ReaderPrefs, type ReaderScope } from "@/api";
+import { BG_LABEL, DIRECTION_LABEL, FIT_LABEL, PROFILE_FOR_LABEL, SPREAD_LABEL, activeProfile, type ReaderPrefs, type ReaderScope } from "@/api";
 import { spring } from "@/lib/springs";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
@@ -39,8 +39,7 @@ function Segmented<T extends string>({ label, value, options, onChange, disabled
   );
 }
 
-const SCOPE_NOTE: Record<ReaderScope, string> = {
-  global: "全体設定の値を使っています。",
+const SCOPE_NOTE: Record<Exclude<ReaderScope, "global">, string> = {
   series: "このシリーズの全巻が下の設定で開きます。",
   book: "この巻だけ下の設定で開きます。",
 };
@@ -105,7 +104,7 @@ export function ReaderSettings({
               ]}
             />
             <p className={cn(typeClass("caption"), "text-white/60")}>
-              {SCOPE_NOTE[scope]}
+              {scope === "global" ? `全体設定（${PROFILE_FOR_LABEL[activeProfile()]}）の値を使っています。` : SCOPE_NOTE[scope]}
               <Link to="/settings/reader" className="relative ml-1 text-white/80 underline underline-offset-2 touch-hit hover:text-white">
                 全体設定を開く
               </Link>

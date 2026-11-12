@@ -227,6 +227,31 @@ func TestReaderPrefs(t *testing.T) {
 		t.Fatalf("book prefs %+v", bp)
 	}
 
+	if all.GlobalMobile != nil {
+		t.Fatalf("mobile profile before it was saved: %+v", all.GlobalMobile)
+	}
+
+	// The mobile profile is its own row: saving one leaves the other alone.
+	e.admin.json("PUT", "/api/v1/me/reader-prefs/global?profile=mobile",
+		map[string]any{"direction": "series", "spread": "off", "fit": "screen", "bg": "black", "splitWide": true}, 204, nil)
+	e.admin.json("PUT", "/api/v1/me/reader-prefs/global?profile=tablet",
+		map[string]any{"direction": "series", "spread": "off", "fit": "screen", "bg": "black"}, 400, nil)
+	all = ReaderPrefsAll{}
+	e.admin.json("GET", "/api/v1/me/reader-prefs", nil, 200, &all)
+	if m := all.GlobalMobile; m == nil || m.Spread != GlobalReaderPrefsSpreadOff || m.SplitWide == nil || !*m.SplitWide {
+		t.Fatalf("mobile profile %+v", m)
+	}
+	if all.Global.Spread != GlobalReaderPrefsSpreadOn || all.Global.SplitWide != nil {
+		t.Fatalf("desktop profile changed by a mobile save: %+v", all.Global)
+	}
+	e.admin.json("PUT", "/api/v1/me/reader-prefs/global?profile=desktop",
+		map[string]any{"direction": "rtl", "spread": "cover", "fit": "width", "bg": "gray"}, 204, nil)
+	all = ReaderPrefsAll{}
+	e.admin.json("GET", "/api/v1/me/reader-prefs", nil, 200, &all)
+	if all.Global.Spread != GlobalReaderPrefsSpreadCover || all.GlobalMobile == nil || all.GlobalMobile.Spread != GlobalReaderPrefsSpreadOff {
+		t.Fatalf("profiles after a desktop save: %+v / %+v", all.Global, all.GlobalMobile)
+	}
+
 	e.admin.json("DELETE", "/api/v1/me/reader-prefs/series/"+alpha.Id, nil, 204, nil)
 	e.admin.json("DELETE", "/api/v1/me/reader-prefs/series/nope", nil, 404, nil)
 	all = ReaderPrefsAll{}

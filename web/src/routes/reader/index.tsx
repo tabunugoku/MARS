@@ -24,26 +24,59 @@ import { ReaderSettings } from "./settings";
 // stays out of the way until asked for (tap the centre, or press M).
 // ---------------------------------------------------------------------------
 
-type View = { pages: number[] }; // one or two page numbers shown together
+/** One or two page numbers shown together. half: only that half of a
+ *  landscape page, in reading order ("first" is the right half in RTL). */
+type View = { pages: number[]; half?: "first" | "second" };
 
 /** A page scanned as a two-page spread (wider than tall) always stands alone. */
 const isWide = (pg: Page | undefined) => !!pg && pg.width > pg.height;
 
 /** Group pages into views. Spread mode pairs pages; "cover" keeps page 1
- *  alone; a page that is already a spread is never paired. */
-function buildViews(pages: Page[], spread: ReaderPrefs["spread"]): View[] {
+ *  alone; a page that is already a spread is never paired. With split, such
+ *  a page becomes two views, one per half. */
+function buildViews(pages: Page[], spread: ReaderPrefs["spread"], split = false): View[] {
   const count = pages.length;
   const views: View[] = [];
   let p = 1;
-  if (spread === "cover" && count > 0) views.push({ pages: [p++] });
+  const single = (n: number) => {
+    if (split && isWide(pages[n - 1])) views.push({ pages: [n], half: "first" }, { pages: [n], half: "second" });
+    else views.push({ pages: [n] });
+  };
+  if (spread === "cover" && count > 0) single(p++);
   while (p <= count) {
-    if (spread === "off" || p === count || isWide(pages[p - 1]) || isWide(pages[p])) views.push({ pages: [p++] });
+    if (spread === "off" || p === count || isWide(pages[p - 1]) || isWide(pages[p])) single(p++);
     else {
       views.push({ pages: [p, p + 1] });
       p += 2;
     }
   }
   return views;
+}
+
+/** The view showing page n; its second half when second is set and the page
+ *  is split. -1 when no view shows it. */
+function findView(views: View[], n: number, second = false): number {
+  const i = views.findIndex((v) => v.pages.includes(n));
+  return second && views[i + 1]?.half === "second" && views[i + 1].pages[0] === n ? i + 1 : i;
+}
+
+/** The server keeps a page number only. Which half of a split page the reader
+ *  stopped at is kept in this browser: the page whose second half was showing. */
+const halfKey = (bookId: string) => `cominavi.half.${bookId}`;
+function readHalf(bookId: string): number | null {
+  try {
+    return Number(localStorage.getItem(halfKey(bookId))) || null;
+  } catch {
+    return null;
+  }
+}
+function writeHalf(bookId: string, page: number | null) {
+  try {
+    if (page) localStorage.setItem(halfKey(bookId), String(page));
+    else localStorage.removeItem(halfKey(bookId));
+  } catch {
+    // storage blocked: the half is not remembered
+  }
 }
 
 const progressKey = (p: { page: number; completed: boolean }) => `${p.page}|${p.completed}`;
@@ -224,12 +257,16 @@ function ReaderBody({
 
   const webtoon = prefs.direction === "webtoon";
   const pageCount = pages.length;
-  const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread), [pages, prefs.spread, webtoon]);
+  // A landscape page in halves on a portrait screen, when this profile asks.
+  const portrait = useMatchMedia("(orientation: portrait)");
+  const split = !webtoon && !!globalPrefs.splitWide && portrait;
+  const views = useMemo(() => buildViews(pages, webtoon ? "off" : prefs.spread, split), [pages, prefs.spread, webtoon, split]);
   // index views.length = the end card
-  const [vi, setVi] = useState(() => Math.max(0, views.findIndex((v) => v.pages.includes(startPage))));
+  const [vi, setVi] = useState(() => Math.max(0, findView(views, startPage, !incognito && readHalf(book.id) === startPage)));
   const viewIndex = Math.min(vi, views.length);
   const atEnd = viewIndex === views.length;
   const currentPage = atEnd ? pageCount : views[viewIndex].pages[0];
+  const half = atEnd ? undefined : views[viewIndex].half;
   const url = (p: number) => pages[p - 1]?.url ?? "";
 
   // The page the reader is "on", independent of grouping (Infinity = end card).
@@ -237,17 +274,24 @@ function ReaderBody({
   // is declared before the one that records the anchor, so it reads the page
   // from the previous layout, not the one recomputed with the stale index.
   const anchor = useRef<number>(currentPage);
+  // The page whose second half is showing, kept while a landscape screen shows it whole.
+  const secondOf = useRef<number | null>(half === "second" ? currentPage : null);
   const [webtoonPage, setWebtoonPage] = useState(currentPage);
   const [webtoonEnd, setWebtoonEnd] = useState(false);
   useEffect(() => {
     const a = anchor.current;
-    setVi(a === Infinity ? views.length : Math.max(0, views.findIndex((v) => v.pages.includes(a))));
+    setVi(a === Infinity ? views.length : Math.max(0, findView(views, a, secondOf.current === a)));
     setWebtoonPage(a === Infinity ? pageCount : a);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [views]);
   useEffect(() => {
-    if (!webtoon) anchor.current = atEnd ? Infinity : currentPage;
-  }, [atEnd, currentPage, webtoon]);
+    if (webtoon) return;
+    anchor.current = atEnd ? Infinity : currentPage;
+    if (half) secondOf.current = half === "second" ? currentPage : null;
+    else if (secondOf.current !== currentPage) secondOf.current = null;
+    // Remember it for the next visit too.
+    if (!incognito) writeHalf(book.id, atEnd ? null : secondOf.current);
+  }, [atEnd, currentPage, half, webtoon, incognito, book.id]);
   const [jump, setJump] = useState<{ page: number; n: number } | null>(null);
 
   // The end card counts as the last page, finished (in webtoon too, where it
@@ -255,7 +299,8 @@ function ReaderBody({
   const shownPage = webtoon ? (webtoonEnd ? pageCount : webtoonPage) : currentPage;
   const lastShown = webtoon ? shownPage : atEnd ? pageCount : Math.max(...views[viewIndex].pages);
   const finished = webtoon ? webtoonEnd : atEnd;
-  const navigated = useProgressSaver(book.id, shownPage, lastShown >= pageCount, finished ? "end" : String(shownPage), book.progress, incognito);
+  // The first half of a split last page leaves the second half unread.
+  const navigated = useProgressSaver(book.id, shownPage, lastShown >= pageCount && half !== "first", finished ? "end" : String(shownPage), book.progress, incognito);
 
   const axis = prefs.direction === "vertical" ? "y" : "x";
   const forward = prefs.direction === "rtl" ? -1 : 1;
@@ -340,7 +385,10 @@ function ReaderBody({
       anchor.current = p;
       setWebtoonPage(p);
       setJump((j) => ({ page: p, n: (j?.n ?? 0) + 1 }));
-    } else setVi(Math.max(0, views.findIndex((v) => v.pages.includes(p))));
+    } else {
+      secondOf.current = null;
+      setVi(Math.max(0, findView(views, p)));
+    }
     setPanel("none");
     navigated();
   };
@@ -349,7 +397,7 @@ function ReaderBody({
   // shows decoded pixels; two further views are preloaded invisibly.
   const slot = (i: number) =>
     i < 0 ? null : i === views.length ? <EndCard key="end" book={book} next={next} seriesId={book.seriesId} incognito={incognito} /> : i > views.length ? null : (
-      <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} />
+      <PageView key={i} view={views[i]} url={url} rtl={forward === -1} fit={prefs.fit} pageInfo={(p) => pages[p - 1]} />
     );
 
   const tone = bgClass[prefs.bg];
@@ -506,7 +554,46 @@ function PageImg({ src, page, fit, className }: { src: string; page: number; fit
   return <img src={src} alt={`${page}ページ`} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
 }
 
-function PageView({ view, url, rtl, fit }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"] }) {
+/** Whether a media query matches now; follows changes (rotation, resize). */
+function useMatchMedia(query: string): boolean {
+  const [on, setOn] = useState(() => typeof matchMedia !== "undefined" && matchMedia(query).matches);
+  useEffect(() => {
+    const m = matchMedia(query);
+    const update = () => setOn(m.matches);
+    update();
+    m.addEventListener("change", update);
+    return () => m.removeEventListener("change", update);
+  }, [query]);
+  return on;
+}
+
+/** One half of a landscape page, as large as the stage allows: a box with
+ *  the half's aspect, sized with container units, cropping the image. */
+function HalfPage({ src, page, width, height, side }: { src: string; page: number; width: number; height: number; side: "left" | "right" }) {
+  const ar = width / 2 / height;
+  return (
+    <div className="flex size-full items-center justify-center" style={{ containerType: "size" }}>
+      <div className="overflow-hidden" style={{ width: `min(100cqw, ${100 * ar}cqh)`, height: `min(100cqh, ${100 / ar}cqw)` }}>
+        <img
+          src={src}
+          alt={`${page}ページ（${side === "right" ? "右" : "左"}半分）`}
+          draggable={false}
+          decoding="sync"
+          className={cn("size-full object-cover", side === "right" ? "object-right" : "object-left")}
+        />
+      </div>
+    </div>
+  );
+}
+
+function PageView({ view, url, rtl, fit, pageInfo }: { view: View; url: (page: number) => string; rtl: boolean; fit: ReaderPrefs["fit"]; pageInfo: (page: number) => Page | undefined }) {
+  if (view.half) {
+    const p = view.pages[0];
+    const info = pageInfo(p);
+    // In RTL the right half is read first.
+    const side = (view.half === "first") === rtl ? "right" : "left";
+    return <HalfPage src={url(p)} page={p} width={info?.width ?? 2} height={info?.height ?? 1} side={side} />;
+  }
   const pages = rtl ? [...view.pages].reverse() : view.pages;
   const scroll = fit !== "screen";
   if (pages.length === 1) {
@@ -578,7 +665,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
         </button>
       </div>
       <div ref={ref} dir={rtl ? "rtl" : "ltr"} className="shelf-scroll flex gap-2 overflow-x-auto px-4 pb-1">
-        {pages.map(({ number: p, url }) => (
+        {pages.map(({ number: p, thumbnailUrl }) => (
           <button
             key={p}
             type="button"
@@ -589,7 +676,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
             aria-label={`${p}ページへ`}
             aria-current={p === current ? "page" : undefined}
           >
-            <img src={url} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
+            <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
             <span className={cn(typeClass("micro"), "mt-1 block text-center tabular-nums text-white/70")}>{p}</span>
           </button>
         ))}

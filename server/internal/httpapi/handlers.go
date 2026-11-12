@@ -338,6 +338,7 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 			return nil, err
 		}
 		p.Url = fmt.Sprintf("/api/v1/books/%s/pages/%d?v=%s", req.BookId, p.Number, v)
+		p.ThumbnailUrl = fmt.Sprintf("/api/v1/books/%s/pages/%d/thumbnail?v=%s", req.BookId, p.Number, v)
 		out = append(out, p)
 	}
 	return out, rows.Err()
@@ -348,6 +349,9 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 func (s *server) GetBookPage(context.Context, GetBookPageRequestObject) (GetBookPageResponseObject, error) {
 	return GetBookPage404JSONResponse{notFound("not routed")}, nil
 }
+func (s *server) GetBookPageThumbnail(context.Context, GetBookPageThumbnailRequestObject) (GetBookPageThumbnailResponseObject, error) {
+	return GetBookPageThumbnail404JSONResponse{notFound("not routed")}, nil
+}
 func (s *server) GetBookThumbnail(context.Context, GetBookThumbnailRequestObject) (GetBookThumbnailResponseObject, error) {
 	return GetBookThumbnail404JSONResponse{notFound("not routed")}, nil
 }
@@ -355,21 +359,64 @@ func (s *server) GetSeriesThumbnail(context.Context, GetSeriesThumbnailRequestOb
 	return GetSeriesThumbnail404JSONResponse{notFound("not routed")}, nil
 }
 
-func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
+// pageAllowed checks the page number, that the caller may see the book and
+// may read it, and answers the request itself when not. A thumbnail of a
+// page is the page, so both page handlers use it.
+func (s *server) pageAllowed(w http.ResponseWriter, r *http.Request) (int, bool) {
 	n, err := strconv.Atoi(r.PathValue("page"))
 	if err != nil || n < 1 {
 		writeError(w, http.StatusNotFound, "ページが見つかりません")
-		return
+		return 0, false
 	}
 	if ok, err := s.visible(r.Context(), "books", r.PathValue("bookId")); err != nil {
 		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
-		return
+		return 0, false
 	} else if !ok {
 		writeError(w, http.StatusNotFound, "ページが見つかりません")
-		return
+		return 0, false
 	}
 	if !canStream(r.Context()) {
 		writeError(w, http.StatusForbidden, "このアカウントでは本を読めません")
+		return 0, false
+	}
+	return n, true
+}
+
+// servePageThumbnail is GET /books/{bookId}/pages/{page}/thumbnail.
+func (s *server) servePageThumbnail(w http.ResponseWriter, r *http.Request) {
+	n, ok := s.pageAllowed(w, r)
+	if !ok {
+		return
+	}
+	t, err := s.Library.PageThumbnail(r.Context(), r.PathValue("bookId"), n)
+	if errors.Is(err, library.ErrNotFound) {
+		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		return
+	}
+	if err != nil {
+		if r.Context().Err() == nil {
+			slog.Warn("page thumbnail", "book", r.PathValue("bookId"), "page", n, "err", err)
+		}
+		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
+		return
+	}
+	f := t.File
+	defer f.Close()
+	h := w.Header()
+	h.Set("ETag", t.ETag)
+	if r.URL.Query().Get("v") == t.Version {
+		h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		h.Set("Cache-Control", "private, no-cache")
+	}
+	h.Set("Content-Type", "image/jpeg")
+	h.Set("X-Content-Type-Options", "nosniff")
+	http.ServeContent(w, r, "", time.Time{}, f) // answers If-None-Match from the ETag
+}
+
+func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
+	n, ok := s.pageAllowed(w, r)
+	if !ok {
 		return
 	}
 	p, err := s.Library.OpenPage(r.Context(), r.PathValue("bookId"), n)

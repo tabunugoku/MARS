@@ -59,6 +59,7 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /auth/logout", s.handleLogout)
 	mux.HandleFunc("POST /setup", s.handleSetup)
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
+	mux.HandleFunc("GET /books/{bookId}/pages/{page}/thumbnail", s.servePageThumbnail)
 	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
 	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
 	mux.HandleFunc("GET /books/{bookId}/file", s.serveBookFile)
