@@ -68,7 +68,9 @@ function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconCompo
 /** Keeps the library counts and the task badge current from the event
  *  stream. live.ts is loaded with import() once the shell has mounted, so it
  *  stays out of the initial bundle. Only a task that appears or changes state
- *  reloads the badge; progress ticks do not. */
+ *  reloads the badge; progress ticks do not. The last state seen in an event
+ *  counts at once, so ticks that arrive while the list reloads do not start
+ *  another reload. */
 function useShellLive(reloadLibs: () => void, reloadTasks: () => void, tasks: { id: string; state: string }[] | undefined) {
   const latest = useRef({ reloadLibs, reloadTasks, states: new Map<string, string>() });
   useEffect(() => {
@@ -81,14 +83,19 @@ function useShellLive(reloadLibs: () => void, reloadTasks: () => void, tasks: { 
       if (dead) return;
       const libsLater = debounce(() => latest.current.reloadLibs(), 2000, 10000);
       const tasksLater = debounce(() => latest.current.reloadTasks(), 500, 3000);
+      const seen = new Map<string, string>();
       const unsubscribe = subscribeLive((e) => {
-        if (e.type === "reconnect") {
+        if (e.type === "reconnect" || e.type === "open") {
+          // A task may have ended before the stream opened, or in a gap.
+          seen.clear();
           libsLater();
           tasksLater();
         } else if (e.type === "library") {
           libsLater();
-        } else if (e.type === "task" && latest.current.states.get(e.data.id) !== e.data.state) {
-          tasksLater();
+        } else if (e.type === "task") {
+          const was = seen.get(e.data.id) ?? latest.current.states.get(e.data.id);
+          seen.set(e.data.id, e.data.state);
+          if (was !== e.data.state) tasksLater();
         }
       });
       off = () => {

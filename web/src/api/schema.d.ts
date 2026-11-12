@@ -1118,6 +1118,8 @@ export interface components {
             booksAdded: number;
             booksChanged: number;
             booksRemoved: number;
+            /** @description Series and unchanged books back from the trash, and unchanged books moved to another series */
+            restored: number;
         };
         /** @description Data of a `book` event, sent when a book was analysed (pages, thumbnail, metadata) */
         BookEvent: {

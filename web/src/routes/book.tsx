@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, bookFileUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
+import { bumpCover } from "@/lib/cover-retry";
 import { LoadError } from "@/components/shell/load-error";
 import { Cover } from "@/components/media/cover";
 import { BrandAction } from "@/components/media/brand-action";
@@ -66,8 +67,6 @@ function BookPage({ id }: { id: string }) {
   const { data: me } = useApi(() => api.me(), []);
   const isAdmin = me?.role === "admin";
   const canDownload = isAdmin || !!me?.canDownload;
-  // Bumped after the thumbnail is made again, so the <img> fetches it anew.
-  const [coverV, setCoverV] = useState(0);
   const [picking, setPicking] = useState(false);
 
   if (error) {
@@ -116,7 +115,7 @@ function BookPage({ id }: { id: string }) {
   const regenerate = async () => {
     try {
       await api.regenerateBookThumbnail(book.id);
-      setCoverV((v) => v + 1);
+      bumpCover(book.id, book.seriesId); // the <img> fetches it anew
       toast.success("表紙を作り直しました");
     } catch (err) {
       toast.error(errorMessage(err));
@@ -128,7 +127,7 @@ function BookPage({ id }: { id: string }) {
     try {
       await api.setBookCover(book.id, n);
       setPicking(false);
-      setCoverV((v) => v + 1);
+      bumpCover(book.id, book.seriesId);
       toast.success(`${n}ページ目を表紙にしました`);
       reload();
     } catch (err) {
@@ -208,7 +207,7 @@ function BookPage({ id }: { id: string }) {
 
       <div className="flex flex-col gap-6 md:flex-row md:gap-8">
         <div className="mx-auto w-[160px] shrink-0 md:mx-0 md:w-[200px]">
-          <Cover src={coverV && book.thumbnailUrl.startsWith("/") ? `${book.thumbnailUrl}?v=${coverV}` : book.thumbnailUrl} title={series?.title ?? book.title} label={String(book.number)} priority />
+          <Cover src={book.thumbnailUrl} title={series?.title ?? book.title} label={String(book.number)} priority />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col gap-3">

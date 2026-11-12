@@ -119,6 +119,7 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
 				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
 				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,
+				Restored: st.Restored,
 			}})
 		}
 		_, err = s.queueAnalyze(context.WithoutCancel(ctx), l.id, deep)

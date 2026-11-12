@@ -49,6 +49,9 @@ export default function Screen() {
   const known = useRef(new Set<string>());
   known.current = new Set(loaded?.map((t) => t.id));
   useLiveEvents((e) => {
+    // A task may have ended between loading the list and the stream opening;
+    // polling stops once it is open, so load the list again.
+    if (e.type === "open") reload();
     if (e.type !== "task" || !known.current.has(e.data.id)) return;
     setPatch((p) => ({ base: loaded, rows: new Map(p.base === loaded ? p.rows : undefined).set(e.data.id, e.data) }));
   });

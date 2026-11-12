@@ -285,7 +285,9 @@ paths:
         caller's own reading progress). Library, book and progress events are
         sent only for libraries the caller may see. A comment line is sent
         about every 25 seconds as a heartbeat. When the client falls behind
-        the stream is closed; on reconnecting, refetch what is shown.
+        the stream is closed; on reconnecting, refetch what is shown. A user
+        may hold 16 streams and the server 512; past that the request is
+        answered 429 with Retry-After.
       responses:
         "200":
           description: Event stream
@@ -1100,7 +1102,7 @@ components:
     LibraryEvent:
       description: Data of a `library` event, sent when a scan or analysis changed the library's series or books
       type: object
-      required: [libraryId, seriesAdded, seriesRemoved, booksAdded, booksChanged, booksRemoved]
+      required: [libraryId, seriesAdded, seriesRemoved, booksAdded, booksChanged, booksRemoved, restored]
       properties:
         libraryId: { type: string }
         seriesAdded: { type: integer }
@@ -1108,6 +1110,9 @@ components:
         booksAdded: { type: integer }
         booksChanged: { type: integer }
         booksRemoved: { type: integer }
+        restored:
+          type: integer
+          description: Series and unchanged books back from the trash, and unchanged books moved to another series
     BookEvent:
       description: Data of a `book` event, sent when a book was analysed (pages, thumbnail, metadata)
       type: object

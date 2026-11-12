@@ -4,7 +4,10 @@
 // httpapi, which knows the user.
 package events
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 // Event is one message. Exactly one audience field is meant to apply:
 // AdminOnly events go to administrators, UserID events to that user only,
@@ -22,44 +25,76 @@ type Event struct {
 // dropped. A dropped stream reconnects and the client refetches.
 const Buffer = 256
 
+// Stream limits: each holds a goroutine, a ticker and a Buffer of events,
+// and every Publish visits every stream. A user rarely has more than a few
+// tabs and devices open.
+const (
+	MaxPerKey = 16
+	MaxTotal  = 512
+)
+
+// ErrTooMany means a new stream would pass MaxPerKey or MaxTotal.
+var ErrTooMany = errors.New("events: too many streams")
+
 // Hub is safe for concurrent use. The zero value is not; use New. A nil
 // *Hub accepts Publish and does nothing, so producers need no checks.
 type Hub struct {
 	mu     sync.Mutex
 	subs   map[*Sub]struct{}
+	perKey map[string]int
 	closed bool
 }
 
-func New() *Hub { return &Hub{subs: map[*Sub]struct{}{}} }
+func New() *Hub { return &Hub{subs: map[*Sub]struct{}{}, perKey: map[string]int{}} }
 
 // Sub is one subscriber. C is closed when the hub drops it (it fell behind)
 // or the hub closes.
 type Sub struct {
 	C    chan Event
+	key  string
 	once sync.Once
+	gone bool // counted out of perKey; guarded by Hub.mu
 }
 
 func (s *Sub) close() { s.once.Do(func() { close(s.C) }) }
 
-// Subscribe adds a subscriber. Call Unsubscribe when done. On a closed hub
-// the returned Sub's channel is already closed.
-func (h *Hub) Subscribe() *Sub {
-	s := &Sub{C: make(chan Event, Buffer)}
+// Subscribe adds a subscriber counted under key (the user). Call
+// Unsubscribe when done. It fails with ErrTooMany past the limits. On a
+// closed hub the returned Sub's channel is already closed.
+func (h *Hub) Subscribe(key string) (*Sub, error) {
+	s := &Sub{C: make(chan Event, Buffer), key: key}
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.closed {
+		s.gone = true
 		s.close()
-		return s
+		return s, nil
+	}
+	if len(h.subs) >= MaxTotal || h.perKey[key] >= MaxPerKey {
+		return nil, ErrTooMany
 	}
 	h.subs[s] = struct{}{}
-	return s
+	h.perKey[key]++
+	return s, nil
 }
 
 func (h *Hub) Unsubscribe(s *Sub) {
 	h.mu.Lock()
-	delete(h.subs, s)
+	h.drop(s)
 	h.mu.Unlock()
 	s.close()
+}
+
+// drop removes s and frees its slot once; h.mu is held.
+func (h *Hub) drop(s *Sub) {
+	delete(h.subs, s)
+	if s.gone {
+		return
+	}
+	s.gone = true
+	if h.perKey[s.key]--; h.perKey[s.key] <= 0 {
+		delete(h.perKey, s.key)
+	}
 }
 
 // Publish hands ev to every subscriber without blocking: one whose buffer
@@ -74,7 +109,7 @@ func (h *Hub) Publish(ev Event) {
 		select {
 		case s.C <- ev:
 		default:
-			delete(h.subs, s)
+			h.drop(s)
 			s.close()
 		}
 	}
@@ -86,7 +121,7 @@ func (h *Hub) Close() {
 	defer h.mu.Unlock()
 	h.closed = true
 	for s := range h.subs {
-		delete(h.subs, s)
+		h.drop(s)
 		s.close()
 	}
 }
@@ -107,6 +142,7 @@ type Library struct {
 	BooksAdded    int    `json:"booksAdded"`
 	BooksChanged  int    `json:"booksChanged"`
 	BooksRemoved  int    `json:"booksRemoved"`
+	Restored      int    `json:"restored"`
 }
 
 // Book is the Data of a "book" event: a book was analysed.

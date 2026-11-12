@@ -45,7 +45,12 @@ func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	// body, but the connection's read deadline still fires.
 	_ = rc.SetReadDeadline(time.Time{})
 
-	sub := s.Events.Subscribe()
+	sub, err := s.Events.Subscribe(u.ID)
+	if err != nil {
+		w.Header().Set("Retry-After", "30")
+		writeError(w, http.StatusTooManyRequests, "開いている更新の接続が多すぎます")
+		return
+	}
 	defer s.Events.Unsubscribe(sub)
 
 	h := w.Header()

@@ -4,7 +4,7 @@
 // screens (lazy chunks), never from the shell, so the initial bundle stays
 // as it is.
 import { useEffect, useRef, useState } from "react";
-import { retryCovers } from "@/lib/cover-retry";
+import { bumpCover, retryCovers } from "@/lib/cover-retry";
 import type { components } from "./schema";
 
 type S = components["schemas"];
@@ -18,7 +18,11 @@ export type LiveEvent =
   | { type: "book"; data: BookEvent }
   | { type: "progress"; data: ProgressEvent }
   /** The stream came back after a gap: events may have been missed. */
-  | { type: "reconnect" };
+  | { type: "reconnect" }
+  /** The stream opened for the first time. Anything loaded before it may
+   *  have changed meanwhile; screens whose state never corrects itself
+   *  (running tasks) reload on it, others need not. */
+  | { type: "open" };
 
 type Listener = (e: LiveEvent) => void;
 
@@ -40,6 +44,7 @@ const enabled = () => import.meta.env.VITE_API !== "mock" && typeof EventSource 
 let coverTimer: ReturnType<typeof setTimeout> | undefined;
 
 function emit(e: LiveEvent) {
+  if (e.type === "book" && e.data.bookId) bumpCover(e.data.bookId, e.data.seriesId);
   for (const l of [...listeners]) l(e);
   // New thumbnails: covers that had none try again, at most every 2 s.
   if ((e.type === "book" || e.type === "reconnect") && !coverTimer) {
@@ -64,7 +69,7 @@ function open() {
   const es = new EventSource("/api/v1/events");
   source = es;
   es.onopen = () => {
-    if (hadOpen) emit({ type: "reconnect" });
+    emit({ type: hadOpen ? "reconnect" : "open" });
     hadOpen = true;
     retries = 0;
     setUp(true);
@@ -154,7 +159,7 @@ export function useLiveConnected(): boolean {
  *  refreshes the screen every few seconds. */
 export function useLiveReload(
   reload: () => void,
-  match: (e: Exclude<LiveEvent, { type: "reconnect" }>) => boolean,
+  match: (e: Exclude<LiveEvent, { type: "reconnect" | "open" }>) => boolean,
   { quiet = 1000, maxWait = 5000 }: { quiet?: number; maxWait?: number } = {},
 ): void {
   const reloadRef = useRef(reload);
@@ -166,6 +171,7 @@ export function useLiveReload(
   const [later] = useState(() => debounce(() => reloadRef.current(), quiet, maxWait));
   useEffect(() => later.cancel, [later]);
   useLiveEvents((e) => {
+    if (e.type === "open") return;
     if (e.type === "reconnect" || matchRef.current(e)) later();
   });
 }

@@ -15,6 +15,10 @@ import (
 type Stats struct {
 	SeriesAdded, SeriesRemoved             int
 	BooksAdded, BooksChanged, BooksRemoved int
+	// Restored counts series and unchanged books brought back from the
+	// trash, and unchanged books that moved to another series: rows that
+	// reappear in lists although nothing needs analysing.
+	Restored int
 }
 
 // DirectionFor is the reading direction a new series gets from its
@@ -147,6 +151,7 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listi
 			if err := exec(`UPDATE series SET deleted_at = NULL, updated_at = ? WHERE id = ?`, ts, s.id); err != nil {
 				return st, err
 			}
+			st.Restored++
 		}
 		s.seen = true
 
@@ -188,6 +193,8 @@ func Sync(ctx context.Context, db *sql.DB, libraryID, kind string, listing Listi
 			if changed {
 				status = "'outdated'"
 				st.BooksChanged++
+			} else {
+				st.Restored++
 			}
 			if err := exec(`
 				UPDATE books SET series_id = ?, size_bytes = ?, mtime = ?, deleted_at = NULL,
