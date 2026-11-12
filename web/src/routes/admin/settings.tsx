@@ -147,13 +147,15 @@ export default function Screen() {
                 value={cur.port}
                 onChange={(e) => patch({ port: Number(e.target.value) })}
               />
-              <FieldDescription>{RESTART_NOTE}</FieldDescription>
+              <FieldDescription>
+                {RESTART_NOTE}。環境変数 COMINAVI_PORT があるときは、そちらが使われます（Docker イメージでは 25600 に決まっています）
+              </FieldDescription>
             </Field>
             <Slider
               value={cur.taskThreads}
               onChange={(v) => patch({ taskThreads: v as number })}
               min={1}
-              max={8}
+              max={16}
               step={1}
               label="タスクの同時実行数"
               formatValue={(v) => `${v}`}
@@ -177,6 +179,7 @@ export default function Screen() {
                   ))}
                 </SelectContent>
               </Select>
+              <FieldDescription>新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。</FieldDescription>
             </Field>
             <Field>
               <FieldLabel id="set-thumb-format">形式</FieldLabel>
@@ -226,16 +229,7 @@ export default function Screen() {
         <section>
           <SectionTitle>連携</SectionTitle>
           <FieldGroup>
-            <Switch label="OPDS を有効にする" checked={cur.opdsEnabled} onToggle={() => patch({ opdsEnabled: !cur.opdsEnabled })} />
-            {cur.opdsEnabled && (
-              <div className="rounded-lg bg-card p-3">
-                <p className={cn(typeClass("caption"), "text-muted-foreground")}>OPDS カタログの URL</p>
-                <p className={cn(typeClass("body"), "break-all font-mono text-foreground")}>
-                  {`http://<host>:${cur.port}/opds/v1.2/catalog`}
-                </p>
-              </div>
-            )}
-            <Switch label="Kobo 同期を有効にする" checked={cur.koboSyncEnabled} onToggle={() => patch({ koboSyncEnabled: !cur.koboSyncEnabled })} />
+            {/* OPDS returns with the OPDS server (a later phase); Kobo sync is hidden until then too. */}
             <Field>
               <FieldLabel id="set-api-keys">API キー</FieldLabel>
               {keys.error && !keys.data && <LoadError message={keys.error} onRetry={keys.reload} />}

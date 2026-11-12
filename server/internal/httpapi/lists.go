@@ -479,6 +479,361 @@ func (s *server) ListReadListBooks(ctx context.Context, req ListReadListBooksReq
 	return ListReadListBooks200JSONResponse(out), nil
 }
 
+// listLink describes one kind of membership: series in a collection, or
+// books in a read list. Both kinds share the member operations below.
+type listLink struct {
+	list      string // collections or read_lists
+	link      string // collection_series or read_list_books
+	listCol   string // collection_id or read_list_id
+	member    string // series or books
+	memberCol string // series_id or book_id
+	alias     string // the member's alias in queries: s or b
+	notFound  string // list not found
+	noMember  string // member not found or hidden from the caller
+	conflict  string // the order sent no longer matches the visible members
+}
+
+var collectionLink = listLink{
+	list: "collections", link: "collection_series", listCol: "collection_id",
+	member: "series", memberCol: "series_id", alias: "s",
+	notFound: "コレクションが見つかりません",
+	noMember: "シリーズが見つかりません",
+	conflict: "コレクションの中身が変わりました。読み込み直してください",
+}
+
+var readListLink = listLink{
+	list: "read_lists", link: "read_list_books", listCol: "read_list_id",
+	member: "books", memberCol: "book_id", alias: "b",
+	notFound: "読書リストが見つかりません",
+	noMember: "巻が見つかりません",
+	conflict: "読書リストの中身が変わりました。読み込み直してください",
+}
+
+// memberSlot is one row of a list in position order.
+type memberSlot struct {
+	id      string
+	visible bool
+}
+
+// listExists reports whether the list row exists.
+func (l listLink) listExists(ctx context.Context, tx *sql.Tx, listID string) (bool, error) {
+	var one int
+	err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+l.list+` WHERE id = ?`, listID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// memberVisible reports whether the member is live and in the caller's
+// scope: the rule collectionMembers and readListMembers apply.
+func (l listLink) memberVisible(ctx context.Context, tx *sql.Tx, memberID string) (bool, error) {
+	cond, args := libScope(ctx, l.alias+".library_id")
+	var one int
+	err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+l.member+` `+l.alias+` WHERE `+l.alias+`.id = ? AND `+l.alias+`.deleted_at IS NULL AND `+cond,
+		append([]any{memberID}, args...)...).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+// add appends memberID after every row of the list, hidden ones included.
+// A member already in the list keeps its place.
+func (l listLink) add(ctx context.Context, tx *sql.Tx, listID, memberID string) error {
+	var one int
+	err := tx.QueryRowContext(ctx, `SELECT 1 FROM `+l.link+` WHERE `+l.listCol+` = ? AND `+l.memberCol+` = ?`,
+		listID, memberID).Scan(&one)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	_, err = tx.ExecContext(ctx, `INSERT INTO `+l.link+` (`+l.listCol+`, `+l.memberCol+`, position)
+		SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM `+l.link+` WHERE `+l.listCol+` = ?`,
+		listID, memberID, listID)
+	return err
+}
+
+// remove deletes one member row. Other rows keep their positions.
+func (l listLink) remove(ctx context.Context, tx *sql.Tx, listID, memberID string) error {
+	_, err := tx.ExecContext(ctx, `DELETE FROM `+l.link+` WHERE `+l.listCol+` = ? AND `+l.memberCol+` = ?`,
+		listID, memberID)
+	return err
+}
+
+// reorder puts the visible members of the list into the order ids gives.
+// ids must be exactly the visible members, each once; otherwise it reports
+// false and writes nothing. A hidden member keeps its slot in the order.
+func (l listLink) reorder(ctx context.Context, tx *sql.Tx, listID string, ids []string) (bool, error) {
+	cond, scopeArgs := libScope(ctx, l.alias+".library_id")
+	args := append(scopeArgs, listID)
+	rows, err := tx.QueryContext(ctx, `SELECT lk.`+l.memberCol+`,
+		CASE WHEN `+l.alias+`.id IS NOT NULL AND `+l.alias+`.deleted_at IS NULL AND `+cond+` THEN 1 ELSE 0 END
+		FROM `+l.link+` lk LEFT JOIN `+l.member+` `+l.alias+` ON `+l.alias+`.id = lk.`+l.memberCol+`
+		WHERE lk.`+l.listCol+` = ? ORDER BY lk.position, lk.`+l.memberCol, args...)
+	if err != nil {
+		return false, err
+	}
+	slots, err := collect(rows, func(r scanner) (memberSlot, error) {
+		var sl memberSlot
+		var v int
+		err := r.Scan(&sl.id, &v)
+		sl.visible = v == 1
+		return sl, err
+	})
+	if err != nil {
+		return false, err
+	}
+	visible := 0
+	for _, sl := range slots {
+		if sl.visible {
+			visible++
+		}
+	}
+	if len(ids) != visible || len(distinct(ids)) != len(ids) {
+		return false, nil
+	}
+	want := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		want[id] = true
+	}
+	for _, sl := range slots {
+		if sl.visible && !want[sl.id] {
+			return false, nil
+		}
+	}
+	// Visible slots take the new order in turn; hidden slots stay put.
+	order := make([]string, 0, len(slots))
+	next := 0
+	for _, sl := range slots {
+		if sl.visible {
+			order = append(order, ids[next])
+			next++
+		} else {
+			order = append(order, sl.id)
+		}
+	}
+	for i, id := range order {
+		if _, err := tx.ExecContext(ctx, `UPDATE `+l.link+` SET position = ? WHERE `+l.listCol+` = ? AND `+l.memberCol+` = ?`,
+			i, listID, id); err != nil {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
+func (s *server) AddCollectionSeries(ctx context.Context, req AddCollectionSeriesRequestObject) (AddCollectionSeriesResponseObject, error) {
+	l := collectionLink
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return AddCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+	}
+	ok, err = l.memberVisible(ctx, tx, req.SeriesId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return AddCollectionSeries404JSONResponse{notFound(l.noMember)}, nil
+	}
+	if err := l.add(ctx, tx, req.CollectionId, req.SeriesId); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	cs, err := s.collections(ctx, " WHERE id = ?", req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) == 0 {
+		return AddCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return AddCollectionSeries200JSONResponse(cs[0]), nil
+}
+
+func (s *server) RemoveCollectionSeries(ctx context.Context, req RemoveCollectionSeriesRequestObject) (RemoveCollectionSeriesResponseObject, error) {
+	l := collectionLink
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return RemoveCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+	}
+	if err := l.remove(ctx, tx, req.CollectionId, req.SeriesId); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	cs, err := s.collections(ctx, " WHERE id = ?", req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) == 0 {
+		return RemoveCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return RemoveCollectionSeries200JSONResponse(cs[0]), nil
+}
+
+func (s *server) ReorderCollection(ctx context.Context, req ReorderCollectionRequestObject) (ReorderCollectionResponseObject, error) {
+	l := collectionLink
+	var in []string
+	if req.Body != nil {
+		in = req.Body.SeriesIds
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return ReorderCollection404JSONResponse{notFound(l.notFound)}, nil
+	}
+	ok, err = l.reorder(ctx, tx, req.CollectionId, in)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return ReorderCollection409JSONResponse{ConflictJSONResponse{Message: l.conflict}}, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	cs, err := s.collections(ctx, " WHERE id = ?", req.CollectionId)
+	if err != nil {
+		return nil, err
+	}
+	if len(cs) == 0 {
+		return ReorderCollection404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return ReorderCollection200JSONResponse(cs[0]), nil
+}
+
+func (s *server) AddReadListBook(ctx context.Context, req AddReadListBookRequestObject) (AddReadListBookResponseObject, error) {
+	l := readListLink
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return AddReadListBook404JSONResponse{notFound(l.notFound)}, nil
+	}
+	ok, err = l.memberVisible(ctx, tx, req.BookId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return AddReadListBook404JSONResponse{notFound(l.noMember)}, nil
+	}
+	if err := l.add(ctx, tx, req.ReadListId, req.BookId); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	ls, err := s.readLists(ctx, " WHERE id = ?", req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if len(ls) == 0 {
+		return AddReadListBook404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return AddReadListBook200JSONResponse(ls[0]), nil
+}
+
+func (s *server) RemoveReadListBook(ctx context.Context, req RemoveReadListBookRequestObject) (RemoveReadListBookResponseObject, error) {
+	l := readListLink
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return RemoveReadListBook404JSONResponse{notFound(l.notFound)}, nil
+	}
+	if err := l.remove(ctx, tx, req.ReadListId, req.BookId); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	ls, err := s.readLists(ctx, " WHERE id = ?", req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if len(ls) == 0 {
+		return RemoveReadListBook404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return RemoveReadListBook200JSONResponse(ls[0]), nil
+}
+
+func (s *server) ReorderReadList(ctx context.Context, req ReorderReadListRequestObject) (ReorderReadListResponseObject, error) {
+	l := readListLink
+	var in []string
+	if req.Body != nil {
+		in = req.Body.BookIds
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	ok, err := l.listExists(ctx, tx, req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return ReorderReadList404JSONResponse{notFound(l.notFound)}, nil
+	}
+	ok, err = l.reorder(ctx, tx, req.ReadListId, in)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return ReorderReadList409JSONResponse{ConflictJSONResponse{Message: l.conflict}}, nil
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	ls, err := s.readLists(ctx, " WHERE id = ?", req.ReadListId)
+	if err != nil {
+		return nil, err
+	}
+	if len(ls) == 0 {
+		return ReorderReadList404JSONResponse{notFound(l.notFound)}, nil
+	}
+	return ReorderReadList200JSONResponse(ls[0]), nil
+}
+
 // collect scans every row with scan and closes rows.
 func collect[T any](rows *sql.Rows, scan func(scanner) (T, error)) ([]T, error) {
 	defer rows.Close()

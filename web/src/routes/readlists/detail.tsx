@@ -1,9 +1,9 @@
 import { useRef, useState } from "react";
 import { DotTrack } from "@/components/media/dot-track";
 import { Link, useNavigate, useParams } from "react-router";
-import { MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, ListMinus, MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
-import { api, errorMessage, useApi, type Book } from "@/api";
+import { api, ApiError, errorMessage, useApi, type Book, type ReadList } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
 import { Cover } from "@/components/media/cover";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
@@ -21,12 +21,21 @@ import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hove
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 
+/** The items in the order of ids; items whose id is not listed are dropped. */
+function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
+  const byId = new Map(xs.map((x) => [x.id, x] as const));
+  return ids.flatMap((id) => byId.get(id) ?? []);
+}
+
 export default function Screen() {
   const { readListId = "" } = useParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  // The member order the last change returned, for the data it was made on.
+  // It is ignored once the page has reloaded.
+  const [local, setLocal] = useState<{ base: unknown; ids: string[] } | null>(null);
 
   const { data, error, reload } = useApi(async () => {
     const rl = await api.readList(readListId);
@@ -73,7 +82,9 @@ export default function Screen() {
     );
   }
 
-  const next = books.find((b) => !b.progress?.completed) ?? books[0];
+  // The books as the last change left them; the server's list otherwise.
+  const shown = local && local.base === data ? orderBy(books, local.ids) : books;
+  const next = shown.find((b) => !b.progress?.completed) ?? shown[0];
 
   const openDialog = (kind: "rename" | "delete") => {
     setName(rl.name);
@@ -103,6 +114,39 @@ export default function Screen() {
       })
       .catch((err: unknown) => toast.error(errorMessage(err)))
       .finally(() => setBusy(false));
+  };
+
+  // Runs one member change. The returned list is applied at once, with the
+  // controls still disabled until then, and the page reloads after it.
+  const commit = (call: Promise<ReadList>) => {
+    setBusy(true);
+    call
+      .then((updated) => {
+        setLocal({ base: data, ids: updated.bookIds });
+        setBusy(false);
+        reload();
+      })
+      .catch((err: unknown) => {
+        setBusy(false);
+        if (err instanceof ApiError && err.status === 409) {
+          toast.error("ほかの画面で変更されました。読み込み直します");
+          reload();
+        } else {
+          toast.error(errorMessage(err));
+        }
+      });
+  };
+
+  const moveBook = (index: number, direction: -1 | 1) => {
+    const ids = shown.map((b) => b.id);
+    const to = index + direction;
+    if (to < 0 || to >= ids.length) return;
+    [ids[index], ids[to]] = [ids[to], ids[index]];
+    commit(api.reorderReadList(rl.id, ids));
+  };
+
+  const removeBook = (bookId: string) => {
+    commit(api.removeReadListBook(rl.id, bookId));
   };
 
   return (
@@ -170,16 +214,33 @@ export default function Screen() {
         </DialogContent>
       </Dialog>
 
-      {books.length === 0 ? (
-        <EmptyState title="巻がありません" body="巻の詳細からこのリーディングリストに追加できます" />
+      {shown.length === 0 ? (
+        <EmptyState
+          title="巻がありません"
+          body={isAdmin ? "巻の「その他」メニューの「リーディングリストに追加」から追加できます。" : undefined}
+        />
       ) : (
-        <BookRows books={books} titles={titles} />
+        <BookRows books={shown} titles={titles} editable={isAdmin} busy={busy} onMove={moveBook} onRemove={removeBook} />
       )}
     </Page>
   );
 }
 
-function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string> }) {
+function BookRows({
+  books,
+  titles,
+  editable,
+  busy,
+  onMove,
+  onRemove,
+}: {
+  books: Book[];
+  titles: Map<string, string>;
+  editable: boolean;
+  busy: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: (bookId: string) => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const hover = useFluidHover(ref);
   return (
@@ -187,7 +248,18 @@ function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string
       <FluidHoverHighlight hover={hover} className="rounded-[8px]" />
       <ol>
         {books.map((b, i) => (
-          <BookRow key={b.id} book={b} index={i} seriesTitle={titles.get(b.seriesId)} register={hover.registerItem} />
+          <BookRow
+            key={b.id}
+            book={b}
+            index={i}
+            count={books.length}
+            seriesTitle={titles.get(b.seriesId)}
+            register={hover.registerItem}
+            editable={editable}
+            busy={busy}
+            onMove={onMove}
+            onRemove={onRemove}
+          />
         ))}
       </ol>
     </div>
@@ -197,13 +269,23 @@ function BookRows({ books, titles }: { books: Book[]; titles: Map<string, string
 function BookRow({
   book,
   index,
+  count,
   seriesTitle,
   register,
+  editable,
+  busy,
+  onMove,
+  onRemove,
 }: {
   book: Book;
   index: number;
+  count: number;
   seriesTitle?: string;
   register: (index: number, element: HTMLElement | null) => void;
+  editable: boolean;
+  busy: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
+  onRemove: (bookId: string) => void;
 }) {
   const ref = useRef<HTMLAnchorElement>(null);
   useRegisterFluidHoverItem(register, index, ref);
@@ -211,11 +293,11 @@ function BookRow({
   const pct = p ? Math.min(100, Math.round((p.page / book.pageCount) * 100)) : 0;
 
   return (
-    <li>
+    <li className="flex items-center gap-1">
       <Link
         ref={ref}
         to={`/books/${book.id}`}
-        className="relative z-10 flex items-center gap-3 rounded-[8px] px-2 py-2 outline-none focus-visible:ring-2 ring-[var(--focus-ring)]"
+        className="relative z-10 flex min-w-0 flex-1 items-center gap-3 rounded-[8px] px-2 py-2 outline-none focus-visible:ring-2 ring-[var(--focus-ring)]"
       >
         <span className={cn(typeClass("body"), "w-6 shrink-0 text-right text-muted-foreground tabular-nums")}>{index + 1}</span>
         <div className="w-10 shrink-0">
@@ -240,6 +322,46 @@ function BookRow({
           )}
         </div>
       </Link>
+      {editable && (
+        <div className="relative z-10 flex shrink-0 items-center">
+          <Tooltip content="上へ">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="上へ"
+              disabled={busy || index === 0}
+              onClick={() => onMove(index, -1)}
+            >
+              <ArrowUp size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip content="下へ">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="下へ"
+              disabled={busy || index === count - 1}
+              onClick={() => onMove(index, 1)}
+            >
+              <ArrowDown size={16} />
+            </Button>
+          </Tooltip>
+          <Tooltip content="リストから外す">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="touch-hit relative"
+              aria-label="リストから外す"
+              disabled={busy}
+              onClick={() => onRemove(book.id)}
+            >
+              <ListMinus size={16} />
+            </Button>
+          </Tooltip>
+        </div>
+      )}
     </li>
   );
 }

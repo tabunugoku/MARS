@@ -56,7 +56,6 @@ export default function Screen() {
   const tabs = [
     { label: "エラー", rows: rowsFor(["error", "unsupported"]) },
     { label: "見つからない", rows: rowsFor(["missing"]) },
-    { label: "重複", rows: rowsFor(["duplicate"]) },
   ];
 
   return (

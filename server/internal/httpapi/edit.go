@@ -132,6 +132,29 @@ func loadSettings(ctx context.Context, q queryRower) (ServerSettings, error) {
 	return v, nil
 }
 
+// LoadServerSettings returns the stored server settings for the server
+// itself (port, task threads, thumbnail size) read at startup or per use.
+// Missing, unreadable or corrupt settings fall back to the defaults.
+func LoadServerSettings(ctx context.Context, db *sql.DB) ServerSettings {
+	v, _ := loadSettings(ctx, db)
+	return v
+}
+
+// ThumbBounds returns the thumbnail box (width, height) for a thumbnailSize
+// setting. An unknown size gets the medium box.
+func ThumbBounds(size string) (int, int) {
+	switch ServerSettingsThumbnailSize(size) {
+	case ServerSettingsThumbnailSizeSmall:
+		return 300, 450
+	case ServerSettingsThumbnailSizeLarge:
+		return 600, 900
+	case ServerSettingsThumbnailSizeXlarge:
+		return 800, 1200
+	default:
+		return 400, 600
+	}
+}
+
 func checkSeriesUpdate(b *SeriesUpdate) string {
 	switch {
 	case b.Title != nil && strings.TrimSpace(*b.Title) == "":

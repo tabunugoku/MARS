@@ -22,6 +22,7 @@ import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { EditDialog, directionLabel, fieldLabel, roleLabel } from "./edit-dialog";
+import { AddToCollectionDialog } from "./add-to-collection";
 
 export default function Screen() {
   const { seriesId = "" } = useParams();
@@ -51,6 +52,7 @@ function SeriesPage({ id }: { id: string }) {
   const [more, setMore] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editRun, setEditRun] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
   // The series as last saved from the edit dialog; cleared when the page reloads.
   const [saved, setSaved] = useState<Series | null>(null);
   const [busy, setBusy] = useState(false);
@@ -194,10 +196,11 @@ function SeriesPage({ id }: { id: string }) {
               <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
               <DropdownContent align="start" sideOffset={4}>
                 <MenuItem index={0} label="メタデータを編集" onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
+                {isAdmin && <MenuItem index={1} label="コレクションに追加" onSelect={() => setAddOpen(true)} />}
                 {canDownload && books.length > 0 && (
-                  <MenuItem index={1} label="まとめてダウンロード（ZIP）" onSelect={() => startDownload(seriesFileUrl(id))} />
+                  <MenuItem index={isAdmin ? 2 : 1} label="まとめてダウンロード（ZIP）" onSelect={() => startDownload(seriesFileUrl(id))} />
                 )}
-                {isAdmin && <MenuItem index={canDownload && books.length > 0 ? 2 : 1} label="表紙を作り直す" onSelect={regenerate} />}
+                {isAdmin && <MenuItem index={(isAdmin ? 2 : 1) + (canDownload && books.length > 0 ? 1 : 0)} label="表紙を作り直す" onSelect={regenerate} />}
               </DropdownContent>
             </DropdownMenu>
           </div>
@@ -282,6 +285,7 @@ function SeriesPage({ id }: { id: string }) {
         onOpenChange={setEditOpen}
         onSaved={(s) => setSaved(s)}
       />
+      {isAdmin && <AddToCollectionDialog seriesId={id} open={addOpen} onOpenChange={setAddOpen} />}
     </Page>
   );
 }
