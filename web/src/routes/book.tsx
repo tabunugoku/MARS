@@ -447,7 +447,7 @@ function BookPage({ id }: { id: string }) {
             </Button>
             <DropdownMenu>
               <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
-              <DropdownContent align="start" sideOffset={4}>
+              <DropdownContent align="start" sideOffset={4} className="w-56">
                 {menu.map((item, i) => (
                   <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
                 ))}

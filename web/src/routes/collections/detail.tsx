@@ -207,7 +207,7 @@ export default function Screen() {
                   <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")}><MoreHorizontal size={16} /></Button>} />
                 </span>
               </Tooltip>
-              <DropdownContent align="end">
+              <DropdownContent align="end" className="w-56">
                 <MenuItem index={0} label={t("rename")} icon={SquarePen} onSelect={() => openDialog("rename")} />
                 <MenuItem index={1} label={t("delete")} onSelect={() => openDialog("delete")} />
               </DropdownContent>

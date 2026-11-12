@@ -448,7 +448,7 @@ export default function Screen() {
                 <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")}><MoreHorizontal size={16} /></Button>} />
               </span>
             </Tooltip>
-            <DropdownContent align="end">
+            <DropdownContent align="end" className="w-56">
               {menuItems.map((item, i) => (
                 <MenuItem key={item.label} index={i} label={item.label} icon={item.icon} disabled={item.disabled} onSelect={item.run} />
               ))}

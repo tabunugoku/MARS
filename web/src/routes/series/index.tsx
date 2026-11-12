@@ -350,7 +350,7 @@ function SeriesPage({ id }: { id: string }) {
             </Button>
             <DropdownMenu>
               <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
-              <DropdownContent align="start" sideOffset={4}>
+              <DropdownContent align="start" sideOffset={4} className="w-56">
                 <MenuItem index={0} label={t("editMetadata")} onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
                 {isAdmin && <MenuItem index={1} label={t("addToCollection")} onSelect={() => setAddOpen(true)} />}
                 {canDownload && books.length > 0 && (

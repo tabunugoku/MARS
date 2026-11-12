@@ -222,7 +222,7 @@ export default function Screen() {
                     </DropdownTrigger>
                   </span>
                 </Tooltip>
-                <DropdownContent align="end">
+                <DropdownContent align="end" className="w-56">
                   <MenuItem index={0} label={t("rename")} icon={SquarePen} onSelect={() => openDialog("rename")} />
                   <MenuItem index={1} label={t("delete")} onSelect={() => openDialog("delete")} />
                 </DropdownContent>
