@@ -306,7 +306,12 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 					return
 				}
 				// Events may have been lost (for example an inotify queue
-				// overflow): scan to be safe.
+				// overflow): pick up folders made meanwhile, then scan to
+				// be safe.
+				if err := rescanTree(w, root, exclude); err != nil {
+					fail(err)
+					return
+				}
 				quiet()
 			case <-fire:
 				fire, timer = nil, nil
@@ -317,11 +322,23 @@ func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(
 	return cancel, done, nil
 }
 
+// errWatchRootGone is what handleWatchEvent returns when the library root
+// itself is removed or renamed. The watch set then covers nothing, so the
+// watcher must fail; the reconcile loop restarts it with back-off.
+var errWatchRootGone = errors.New("library root removed or renamed")
+
 // handleWatchEvent reports whether ev can change the library. A new folder is
-// added to the watch set first.
+// added to the watch set first. A removal or rename of the root returns
+// errWatchRootGone.
 func handleWatchEvent(w *fsnotify.Watcher, root string, ev fsnotify.Event, exclude []string) (bool, error) {
 	rel, err := filepath.Rel(root, ev.Name)
-	if err != nil || rel == "." {
+	if err != nil {
+		return false, nil
+	}
+	if rel == "." {
+		if ev.Has(fsnotify.Remove) || ev.Has(fsnotify.Rename) {
+			return false, errWatchRootGone
+		}
 		return false, nil
 	}
 	rel = filepath.ToSlash(rel)
@@ -343,6 +360,17 @@ func handleWatchEvent(w *fsnotify.Watcher, root string, ev fsnotify.Event, exclu
 		}
 	}
 	return false, nil
+}
+
+// rescanTree adds root and the folders under it to the watcher again. It runs
+// after events may have been lost, so a folder created meanwhile gets watched.
+// Folders already watched are unchanged (fsnotify's Add is idempotent). A
+// missing root is not an error here: its removal event fails the watcher.
+func rescanTree(w *fsnotify.Watcher, root string, exclude []string) error {
+	if err := addTree(w, root, root, exclude); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return err
+	}
+	return nil
 }
 
 // addTree adds dir and the folders under it to the watcher, leaving out what

@@ -303,6 +303,18 @@ func TestPDFUnsupportedPages(t *testing.T) {
 			{images: []pdfObj{{body: fmt.Sprintf("/Type /XObject /Subtype /Image /Width %d /Height %d "+
 				"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", w, h), stream: rgb}}},
 		}, "PDF page 1 uses an unsupported image encoding"},
+		{"same image drawn twice", []pdfPageSpec{
+			{images: []pdfObj{jpegObj(t, w, h), jpegObj(t, w, h)}}, // pdfcpu merges these into one object
+		}, "PDF page 1 is not a single image"},
+		{"DCT image with Decode array", []pdfPageSpec{
+			{images: []pdfObj{withDict(jpegObj(t, w, h), "/Decode [1 0 1 0 1 0]")}},
+		}, "PDF page 1 uses an unsupported image encoding"},
+		{"DCT image with SMask", []pdfPageSpec{
+			{images: []pdfObj{jpegWithSMask(t, w, h)}},
+		}, "PDF page 1 uses an unsupported image encoding"},
+		{"Flate image with Decode array", []pdfPageSpec{
+			{images: []pdfObj{withDict(flateObj(w, h, "/DeviceRGB", rgb, nil), "/Decode [1 0 1 0 1 0]")}},
+		}, "PDF page 1 uses an unsupported image encoding"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -320,16 +332,20 @@ func TestPDFUnsupportedPages(t *testing.T) {
 	}
 }
 
-func TestPDFAlphaImageCountsAsOne(t *testing.T) {
+func TestPDFAlphaImageIsUnsupported(t *testing.T) {
+	// pdfcpu's PNG output would drop the alpha channel, so an image with an
+	// SMask is refused rather than shown without its transparency.
 	const w, h = 8, 8
 	alpha := bytes.Repeat([]byte{200}, w*h)
 	mask := flateObj(w, h, "/DeviceGray", alpha, nil)
 	img := flateObj(w, h, "/DeviceRGB", gradientRGB(w, h), &mask)
 	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{img}}}))
-	if err != nil {
-		t.Fatalf("image with SMask: %v", err)
+	if a != nil {
+		a.Close()
 	}
-	a.Close()
+	if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "PDF page 1 uses an unsupported image encoding") {
+		t.Fatalf("err = %v, want unsupported image encoding", err)
+	}
 }
 
 func TestPDFEncrypted(t *testing.T) {
@@ -404,5 +420,142 @@ func TestPDFWalkSkipRest(t *testing.T) {
 	})
 	if err != nil || visited != 1 {
 		t.Fatalf("Walk with SkipRest: visited %d, err %v; want 1, nil", visited, err)
+	}
+}
+
+// withDict appends dictionary entries to an image object.
+func withDict(o pdfObj, extra string) pdfObj {
+	o.body += " " + extra
+	return o
+}
+
+// jpegWithSMask is a JPEG image with an alpha SMask object.
+func jpegWithSMask(t *testing.T, w, h int) pdfObj {
+	t.Helper()
+	mask := flateObj(w, h, "/DeviceGray", bytes.Repeat([]byte{200}, w*h), nil)
+	o := jpegObj(t, w, h)
+	o.body += " /SMask SMASK"
+	o.smask = &mask
+	return o
+}
+
+// lowerPDFImageLimit sets maxPDFImageBytes for the rest of the test.
+func lowerPDFImageLimit(t *testing.T, n int64) {
+	t.Helper()
+	old := maxPDFImageBytes
+	maxPDFImageBytes = n
+	t.Cleanup(func() { maxPDFImageBytes = old })
+}
+
+func TestPDFFlateBombIsBounded(t *testing.T) {
+	// A 1x1 RGB image whose stream inflates to 8 MiB. The decode stops at the
+	// 3 bytes the dictionary declares, so the page is a valid 1x1 PNG.
+	lowerPDFImageLimit(t, 1<<20)
+	bomb := make([]byte, 8<<20)
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{
+		flateObj(1, 1, "/DeviceRGB", bomb, nil),
+	}}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	b := readEntry(t, a, "0001.png")
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil || format != "png" || cfg.Width != 1 || cfg.Height != 1 {
+		t.Fatalf("decode = %v %q %dx%d, want png 1x1", err, format, cfg.Width, cfg.Height)
+	}
+}
+
+func TestPDFImageTooLarge(t *testing.T) {
+	lowerPDFImageLimit(t, 1<<20)
+	cases := []struct {
+		name string
+		img  pdfObj
+	}{
+		// 2000x1000 RGB is 6 MB of pixels, over the 1 MiB limit.
+		{"over the byte limit", flateObj(2000, 1000, "/DeviceRGB", nil, nil)},
+		// A side over maxPDFImageSide is refused on the dimensions alone.
+		{"side over 20000", flateObj(20001, 1, "/DeviceGray", nil, nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{tc.img}}}))
+			if a != nil {
+				a.Close()
+			}
+			if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "image is too large") {
+				t.Fatalf("err = %v, want unsupported image is too large", err)
+			}
+		})
+	}
+}
+
+func TestPDFTruncatedFlateImage(t *testing.T) {
+	// The dictionary declares 100x100 RGB, but the stream holds 8 bytes.
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{
+		flateObj(100, 100, "/DeviceRGB", make([]byte, 8), nil),
+	}}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	if _, err := a.Open("0001.png"); !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "cannot be decoded") {
+		t.Fatalf("Open err = %v, want unsupported cannot be decoded", err)
+	}
+}
+
+func TestPDFGrayAndIndexedImages(t *testing.T) {
+	const w, h = 16, 8
+	gray := make([]byte, w*h)
+	for i := range gray {
+		gray[i] = byte(i * 16)
+	}
+	idx := make([]byte, w*h)
+	for i := range idx {
+		idx[i] = byte(i % 2)
+	}
+	checkPNG := func(t *testing.T, b []byte) {
+		t.Helper()
+		cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+		if err != nil || format != "png" || cfg.Width != w || cfg.Height != h {
+			t.Fatalf("decode = %v %q %dx%d, want png %dx%d", err, format, cfg.Width, cfg.Height, w, h)
+		}
+	}
+	t.Run("gray", func(t *testing.T) {
+		a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{
+			flateObj(w, h, "/DeviceGray", gray, nil),
+		}}}))
+		if err != nil {
+			t.Fatalf("gray image: %v", err)
+		}
+		defer a.Close()
+		checkPNG(t, readEntry(t, a, "0001.png"))
+	})
+	t.Run("indexed", func(t *testing.T) {
+		// Indexed is either rendered as a valid PNG or refused as unsupported.
+		a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{
+			flateObj(w, h, "[/Indexed /DeviceRGB 1 <000000ffffff>]", idx, nil),
+		}}}))
+		if err != nil {
+			if !errors.Is(err, ErrUnsupported) {
+				t.Fatalf("indexed image: err = %v, want a PNG or ErrUnsupported", err)
+			}
+			return
+		}
+		defer a.Close()
+		checkPNG(t, readEntry(t, a, "0001.png"))
+	})
+}
+
+func TestOpenPathContextCanceled(t *testing.T) {
+	path := writePDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{jpegObj(t, 8, 8)}}}))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	a, _, err := OpenPathContext(ctx, PathOf(path))
+	if a != nil {
+		a.Close()
+	}
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
 	}
 }

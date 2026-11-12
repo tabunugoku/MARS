@@ -2,6 +2,7 @@ package library
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +10,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 
 	"github.com/tabunugoku/cominavi/server/internal/db"
 )
@@ -179,4 +182,102 @@ func TestWatchFailedStartBackoff(t *testing.T) {
 	}
 	s.reconcileWatches(ctx, ws)
 	check("after config change", 3)
+}
+
+func TestWatchTreeRootRemoved(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "lib")
+	testMkdir(t, root, "a")
+	failed := make(chan error, 1)
+	cancel, done, err := watchTree(context.Background(), root, nil,
+		func() {}, func(err error) { failed <- err })
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cancel()
+	if err := os.RemoveAll(root); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-failed:
+		if !errors.Is(err, errWatchRootGone) {
+			t.Fatalf("fail got %v, want errWatchRootGone", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("watcher did not fail after its root was removed")
+	}
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("watcher goroutine did not exit after failing")
+	}
+}
+
+func TestHandleWatchEventRootGone(t *testing.T) {
+	root := t.TempDir()
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	for _, op := range []fsnotify.Op{fsnotify.Remove, fsnotify.Rename} {
+		dirty, err := handleWatchEvent(w, root, fsnotify.Event{Name: root, Op: op}, nil)
+		if !errors.Is(err, errWatchRootGone) {
+			t.Errorf("%v on root: err = %v, want errWatchRootGone", op, err)
+		}
+		if dirty {
+			t.Errorf("%v on root reported a change", op)
+		}
+	}
+	if dirty, err := handleWatchEvent(w, root, fsnotify.Event{Name: root, Op: fsnotify.Chmod}, nil); err != nil || dirty {
+		t.Errorf("chmod on root: dirty=%v err=%v, want false, nil", dirty, err)
+	}
+}
+
+func TestRescanTreeWatchesFolderMissedDuringOverflow(t *testing.T) {
+	root := t.TempDir()
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err := w.Add(root); err != nil {
+		t.Fatal(err)
+	}
+	// The folder is made while nothing watches it, as after an overflow.
+	testMkdir(t, root, "late")
+	if err := rescanTree(w, root, nil); err != nil {
+		t.Fatal(err)
+	}
+	testWriteFile(t, root, "late/x.cbz")
+
+	// The book's create event must now lead to a scan (onQuiet).
+	var quiet atomic.Int32
+	deadline := time.Now().Add(5 * time.Second)
+	for quiet.Load() == 0 && time.Now().Before(deadline) {
+		select {
+		case ev := <-w.Events:
+			dirty, err := handleWatchEvent(w, root, ev, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if dirty && filepath.Base(ev.Name) == "x.cbz" {
+				quiet.Add(1) // stands for the onQuiet call in watchTree
+			}
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+	if quiet.Load() == 0 {
+		t.Fatal("a book in a folder missed during overflow did not lead to a scan")
+	}
+}
+
+func TestRescanTreeMissingRootIsNotAnError(t *testing.T) {
+	w, err := fsnotify.NewWatcher()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer w.Close()
+	if err := rescanTree(w, filepath.Join(t.TempDir(), "gone"), nil); err != nil {
+		t.Fatalf("missing root: %v, want nil", err)
+	}
 }

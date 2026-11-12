@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 )
 
 // Every handler that returns series or books builds its query from
@@ -113,6 +114,7 @@ func scanBook(r scanner) (Book, error) {
 		&page, &completed, &readAt)
 	x.Authors, x.Tags, x.Format, x.MediaStatus = authors(au), strs(tags), BookFormat(format), MediaStatus(status)
 	x.LockedFields = strs(locked)
+	mediaErr = publicMediaError(mediaErr)
 	x.MediaError = &mediaErr
 	if release.Valid {
 		x.ReleaseDate = &release.String
@@ -151,4 +153,19 @@ func (s *server) oneBook(ctx context.Context, id string) (x Book, ok bool, err e
 		return x, false, nil
 	}
 	return x, err == nil, err
+}
+
+// publicMediaError is the reason shown with a book that cannot be read. Only
+// the archive package's own "unsupported" reasons are shown; any other error
+// (an OS error, for one) may name paths under the library root, which only
+// administrators see, in the media issues list.
+func publicMediaError(raw string) string {
+	const prefix = "archive: unsupported: "
+	switch {
+	case raw == "":
+		return ""
+	case strings.HasPrefix(raw, prefix) && !strings.ContainsAny(raw, `/\`):
+		return strings.TrimPrefix(raw, prefix)
+	}
+	return "ファイルを読み込めませんでした"
 }

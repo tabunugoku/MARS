@@ -376,8 +376,23 @@ func TestBookMediaErrorAndWatch(t *testing.T) {
 	}
 	var failed Book
 	e.admin.json("GET", "/api/v1/books/"+b.Id, nil, 200, &failed)
-	if failed.MediaError == nil || *failed.MediaError != "broken archive" {
+	if failed.MediaError == nil || *failed.MediaError != "ファイルを読み込めませんでした" {
 		t.Fatalf("mediaError after failure: %v", failed.MediaError)
+	}
+	// An archive's own reason shows without its prefix; one naming a path
+	// does not show at all (paths are for administrators).
+	for raw, want := range map[string]string{
+		"archive: unsupported: PDF page 1 is not a single image": "PDF page 1 is not a single image",
+		"open /srv/comics/A/b.cbz: permission denied":           "ファイルを読み込めませんでした",
+		`archive: unsupported: "C:\lib\x.foo"`:            "ファイルを読み込めませんでした",
+	} {
+		if _, err := e.db.Exec(`UPDATE books SET media_error = ? WHERE id = ?`, raw, b.Id); err != nil {
+			t.Fatal(err)
+		}
+		e.admin.json("GET", "/api/v1/books/"+b.Id, nil, 200, &failed)
+		if failed.MediaError == nil || *failed.MediaError != want {
+			t.Fatalf("mediaError for %q: %v", raw, failed.MediaError)
+		}
 	}
 	e.admin.json("GET", "/api/v1/books/"+b.Id+"/pages", nil, 200, &pages)
 	if len(pages) != 0 {

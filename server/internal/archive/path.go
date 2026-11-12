@@ -1,6 +1,7 @@
 package archive
 
 import (
+	"context"
 	"fmt"
 	"io/fs"
 	"os"
@@ -34,6 +35,15 @@ func (p Path) Stat() (fs.FileInfo, error) {
 
 // OpenPath opens the book at p, choosing the reader by extension.
 func OpenPath(p Path) (Archive, Format, error) {
+	return OpenPathContext(context.Background(), p)
+}
+
+// OpenPathContext is OpenPath that gives up with ctx's error when ctx ends.
+// Parsing a PDF can take a while, so ctx reaches the PDF reader too.
+func OpenPathContext(ctx context.Context, p Path) (Archive, Format, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, "", err
+	}
 	f, ok := formatOf(p.Rel)
 	if !ok {
 		return nil, "", fmt.Errorf("%w: unknown extension on %q", ErrUnsupported, filepath.Base(p.Rel))
@@ -57,7 +67,9 @@ func OpenPath(p Path) (Archive, Format, error) {
 	case CB7:
 		a, err = withFile(root, p.Rel, openSevenZip)
 	case PDF:
-		a, err = withFile(root, p.Rel, openPDF)
+		a, err = withFile(root, p.Rel, func(file *os.File, size int64) (Archive, error) {
+			return openPDF(ctx, file, size)
+		})
 	}
 	root.Close() // an open file outlives its root
 	return a, f, err
