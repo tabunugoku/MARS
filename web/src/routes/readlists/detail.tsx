@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { DotTrack } from "@/components/media/dot-track";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowDown, ArrowUp, ListMinus, MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, MoreHorizontal, Play, SquarePen, X } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, ApiError, errorMessage, useApi, type Book, type ReadList } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
@@ -410,7 +410,7 @@ function BookRow({
               disabled={busy}
               onClick={() => onRemove(book.id)}
             >
-              <ListMinus size={16} />
+              <X size={16} />
             </Button>
           </Tooltip>
         </div>
