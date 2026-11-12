@@ -260,7 +260,7 @@ export default function Screen() {
       )}
 
       {users && users.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <Table>
             <TableHeader>
               <TableRow>

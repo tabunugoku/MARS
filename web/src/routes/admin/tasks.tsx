@@ -279,7 +279,7 @@ export default function Screen() {
             <SectionTitle>{t("historyTitle")}</SectionTitle>
             {!tasks && <TableSkeleton heads={historyHeads} rows={3} />}
             {tasks && (
-              <div className="overflow-x-auto">
+              <div className="overflow-x-auto overflow-y-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
