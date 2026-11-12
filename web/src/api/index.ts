@@ -2,6 +2,7 @@
 // with VITE_API=mock), its types, reader settings and small formatters.
 // Keep screens free of direct "@/mock" imports.
 import { useCallback, useEffect, useRef, useState, type DependencyList } from "react";
+import { toast } from "@yusufceng1z/ding-react";
 import { defineMessages, intlLocale, translate } from "@/i18n";
 import { ApiError } from "./http";
 import type { Series } from "./types";
@@ -56,7 +57,12 @@ export function errorMessage(err: unknown): string {
 
 /** Loads data for a screen. A new deps list starts over (never shows the
  *  previous request's result under a new heading). error is set when the
- *  call failed; reload() runs it again. */
+ *  call failed; reload() runs it again.
+ *
+ *  A failed reload keeps the data on screen and shows the message as a toast
+ *  (error stays null), so a screen never swaps to its error view under an
+ *  open dialog or a draft. A failed reload with no data yet, and any failed
+ *  load for new deps, sets error as before. */
 export function useApi<T>(
   fn: () => Promise<T>,
   deps: DependencyList,
@@ -69,16 +75,33 @@ export function useApi<T>(
   const [tick, setTick] = useState(0);
   // A reload keeps the current data on screen; new deps (another id) never do.
   const last = useRef<{ tick: number; deps: DependencyList }>({ tick, deps });
+  // The data on screen, read by the effect when a reload fails.
+  const shown = useRef<T | undefined>(undefined);
   useEffect(() => {
     let live = true;
     const prev = last.current;
     const sameDeps = prev.deps.length === deps.length && prev.deps.every((d, i) => Object.is(d, deps[i]));
     const isReload = tick !== prev.tick && sameDeps;
+    const keepShown = isReload && shown.current !== undefined;
     last.current = { tick, deps };
+    if (!isReload) shown.current = undefined;
     setState((s) => (isReload ? { ...s, loading: true } : { data: undefined, loading: true, error: null }));
     fn().then(
-      (data) => live && setState({ data, loading: false, error: null }),
-      (err: unknown) => live && setState({ data: undefined, loading: false, error: errorMessage(err) }),
+      (data) => {
+        if (!live) return;
+        shown.current = data;
+        setState({ data, loading: false, error: null });
+      },
+      (err: unknown) => {
+        if (!live) return;
+        const message = errorMessage(err);
+        if (keepShown) {
+          toast.error(message);
+          setState((s) => ({ ...s, loading: false, error: null }));
+        } else {
+          setState({ data: undefined, loading: false, error: message });
+        }
+      },
     );
     return () => {
       live = false;

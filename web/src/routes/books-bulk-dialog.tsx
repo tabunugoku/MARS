@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage } from "@/api";
 import { inChunks, splitList } from "@/components/media/selection-state";
+import { useBulkDialog } from "@/components/media/use-bulk-dialog";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -58,16 +59,9 @@ export function BooksBulkDialog({
   const remove = splitList(removeTags);
   const changed = add.length > 0 || remove.length > 0;
 
-  // A failed save may have saved earlier chunks: the caller reloads once the
-  // dialog closes (see onDone).
-  const failed = useRef(false);
-  const close = (next: boolean) => {
-    onOpenChange(next);
-    if (!next && failed.current) {
-      failed.current = false;
-      onDone(false);
-    }
-  };
+  // A failed save may have saved earlier chunks; useBulkDialog reports that
+  // through onDone (see the prop comment).
+  const bulk = useBulkDialog(onOpenChange, onDone);
 
   const submit = async () => {
     if (!changed || saving || bookIds.length === 0) return;
@@ -77,19 +71,17 @@ export function BooksBulkDialog({
         api.bulkUpdateBooks({ bookIds: chunk, addTags: add, removeTags: remove }).then((r) => r.updated),
       );
       toast.success(t("updated", { n }));
-      onOpenChange(false);
-      failed.current = false;
-      onDone(true);
+      bulk.saved();
     } catch (err) {
       toast.error(errorMessage(err));
-      failed.current = true;
+      bulk.saveFailed();
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={close}>
+    <Dialog open={open} onOpenChange={bulk.close}>
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>

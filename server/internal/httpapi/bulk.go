@@ -311,6 +311,11 @@ func (s *server) BulkUpdateBooks(ctx context.Context, req BulkUpdateBooksRequest
 // every live book, ready or not, as markRead does: the series' read count
 // counts them all, so skipping one would leave the series never fully read.
 // Like markRead, a write without a writer is not ordered, so it always applies.
+//
+// It applies no media filter of its own: a caller that numbers or lists only
+// some books (the Komga tracker counts READY books only) must put the same
+// condition in where, built from the helper that lists them, so it never marks
+// a book its client cannot see.
 func setReadState(ctx context.Context, tx *sql.Tx, read bool, where string, args []any) error {
 	uid := currentUser(ctx).ID
 	if read {
