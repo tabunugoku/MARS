@@ -37,7 +37,8 @@ type Analysis struct {
 	Format    archive.Format
 	Pages     []Page
 	ComicInfo []byte // nil when the archive has no ComicInfo.xml
-	Cover     []byte // raw bytes of page 1, for the thumbnail
+	Cover     []byte // raw bytes of the cover page, for the thumbnail
+	CoverPage int    // which page Cover is (1-based)
 }
 
 var (
