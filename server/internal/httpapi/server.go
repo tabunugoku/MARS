@@ -71,7 +71,14 @@ func New(d Deps) http.Handler {
 	api.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		writeError(r.Context(), w, http.StatusNotFound, "not_found.route")
 	})
-	mux.Handle("/", HandlerFromMux(strict, api))
+	mux.Handle("/", HandlerWithOptions(strict, StdHTTPServerOptions{
+		BaseRouter: api,
+		// A query parameter that does not parse (limit=oops) gets the same JSON
+		// error as every other bad request, not the generated plain text.
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
+		},
+	}))
 	return withLocale(s.authenticate(mux))
 }
 

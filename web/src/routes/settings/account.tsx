@@ -35,6 +35,7 @@ const m = defineMessages({
     languageSaved: "言語を保存しました",
     nameJa: "日本語",
     nameEn: "English",
+    localeBlocked: "名前やパスワードの変更を保存するか取り消してから、言語を保存してください。",
   },
   en: {
     title: "Account",
@@ -61,6 +62,7 @@ const m = defineMessages({
     // Language names are shown in their own language.
     nameJa: "日本語",
     nameEn: "English",
+    localeBlocked: "Save or discard the name and password changes first",
   },
 });
 
@@ -112,6 +114,13 @@ export default function Screen() {
   const pwReady = pw.current !== "" && pw.next.length >= 8 && pw.next === pw.confirm;
   const shownLocale = locale ?? current.locale;
   const localeDirty = locale !== null && locale !== current.locale;
+  // One account save at a time: the other save buttons wait for it.
+  const busy = savingName || savingPw || savingLocale;
+  // An open name or password draft blocks the language save (it would
+  // remount the app and lose the draft).
+  const nameDraft = name !== null && name !== current.name;
+  const pwDraft = pw.current !== "" || pw.next !== "" || pw.confirm !== "";
+  const localeBlocked = nameDraft || pwDraft;
 
   const saveName = async () => {
     setSavingName(true);
@@ -127,7 +136,8 @@ export default function Screen() {
     }
   };
 
-  // The name goes as it is saved, not as typed: only the language changes here.
+  // The name sent is the saved one (`current`, from the last save response),
+  // never the draft. The saves cannot overlap, so this name is current.
   const saveLocale = async () => {
     if (locale === null) return;
     setSavingLocale(true);
@@ -175,7 +185,7 @@ export default function Screen() {
               <FieldDescription>{t("emailNote")}</FieldDescription>
             </Field>
             <div>
-              <Button variant="secondary" disabled={!nameDirty || savingName} loading={savingName} onClick={saveName}>
+              <Button variant="secondary" disabled={!nameDirty || busy} loading={savingName} onClick={saveName}>
                 {t("save")}
               </Button>
             </div>
@@ -194,10 +204,11 @@ export default function Screen() {
               </RadioGroup>
             </Field>
             <div>
-              <Button variant="secondary" disabled={!localeDirty || savingLocale} loading={savingLocale} onClick={saveLocale}>
+              <Button variant="secondary" disabled={!localeDirty || busy || localeBlocked} loading={savingLocale} onClick={saveLocale}>
                 {t("save")}
               </Button>
             </div>
+            {localeBlocked && <FieldDescription>{t("localeBlocked")}</FieldDescription>}
           </FieldGroup>
         </section>
 
@@ -226,7 +237,7 @@ export default function Screen() {
               {mismatch && <FieldError>{t("mismatch")}</FieldError>}
             </Field>
             <div>
-              <Button variant="secondary" disabled={!pwReady || savingPw} loading={savingPw} onClick={changePassword}>
+              <Button variant="secondary" disabled={!pwReady || busy} loading={savingPw} onClick={changePassword}>
                 {t("changePassword")}
               </Button>
             </div>

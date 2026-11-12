@@ -1,6 +1,6 @@
 // Every call the screens make, against the Go server. The mock in mock.ts
 // implements the same Api interface for `VITE_API=mock`.
-import { query, request, requestPage } from "./http";
+import { ApiError, query, request, requestPage } from "./http";
 import type {
   AdjacentBooks, ApiKey, ApiKeyCreated, Book, BookUpdate, Collection, CollectionCreate, CollectionUpdate,
   Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
@@ -26,6 +26,13 @@ export const realApi = {
 
   // The caller
   me: () => get<User>("/me"),
+  /** The caller, or null when nobody is signed in. Never redirects to sign-in,
+   *  so the reader and the app's language sync can ask at any time. */
+  sessionUser: () =>
+    request<User>("GET", "/me", undefined, { public: true }).catch((err: unknown) => {
+      if (err instanceof ApiError && err.status === 401) return null;
+      throw err;
+    }),
   /** locale "" follows the browser; omitted, the server keeps the stored choice. */
   updateMe: (name: string, locale?: "" | "ja" | "en") =>
     request<User>("PATCH", "/me", locale === undefined ? { name } : { name, locale }),

@@ -12,7 +12,7 @@ import Input from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { defineMessages, useT } from "@/i18n";
+import { applyUserLocale, defineMessages, useT } from "@/i18n";
 import { SetupForm } from "./login-setup";
 
 const m = defineMessages({
@@ -85,7 +85,9 @@ function SignInForm() {
     if (next.user || next.pass) return;
     setSending(true);
     try {
-      await api.login({ username: user.trim(), password: pass, remember: keep });
+      const signedIn = await api.login({ username: user.trim(), password: pass, remember: keep });
+      // The account's own language applies before the next screen draws.
+      applyUserLocale(signedIn.locale);
       navigate(safeNext(new URLSearchParams(location.search).get("next")), { replace: true });
     } catch (err) {
       setServerError(errorMessage(err));

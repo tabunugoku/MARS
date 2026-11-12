@@ -17,7 +17,7 @@ import { SidebarSearchField } from "@/components/sidebar-app/search-field";
 import type { IconComponent } from "@/lib/icon-context";
 import { useEffect, useRef } from "react";
 import { api, useApi } from "@/api";
-import { applyUserLocale, defineMessages, useT } from "@/i18n";
+import { defineMessages, useT } from "@/i18n";
 import { fontWeights } from "@/lib/font-weight";
 import { typeClass } from "@/lib/type-scale";
 import {
@@ -165,10 +165,6 @@ export function AppSidebar() {
   const { data: libs, reload: reloadLibs } = useApi(() => api.libraries(), []);
   const { data: me } = useApi(() => api.me(), []);
   const t = useT(m);
-  // The signed-in user's own language choice (see docs/i18n.md).
-  useEffect(() => {
-    if (me) applyUserLocale(me.locale);
-  }, [me]);
   // Running and queued tasks, for the badge on タスク (administrators only).
   const { data: tasks, reload: reloadTasks } = useApi(
     () => (me?.role === "admin" ? api.tasks() : Promise.resolve([])),

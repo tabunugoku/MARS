@@ -30,9 +30,11 @@ func (s *server) StreamEvents(context.Context, StreamEventsRequestObject) (Strea
 }
 
 // serveEvents is GET /events: a text/event-stream of the changes the caller
-// may see. The caller is signed in (authenticate). Each heartbeat checks the
-// credential again, so a logout, a deleted user or a narrowed library list
-// takes effect on an open stream within one heartbeat.
+// may see. The caller is signed in (authenticate). The task and error text
+// follows the request's language: Accept-Language, or lang=en|ja in the URL,
+// which the web app sends because EventSource cannot set headers (withLocale).
+// Each heartbeat checks the credential again, so a logout, a deleted user or
+// a narrowed library list takes effect on an open stream within one heartbeat.
 func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	if s.Events == nil {
 		writeError(r.Context(), w, http.StatusNotFound, "not_found.events")

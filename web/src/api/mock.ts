@@ -124,6 +124,7 @@ export const mockApi: Api = {
   logout: () => delay(undefined),
 
   me: () => delay(me()),
+  sessionUser: () => delay(me()),
   updateMe: (name, locale) => {
     db.currentUser.name = name.trim();
     if (locale !== undefined) db.currentUser.locale = locale;

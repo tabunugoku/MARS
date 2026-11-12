@@ -299,6 +299,11 @@ paths:
         the stream is closed; on reconnecting, refetch what is shown. A user
         may hold 16 streams and the server 512; past that the request is
         answered 429 with Retry-After.
+      parameters:
+        - name: lang
+          in: query
+          description: "Language of task labels and errors in the stream (EventSource cannot send Accept-Language). Any request may use it; it wins over Accept-Language."
+          schema: { type: string, enum: [ja, en] }
       responses:
         "200":
           description: Event stream

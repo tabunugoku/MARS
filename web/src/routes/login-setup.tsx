@@ -7,7 +7,7 @@ import Input from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
-import { defineMessages, useT } from "@/i18n";
+import { applyUserLocale, defineMessages, useT } from "@/i18n";
 
 const m = defineMessages({
   ja: {
@@ -70,7 +70,8 @@ export function SetupForm() {
     if (Object.values(next).some(Boolean)) return;
     setSending(true);
     try {
-      await api.setup({ token: token.trim(), name: name.trim(), email: email.trim(), password: pass });
+      const admin = await api.setup({ token: token.trim(), name: name.trim(), email: email.trim(), password: pass });
+      applyUserLocale(admin.locale);
       navigate("/", { replace: true });
     } catch (err) {
       setServerError(errorMessage(err));

@@ -72,6 +72,11 @@ function subscribe(f: () => void) {
   return () => listeners.delete(f);
 }
 
+/** Calls f on every language change, for code outside React. Returns the unsubscribe. */
+export function subscribeLocale(f: () => void): () => void {
+  return subscribe(f);
+}
+
 export function useLocale(): Locale {
   return useSyncExternalStore(subscribe, getLocale, getLocale);
 }

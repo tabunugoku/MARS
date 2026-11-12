@@ -2095,7 +2095,10 @@ export interface operations {
     };
     streamEvents: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Language of task labels and errors in the stream (EventSource cannot send Accept-Language). Any request may use it; it wins over Accept-Language. */
+                lang?: "ja" | "en";
+            };
             header?: never;
             path?: never;
             cookie?: never;

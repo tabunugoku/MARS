@@ -16,9 +16,8 @@ import { defineMessages, useT } from "@/i18n";
 
 const m = defineMessages({
   ja: {
-    themeToDark: "ダークテーマ（クリックでライト）",
-    themeToLight: "ライトテーマ（クリックでダーク）",
-    toggleTheme: "テーマを切り替え",
+    darkNow: "ダークテーマ（クリックでライト）",
+    lightNow: "ライトテーマ（クリックでダーク）",
     mainNav: "メインナビゲーション",
     home: "ホーム",
     library: "ライブラリ",
@@ -26,9 +25,8 @@ const m = defineMessages({
     collections: "コレクション",
   },
   en: {
-    themeToDark: "Dark theme (click for light)",
-    themeToLight: "Light theme (click for dark)",
-    toggleTheme: "Switch theme",
+    darkNow: "Dark theme (click for light)",
+    lightNow: "Light theme (click for dark)",
     mainNav: "Main navigation",
     home: "Home",
     library: "Library",
@@ -62,11 +60,13 @@ export function AppShell() {
 function Topbar() {
   const { theme, toggle } = useTheme();
   const t = useT(m);
+  // Names the theme in use; a click switches to the other one.
+  const label = theme === "dark" ? t("darkNow") : t("lightNow");
   return (
     <SidebarInsetTopbar className="relative pr-2">
       <div className="flex-1" />
-      <Tooltip content={theme === "dark" ? t("themeToLight") : t("themeToDark")} side="bottom">
-        <Button variant="ghost" size="icon" aria-label={t("toggleTheme")} onClick={(e) => toggle(e.currentTarget)}>
+      <Tooltip content={label} side="bottom">
+        <Button variant="ghost" size="icon" aria-label={label} onClick={(e) => toggle(e.currentTarget)}>
           <ThemeGlyph dark={theme === "dark"} />
         </Button>
       </Tooltip>

@@ -122,14 +122,21 @@ var messages = map[string]struct{ ja, en string }{
 	"watch.limit":                     {"ファイルの監視を始められませんでした（監視できるフォルダ数の上限）。定期スキャンを使ってください", "Could not start watching files (too many folders to watch). Use scheduled scans instead"},
 }
 
-// withLocale records the request's language: an Accept-Language whose first
+// withLocale records the request's language. A lang query parameter ("en" or
+// "ja") wins over Accept-Language, for any request: a browser's EventSource
+// (GET /events) cannot set headers, so the web app puts lang in the URL there.
+// Any other lang value is ignored. Without it, an Accept-Language whose first
 // tag starts with "en" gives English; anything else gives Japanese.
 func withLocale(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		loc := "ja"
-		first, _, _ := strings.Cut(r.Header.Get("Accept-Language"), ",")
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(first)), "en") {
-			loc = "en"
+		if q := r.URL.Query().Get("lang"); q == "en" || q == "ja" {
+			loc = q
+		} else {
+			first, _, _ := strings.Cut(r.Header.Get("Accept-Language"), ",")
+			if strings.HasPrefix(strings.ToLower(strings.TrimSpace(first)), "en") {
+				loc = "en"
+			}
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), localeKey, loc)))
 	})
