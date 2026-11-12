@@ -39,9 +39,11 @@ const m = defineMessages({
     rememberDays: "ログイン保持の日数",
     loginScreen: "ログイン画面",
     backdropCompass: "羅針盤",
-    backdropCovers: "表紙の壁",
+    backdropCovers: "シリーズの表紙",
     backdropCompassNote: "ログイン前の画面には ComiNavi の羅針盤だけが表示されます",
     backdropCoversNote: "最近追加したシリーズの表紙を並べます。ログインしていない人にも表紙が見えます",
+    backdropBookCovers: "巻の表紙",
+    backdropBookCoversNote: "最近追加した巻の表紙を並べます。ログインしていない人にも表紙が見えます",
     integrations: "連携",
     apiKeys: "API キー",
     noApiKeys: "APIキーはまだありません",
@@ -89,9 +91,11 @@ const m = defineMessages({
     rememberDays: "Days to stay signed in",
     loginScreen: "Sign-in screen",
     backdropCompass: "Compass",
-    backdropCovers: "Cover wall",
+    backdropCovers: "Series covers",
     backdropCompassNote: "Only the ComiNavi compass is shown before sign-in",
     backdropCoversNote: "Shows covers of recently added series. People who are not signed in can see them too.",
+    backdropBookCovers: "Book covers",
+    backdropBookCoversNote: "Shows covers of recently added books. People who are not signed in can see them too.",
     integrations: "Integrations",
     apiKeys: "API keys",
     noApiKeys: "No API keys yet",
@@ -140,8 +144,16 @@ export default function Screen() {
     large: t("sizeLarge"),
     xlarge: t("sizeXlarge"),
   };
-  const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompass"), covers: t("backdropCovers") };
-  const backdropNote: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompassNote"), covers: t("backdropCoversNote") };
+  const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = {
+    compass: t("backdropCompass"),
+    covers: t("backdropCovers"),
+    bookCovers: t("backdropBookCovers"),
+  };
+  const backdropNote: Record<ServerSettings["loginBackdrop"], string> = {
+    compass: t("backdropCompassNote"),
+    covers: t("backdropCoversNote"),
+    bookCovers: t("backdropBookCoversNote"),
+  };
   const { data, error, reload } = useApi(() => api.settings(), []);
   const keys = useApi(() => api.apiKeys(), []);
   // The last copy the server returned; drafts are compared against it.

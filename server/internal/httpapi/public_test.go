@@ -53,3 +53,63 @@ func TestCoverWall(t *testing.T) {
 		t.Errorf("private thumbnail without sign-in: %d", rec.Code)
 	}
 }
+
+func TestBookCoverWall(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	red := pngBytes(t, 40, 60, color.RGBA{200, 0, 0, 255})
+	writeCBZ(t, filepath.Join(root, "Alpha", "Alpha v01.cbz"), map[string][]byte{"1.png": red})
+	writeCBZ(t, filepath.Join(root, "Alpha", "Alpha v02.cbz"), map[string][]byte{"1.png": red})
+	lib := e.libraryWith("A", root)
+	series, books := e.onlySeries(lib.Id)
+	if len(books) != 2 {
+		t.Fatalf("books %+v", books)
+	}
+	anon := e.anon()
+
+	if _, err := e.db.Exec(`INSERT INTO settings (key, value) VALUES ('server', '{"loginBackdrop":"bookCovers"}')`); err != nil {
+		t.Fatal(err)
+	}
+	var ls LoginScreen
+	anon.json("GET", "/api/v1/public/login-screen", nil, 200, &ls)
+	if ls.Backdrop != BookCovers || len(ls.Covers) != len(books) {
+		t.Fatalf("book cover wall %+v", ls)
+	}
+	for _, b := range books {
+		want := "/api/v1/public/covers/" + b.Id
+		found := false
+		for _, c := range ls.Covers {
+			if c.ThumbnailUrl == want && c.Title == series.Title+" "+b.Title {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("book %s not on the wall: %+v", b.Id, ls.Covers)
+		}
+		rec := anon.do("GET", want, nil)
+		if rec.Code != 200 || !strings.HasPrefix(rec.Header().Get("Content-Type"), "image/") {
+			t.Fatalf("public book cover: %d %s", rec.Code, rec.Header().Get("Content-Type"))
+		}
+	}
+
+	// A book without a thumbnail is not on the wall, so its cover is not served.
+	hidden := books[1].Id
+	if _, err := e.db.Exec(`UPDATE books SET thumbnail = '' WHERE id = ?`, hidden); err != nil {
+		t.Fatal(err)
+	}
+	anon.json("GET", "/api/v1/public/login-screen", nil, 200, &ls)
+	if len(ls.Covers) != 1 {
+		t.Fatalf("wall after hiding a book: %+v", ls.Covers)
+	}
+	if rec := anon.do("GET", "/api/v1/public/covers/"+hidden, nil); rec.Code != 404 {
+		t.Fatalf("cover of a book off the wall: %d", rec.Code)
+	}
+
+	// With the series wall, a book id is not on the wall.
+	if _, err := e.db.Exec(`UPDATE settings SET value = '{"loginBackdrop":"covers"}' WHERE key = 'server'`); err != nil {
+		t.Fatal(err)
+	}
+	if rec := anon.do("GET", "/api/v1/public/covers/"+books[0].Id, nil); rec.Code != 404 {
+		t.Fatalf("book id while the series wall is on: %d", rec.Code)
+	}
+}

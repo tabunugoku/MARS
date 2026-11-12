@@ -179,7 +179,7 @@ const WALL_SIZE = 72;
 // Until the choice arrives the panel stays plain, so neither flashes.
 function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
   if (!screen) return null;
-  if (screen.backdrop === "covers") {
+  if (screen.backdrop === "covers" || screen.backdrop === "bookCovers") {
     // A small library repeats its covers so the wall still fills the panel.
     const wall = screen.covers.length ? Array.from({ length: WALL_SIZE }, (_, i) => screen.covers[i % screen.covers.length]) : [];
     return (

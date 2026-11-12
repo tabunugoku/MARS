@@ -1004,10 +1004,11 @@ paths:
               schema: { $ref: "#/components/schemas/TrashResult" }
   /public/covers/{seriesId}:
     parameters:
-      - { name: seriesId, in: path, required: true, schema: { type: string } }
+      - { name: seriesId, in: path, required: true, schema: { type: string }, description: "A series id while loginBackdrop is covers; a book id while it is bookCovers." }
     get:
       operationId: getPublicCover
-      summary: A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers)
+      summary: A cover on the sign-in page's cover wall (only while loginBackdrop is covers or bookCovers, and only those covers)
+      description: The id is a series id while loginBackdrop is covers, and a book id while it is bookCovers.
       security: []
       responses:
         "200": { $ref: "#/components/responses/Image" }
@@ -1552,7 +1553,8 @@ components:
         version: { type: string }
     LoginBackdrop:
       type: string
-      enum: [compass, covers]
+      description: "compass: the default artwork. covers: covers of series. bookCovers: covers of books (volumes)."
+      enum: [compass, covers, bookCovers]
     LoginScreen:
       type: object
       required: [backdrop, covers, needsSetup]
@@ -1560,7 +1562,7 @@ components:
         needsSetup: { type: boolean, description: "No user exists yet: show the first-run setup form" }
         backdrop: { $ref: "#/components/schemas/LoginBackdrop" }
         covers:
-          description: Filled only when backdrop is "covers".
+          description: Filled only when backdrop is "covers" or "bookCovers".
           type: array
           items: { $ref: "#/components/schemas/LoginCover" }
     LoginCover:
