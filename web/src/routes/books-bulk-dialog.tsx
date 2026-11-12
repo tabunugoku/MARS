@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage } from "@/api";
 import { inChunks, splitList } from "@/components/media/selection-state";
@@ -41,9 +41,12 @@ export function BooksBulkDialog({
   bookIds: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** After the save: ok when every chunk worked (the dialog has closed). On a
-   *  failure the dialog stays open for a retry, but earlier chunks may have
-   *  been saved, so the caller still reloads; it keeps the selection. */
+  /** ok: every chunk worked and the dialog has closed; the caller reloads and
+   *  clears the selection. A failure keeps the dialog, its draft and the
+   *  selection for a retry. Earlier chunks may have been saved, so when the
+   *  dialog is then closed without a successful retry, onDone(false) runs and
+   *  the caller reloads (keeping the selection). Reloading while the dialog is
+   *  open could swap the screen for its error view and lose the draft. */
   onDone: (ok: boolean) => void;
 }) {
   const t = useT(m);
@@ -55,6 +58,17 @@ export function BooksBulkDialog({
   const remove = splitList(removeTags);
   const changed = add.length > 0 || remove.length > 0;
 
+  // A failed save may have saved earlier chunks: the caller reloads once the
+  // dialog closes (see onDone).
+  const failed = useRef(false);
+  const close = (next: boolean) => {
+    onOpenChange(next);
+    if (!next && failed.current) {
+      failed.current = false;
+      onDone(false);
+    }
+  };
+
   const submit = async () => {
     if (!changed || saving || bookIds.length === 0) return;
     setSaving(true);
@@ -64,17 +78,18 @@ export function BooksBulkDialog({
       );
       toast.success(t("updated", { n }));
       onOpenChange(false);
+      failed.current = false;
       onDone(true);
     } catch (err) {
       toast.error(errorMessage(err));
-      onDone(false);
+      failed.current = true;
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={close}>
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>{t("title")}</DialogTitle>
