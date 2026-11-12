@@ -147,7 +147,10 @@ function changesOf(form: Form, b: Book, locked: string[]): BookUpdate {
   if (num !== b.number) c.number = num;
   const sort = parseNumber(form.numberSort);
   if (sort === undefined) throw new Error(translate(m, "numberSortInvalid"));
-  if (sort !== b.numberSort) c.numberSort = sort;
+  // The server treats an omitted numberSort as "follow number". A sort number
+  // that differs from the old number is custom, so when the number changes it
+  // is sent again; otherwise it would be replaced by the new number.
+  if (sort !== b.numberSort || (num !== b.number && sort !== b.number)) c.numberSort = sort;
 
   if (form.summary !== b.summary) c.summary = form.summary;
 

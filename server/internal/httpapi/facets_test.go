@@ -54,10 +54,10 @@ func TestSeriesFilters(t *testing.T) {
 	// Each filter alone. Within one parameter the values are alternatives.
 	sameSet(t, "tags 宇宙 (admin)", seriesIDs(listFiltered(t, admin, "tags", "宇宙")), g, m)
 	sameSet(t, "tags 宇宙 (reader: library B hidden)", seriesIDs(listFiltered(t, reader, "tags", "宇宙")), g)
-	sameSet(t, "tags 王道,日常 any of", seriesIDs(listFiltered(t, admin, "tags", "王道,日常")), g, d)
+	sameSet(t, "tags 王道 or 日常", seriesIDs(listFiltered(t, admin, "tags", "王道", "tags", "日常")), g, d)
 
 	sameSet(t, "publishers A社", seriesIDs(listFiltered(t, admin, "publishers", "A社")), g)
-	sameSet(t, "publishers A社,C社", seriesIDs(listFiltered(t, admin, "publishers", "A社,C社")), g, m)
+	sameSet(t, "publishers A社 or C社", seriesIDs(listFiltered(t, admin, "publishers", "A社", "publishers", "C社")), g, m)
 	sameSet(t, "publishers C社 (reader)", seriesIDs(listFiltered(t, reader, "publishers", "C社")))
 
 	sameSet(t, "languages ja", seriesIDs(listFiltered(t, admin, "languages", "ja")), g, d)
@@ -66,7 +66,7 @@ func TestSeriesFilters(t *testing.T) {
 
 	// Authors match by name in any role.
 	sameSet(t, "authors 鈴木 (writer and penciller)", seriesIDs(listFiltered(t, admin, "authors", "鈴木")), g, d)
-	sameSet(t, "authors 山田,佐藤 (admin)", seriesIDs(listFiltered(t, admin, "authors", "山田,佐藤")), g, m)
+	sameSet(t, "authors 山田 or 佐藤 (admin)", seriesIDs(listFiltered(t, admin, "authors", "山田", "authors", "佐藤")), g, m)
 	sameSet(t, "authors 佐藤 (reader)", seriesIDs(listFiltered(t, reader, "authors", "佐藤")))
 	sameSet(t, "authors 鈴 (partial name)", seriesIDs(listFiltered(t, admin, "authors", "鈴")))
 	sameSet(t, "authors writer (role, not name)", seriesIDs(listFiltered(t, admin, "authors", "writer")))
@@ -100,6 +100,22 @@ func TestSeriesFilters(t *testing.T) {
 	sameSet(t, "tags 宇宙 with libraryId B", seriesIDs(listFiltered(t, admin, "tags", "宇宙", "libraryId", f.libB.Id)), m)
 	sameSet(t, "tags 宇宙 with libraryId B (reader)",
 		seriesIDs(listFiltered(t, reader, "tags", "宇宙", "libraryId", f.libB.Id)))
+}
+
+// A repeated parameter is a list of values, and a value may contain a comma:
+// "Doe, Jane" is one publisher and one author, not two.
+func TestSeriesFilterCommaInValue(t *testing.T) {
+	f := filterFix(t)
+	admin := f.e.admin
+	f.exec(`UPDATE series SET publisher = 'Doe, Jane', authors = '[{"name":"Doe, Jane","role":"writer"}]' WHERE id = ?`, f.mapSeries.Id)
+
+	sameSet(t, "publishers Doe, Jane", seriesIDs(listFiltered(t, admin, "publishers", "Doe, Jane")), f.mapSeries.Id)
+	sameSet(t, "authors Doe, Jane", seriesIDs(listFiltered(t, admin, "authors", "Doe, Jane")), f.mapSeries.Id)
+	// The pieces of the value match nothing, and a comma-joined list is one value.
+	sameSet(t, "publishers Doe", seriesIDs(listFiltered(t, admin, "publishers", "Doe")))
+	sameSet(t, "publishers Doe,A社 as one value", seriesIDs(listFiltered(t, admin, "publishers", "Doe,A社")))
+	sameSet(t, "publishers Doe, Jane or A社",
+		seriesIDs(listFiltered(t, admin, "publishers", "Doe, Jane", "publishers", "A社")), f.mapSeries.Id, f.galaxySeries.Id)
 }
 
 // facetsOf returns the facets for the caller and query.

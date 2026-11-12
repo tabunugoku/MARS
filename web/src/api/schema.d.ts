@@ -2009,15 +2009,15 @@ export interface operations {
                 /** @description Substring of the title, an alternate title or an author */
                 search?: string;
                 status?: components["schemas"]["SeriesStatus"][];
-                /** @description Any of these genres */
+                /** @description Any of these genres; repeat the parameter for each value (values may contain commas) */
                 genres?: string[];
-                /** @description Any of these tags */
+                /** @description Any of these tags; repeat the parameter for each value (values may contain commas) */
                 tags?: string[];
-                /** @description Any of these publishers */
+                /** @description Any of these publishers; repeat the parameter for each value (values may contain commas) */
                 publishers?: string[];
-                /** @description Any of these languages */
+                /** @description Any of these languages; repeat the parameter for each value (values may contain commas) */
                 languages?: string[];
-                /** @description Any of these author names (any role) */
+                /** @description Any of these author names (any role); repeat the parameter for each value (values may contain commas) */
                 authors?: string[];
                 /** @description Age rating at most this; series without one are included */
                 ageRatingMax?: number;

@@ -175,17 +175,18 @@ export default function Screen() {
   const isAll = libraryId === "all";
   const scope = isAll ? undefined : libraryId;
 
-  // URL is the source of truth for sort and filters (comma-separated lists).
-  // Unknown values from the URL are dropped (sort falls back to "title").
+  // URL is the source of truth for sort and filters. A list filter repeats
+  // its parameter once per value (?tag=a&tag=b), so a value may contain a
+  // comma. Unknown values from the URL are dropped (sort falls back to "title").
   const sort = parseSort(params.get("sort"));
   const desc = params.get("desc") === "1";
-  const read = list(params.get("read")).filter(isReadState);
-  const status = list(params.get("status")).filter(isStatus);
-  const genre = list(params.get("genre"));
-  const tag = list(params.get("tag"));
-  const publisher = list(params.get("publisher"));
-  const language = list(params.get("language"));
-  const author = list(params.get("author"));
+  const read = params.getAll("read").filter(isReadState);
+  const status = params.getAll("status").filter(isStatus);
+  const genre = params.getAll("genre").filter(Boolean);
+  const tag = params.getAll("tag").filter(Boolean);
+  const publisher = params.getAll("publisher").filter(Boolean);
+  const language = params.getAll("language").filter(Boolean);
+  const author = params.getAll("author").filter(Boolean);
   // Age rating "up to N" (a whole number) and completion (1 complete, 0 not).
   const age = parseAge(params.get("age"));
   const complete = params.get("complete") === "1" ? true : params.get("complete") === "0" ? false : undefined;
@@ -200,13 +201,15 @@ export default function Screen() {
     (age === undefined ? 0 : 1) +
     (complete === undefined ? 0 : 1);
 
-  const update = (patch: Record<string, string | null>) =>
+  // A string sets one value, an array repeats the parameter once per value;
+  // null, "" or [] removes the parameter. Other parameters are kept.
+  const update = (patch: Record<string, string | string[] | null>) =>
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         for (const [k, v] of Object.entries(patch)) {
-          if (v) next.set(k, v);
-          else next.delete(k);
+          next.delete(k);
+          for (const x of Array.isArray(v) ? v : v ? [v] : []) next.append(k, x);
         }
         return next;
       },
@@ -215,7 +218,7 @@ export default function Screen() {
 
   const toggle = (key: string, current: string[], value: string) => {
     const next = current.includes(value) ? current.filter((x) => x !== value) : [...current, value];
-    update({ [key]: next.join(",") || null });
+    update({ [key]: next });
   };
   const clearAll = () =>
     update({
@@ -266,13 +269,7 @@ export default function Screen() {
       scope,
       sort,
       desc,
-      read.join(),
-      status.join(),
-      genre.join(),
-      tag.join(),
-      publisher.join(),
-      language.join(),
-      author.join(),
+      JSON.stringify([read, status, genre, tag, publisher, language, author]),
       age,
       complete,
     ],
@@ -282,9 +279,10 @@ export default function Screen() {
   // Selection ends when the list changes (library, sort or filter): the key says which list it is.
   const selKey = JSON.stringify([scope ?? null, sort, desc, read, status, genre, tag, publisher, language, author, age ?? null, complete ?? null]);
   const sel = useSelection(series?.map((s) => s.id) ?? [], selKey);
-  // After a bulk action: the selection clears and the visible data reloads.
-  const afterBulk = () => {
-    sel.clear();
+  // After a bulk action the visible data reloads; the selection clears only when
+  // the action worked, so a failed one can be retried with the same series.
+  const afterBulk = (ok = true) => {
+    if (ok) sel.clear();
     seriesList.reload();
     facets.reload();
     if (isAll) libs.reload();
@@ -652,10 +650,10 @@ export default function Screen() {
         )}
       </AnimatePresence>
       {isAdmin && (
-        <AddToCollectionDialog seriesIds={sel.ids} open={collectionOpen} onOpenChange={setCollectionOpen} onAdded={afterBulk} />
+        <AddToCollectionDialog seriesIds={sel.ids} open={collectionOpen} onOpenChange={setCollectionOpen} onAdded={() => afterBulk()} />
       )}
       {isAdmin && (
-        <SeriesBulkDialog key={bulkRun} seriesIds={sel.ids} open={bulkOpen} onOpenChange={setBulkOpen} onDone={afterBulk} />
+        <SeriesBulkDialog key={bulkRun} seriesIds={sel.ids} open={bulkOpen} onOpenChange={setBulkOpen} onDone={() => afterBulk()} />
       )}
     </Page>
   );
@@ -695,10 +693,6 @@ function languageName(code: string): string {
   } catch {
     return code;
   }
-}
-
-function list(raw: string | null): string[] {
-  return raw ? raw.split(",").filter(Boolean) : [];
 }
 
 function parseAge(raw: string | null): number | undefined {

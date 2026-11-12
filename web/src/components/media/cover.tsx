@@ -34,6 +34,8 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
   // A thumbnail made again in this tab's lifetime (see live events) is
   // fetched anew under ?r=; a failed one is tried again then too.
   const t = useT(m);
+  // Revisions are keyed by the URL's path (see cover-retry.ts), so the
+  // ?v=hash on src does not hide a bump.
   const [rev, setRev] = useState(() => coverRevision(src));
   useEffect(() => {
     if (!src) return;

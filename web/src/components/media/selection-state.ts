@@ -13,7 +13,15 @@ const NONE: Picked = new Set();
  *  whenever the list changes (library, sort, filter): the selection then ends. */
 export function useSelection(visible: string[], scopeKey: string) {
   const [state, setState] = useState<{ on: boolean; key: string; picked: Picked }>({ on: false, key: scopeKey, picked: NONE });
-  const anchor = useRef<string | null>(null);
+  // The shift-click anchor only counts within the scope it was set in.
+  const anchor = useRef<{ key: string; id: string } | null>(null);
+  // A new scope ends the selection for good: going back to the old scope must not
+  // bring its picks back. Reset while rendering, so the first frame already shows it off.
+  const [seenKey, setSeenKey] = useState(scopeKey);
+  if (seenKey !== scopeKey) {
+    setSeenKey(scopeKey);
+    setState({ on: false, key: scopeKey, picked: NONE });
+  }
   const active = state.on && state.key === scopeKey;
   const picked = active ? state.picked : NONE;
 
@@ -37,10 +45,10 @@ export function useSelection(visible: string[], scopeKey: string) {
   }, [scopeKey, visible]);
 
   const toggle = (id: string, shift = false) => {
-    const from = anchor.current;
+    const from = anchor.current?.key === scopeKey ? anchor.current.id : null;
     const fromIndex = from ? visible.indexOf(from) : -1;
     const toIndex = visible.indexOf(id);
-    anchor.current = id;
+    anchor.current = { key: scopeKey, id };
     setState((s) => {
       if (!s.on || s.key !== scopeKey) return s;
       const next = new Set(s.picked);
@@ -88,20 +96,23 @@ export function useSelection(visible: string[], scopeKey: string) {
 
 export type Selection = ReturnType<typeof useSelection>;
 
-/** Runs one bulk call with a toast and a reload afterwards. `after` runs
- *  whether the call worked or not (the visible data may have changed). */
-export function useBulkRun(after: () => void) {
+/** Runs one bulk call with a toast. `after(ok)` runs whether the call worked or not
+ *  (the visible data may have changed); only a successful call should clear the
+ *  selection, so a failed one can be retried with the same ids. */
+export function useBulkRun(after: (ok: boolean) => void) {
   const [busy, setBusy] = useState(false);
   const run = async (call: () => Promise<number>, done: (n: number) => string) => {
     setBusy(true);
+    let ok = false;
     try {
       const n = await call();
       toast.success(done(n));
+      ok = true;
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
       setBusy(false);
-      after();
+      after(ok);
     }
   };
   return { busy, run };

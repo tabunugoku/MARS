@@ -2,14 +2,20 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"image/color"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 	"time"
+
+	"github.com/tabunugoku/cominavi/server/internal/events"
+	"github.com/tabunugoku/cominavi/server/internal/library"
 )
 
 var (
@@ -317,5 +323,108 @@ func TestLocalArtwork(t *testing.T) {
 	e.admin.json("DELETE", "/api/v1/series/"+s.Id+"/thumbnail", nil, 200, &s)
 	if s.ThumbnailSource != SeriesThumbnailSourceLocal {
 		t.Fatalf("dropping the upload did not bring the artwork back: %q", s.ThumbnailSource)
+	}
+}
+
+// thumbFiles lists the file names in the thumbnail folder.
+func thumbFiles(t *testing.T, dir string) []string {
+	t.Helper()
+	ents, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, e := range ents {
+		names = append(names, e.Name())
+	}
+	return names
+}
+
+// trashedInside is a ThumbSize hook that trashes a row. The upload reads the
+// row before it asks for the thumbnail box and stores the file after, so this
+// is a scan trashing the row in between.
+func trashedInside(t *testing.T, e *env, table, id string) func(context.Context) (int, int) {
+	return func(context.Context) (int, int) {
+		if _, err := e.db.Exec("UPDATE "+table+" SET deleted_at = 'x' WHERE id = ?", id); err != nil {
+			t.Fatal(err)
+		}
+		return 400, 600
+	}
+}
+
+// An upload whose row a scan trashes meanwhile answers not found, keeps the
+// old thumbnail file and leaves no new file behind.
+func TestUploadRowTrashedMeanwhile(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	writeCBZ(t, filepath.Join(root, "S", "S v01.cbz"), map[string][]byte{"1.png": pngBytes(t, 20, 30, redCover)})
+	l := e.libraryWith("漫画", root)
+	s, books := e.onlySeries(l.Id)
+	rawPutCode(e, "/api/v1/series/"+s.Id+"/thumbnail", pngBytes(t, 40, 60, blueCover), 200)
+	thumbs := filepath.Join(e.data, "thumbs")
+
+	svc := &library.Service{DB: e.db, ThumbDir: thumbs, ThumbSize: trashedInside(t, e, "series", s.Id)}
+	before := thumbFiles(t, thumbs)
+	if err := svc.SetSeriesUpload(context.Background(), s.Id, pngBytes(t, 40, 60, greenCov)); !errors.Is(err, library.ErrNotFound) {
+		t.Fatalf("series upload to a trashed row: %v", err)
+	}
+	if after := thumbFiles(t, thumbs); !slices.Equal(before, after) {
+		t.Fatalf("series files changed: before %v, after %v", before, after)
+	}
+
+	svc.ThumbSize = trashedInside(t, e, "books", books[0].Id)
+	before = thumbFiles(t, thumbs)
+	if err := svc.SetBookUpload(context.Background(), books[0].Id, pngBytes(t, 40, 60, greenCov)); !errors.Is(err, library.ErrNotFound) {
+		t.Fatalf("book upload to a trashed row: %v", err)
+	}
+	if after := thumbFiles(t, thumbs); !slices.Equal(before, after) {
+		t.Fatalf("book files changed: before %v, after %v", before, after)
+	}
+}
+
+// libraryEvents counts the library events waiting on sub.
+func libraryEvents(sub *events.Sub) int {
+	n := 0
+	for {
+		select {
+		case ev := <-sub.C:
+			if ev.Type == "library" {
+				n++
+			}
+		default:
+			return n
+		}
+	}
+}
+
+// A scan that changes only a series cover still publishes the library event
+// that open screens listen to; a scan that changes nothing publishes none.
+func TestArtworkOnlyScanPublishes(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	writeCBZ(t, filepath.Join(root, "S", "S v01.cbz"), map[string][]byte{"1.png": pngBytes(t, 20, 30, redCover)})
+	var l Library
+	e.admin.json("POST", "/api/v1/libraries", map[string]any{"name": "漫画", "root": root, "kind": "manga", "importLocalArtwork": true}, 201, &l)
+	e.waitTasks()
+	sub, err := e.hub.Subscribe("artwork-test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer e.hub.Unsubscribe(sub)
+
+	e.rescan(l.Id)
+	if n := libraryEvents(sub); n != 0 {
+		t.Fatalf("an idle scan published %d library events", n)
+	}
+	if err := os.WriteFile(filepath.Join(root, "S", "cover.png"), pngBytes(t, 40, 60, blueCover), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	e.rescan(l.Id)
+	s, _ := e.onlySeries(l.Id)
+	if s.ThumbnailSource != SeriesThumbnailSourceLocal {
+		t.Fatalf("artwork not picked up: %q", s.ThumbnailSource)
+	}
+	if n := libraryEvents(sub); n != 1 {
+		t.Fatalf("an artwork-only scan published %d library events, want 1", n)
 	}
 }

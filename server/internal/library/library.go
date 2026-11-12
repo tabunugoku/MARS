@@ -151,10 +151,13 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 			slog.Warn("scan: unreadable paths kept as they were", "library", l.name, "paths", found.Unreadable)
 		}
 		slog.Info("scan", "library", l.name, "stats", st)
-		if err := s.syncArtwork(ctx, l); err != nil {
+		artChanged, err := s.syncArtwork(ctx, l)
+		if err != nil {
 			return err
 		}
-		if st != (scan.Stats{}) {
+		// An artwork-only change (a cover file added, replaced or removed)
+		// is announced too, so open screens refetch the series covers.
+		if st != (scan.Stats{}) || artChanged {
 			s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{
 				LibraryID: l.id, SeriesAdded: st.SeriesAdded, SeriesRemoved: st.SeriesRemoved,
 				BooksAdded: st.BooksAdded, BooksChanged: st.BooksChanged, BooksRemoved: st.BooksRemoved,

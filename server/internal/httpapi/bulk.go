@@ -3,6 +3,8 @@ package httpapi
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 	"time"
@@ -321,6 +323,42 @@ func setReadState(ctx context.Context, tx *sql.Tx, read bool, where string, args
 		AND book_id IN (SELECT b.id FROM books b WHERE b.deleted_at IS NULL AND `+where+`)`,
 		append([]any{uid}, args...)...)
 	return err
+}
+
+// errReadRequired is the decode error of a read-state body without a boolean
+// read. The generated models use a plain bool, so a missing or null read would
+// decode as false and clear the caller's progress. The strict handler decodes
+// the body before any middleware runs, so the check lives in UnmarshalJSON.
+var errReadRequired = errors.New("bad_request.read_required")
+
+func (b *SeriesReadState) UnmarshalJSON(data []byte) error {
+	var v struct {
+		Read      *bool    `json:"read"`
+		SeriesIds []string `json:"seriesIds"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if v.Read == nil {
+		return errReadRequired
+	}
+	*b = SeriesReadState{Read: *v.Read, SeriesIds: v.SeriesIds}
+	return nil
+}
+
+func (b *BooksReadState) UnmarshalJSON(data []byte) error {
+	var v struct {
+		Read    *bool    `json:"read"`
+		BookIds []string `json:"bookIds"`
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	if v.Read == nil {
+		return errReadRequired
+	}
+	*b = BooksReadState{Read: *v.Read, BookIds: v.BookIds}
+	return nil
 }
 
 // SetSeriesReadState marks every book of the given series read or unread for

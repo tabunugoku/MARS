@@ -166,12 +166,20 @@ function SeriesPage({ id }: { id: string }) {
   const shownIds = data ? (order === "asc" ? data.books : [...data.books].reverse()).map((b) => b.id) : [];
   const sel = useSelection(shownIds, `${id}|${order}`);
   const selecting = sel.active && tab === 0;
-  // After a bulk action: the selection clears and the page reloads.
-  const afterBulk = () => {
-    sel.clear();
+  // After a bulk action the page reloads. A stale `saved` snapshot would hide the new
+  // read counts, so it goes too. The selection clears only when the action worked.
+  const reloadAfter = () => {
+    setSaved(null);
     reload();
   };
-  const bulk = useBulkRun(afterBulk);
+  const afterBulk = () => {
+    sel.clear();
+    reloadAfter();
+  };
+  const bulk = useBulkRun((ok) => {
+    if (ok) sel.clear();
+    reloadAfter();
+  });
 
   if (error) {
     return (

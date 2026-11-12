@@ -41,7 +41,8 @@ export function BooksBulkDialog({
   bookIds: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Runs after a save, success or not: the parent reloads and clears the selection. */
+  /** Runs after a successful save: the parent reloads and clears the selection. A failed
+   *  save keeps the dialog and the selection open so the user can retry. */
   onDone: () => void;
 }) {
   const t = useT(m);
@@ -54,7 +55,7 @@ export function BooksBulkDialog({
   const changed = add.length > 0 || remove.length > 0;
 
   const submit = async () => {
-    if (!changed || saving) return;
+    if (!changed || saving || bookIds.length === 0) return;
     setSaving(true);
     try {
       const n = await inChunks(bookIds, (chunk) =>
@@ -62,11 +63,11 @@ export function BooksBulkDialog({
       );
       toast.success(t("updated", { n }));
       onOpenChange(false);
+      onDone();
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
       setSaving(false);
-      onDone();
     }
   };
 
@@ -96,7 +97,7 @@ export function BooksBulkDialog({
 
         <DialogFooter>
           <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
-          <Button variant="primary" disabled={!changed || saving} onClick={submit}>
+          <Button variant="primary" disabled={!changed || saving || bookIds.length === 0} onClick={submit}>
             {t("submit")}
           </Button>
         </DialogFooter>

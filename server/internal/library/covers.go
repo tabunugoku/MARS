@@ -54,6 +54,23 @@ func (s *Service) removeThumb(name string) {
 	}
 }
 
+// thumbStored checks the UPDATE that points a row at the new thumbnail file
+// name. When the statement failed, or matched no live row (a scan trashed
+// the row after the thumbnail was written), the new file is removed and the
+// error (or ErrNotFound) is returned; the caller then keeps the old file.
+func (s *Service) thumbStored(res sql.Result, err error, name string) error {
+	if err == nil {
+		var n int64
+		if n, err = res.RowsAffected(); err == nil && n == 0 {
+			err = ErrNotFound
+		}
+	}
+	if err != nil {
+		s.removeThumb(name)
+	}
+	return err
+}
+
 // seriesArt is what the cover logic needs of a live series.
 type seriesArt struct {
 	id, libraryID, dir, oneshot, thumb, source, sig string
@@ -93,9 +110,9 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 	if err != nil {
 		return err
 	}
-	if _, err := s.DB.ExecContext(ctx, `UPDATE series SET thumbnail = ?, thumbnail_source = 'upload', artwork_sig = '', updated_at = ?
-		WHERE id = ? AND deleted_at IS NULL`, name, time.Now().UTC().Format(time.RFC3339Nano), seriesID); err != nil {
-		s.removeThumb(name)
+	res, err := s.DB.ExecContext(ctx, `UPDATE series SET thumbnail = ?, thumbnail_source = 'upload', artwork_sig = '', updated_at = ?
+		WHERE id = ? AND deleted_at IS NULL`, name, time.Now().UTC().Format(time.RFC3339Nano), seriesID)
+	if err := s.thumbStored(res, err, name); err != nil {
 		return err
 	}
 	s.removeThumb(sr.thumb)
@@ -128,7 +145,8 @@ func (s *Service) DropSeriesUpload(ctx context.Context, seriesID string) error {
 	if err != nil {
 		return err
 	}
-	return s.syncSeriesArt(ctx, l, sr)
+	_, err = s.syncSeriesArt(ctx, l, sr)
+	return err
 }
 
 // SetBookUpload makes img the book's thumbnail, until it is regenerated or its
@@ -157,9 +175,9 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 	if err != nil {
 		return err
 	}
-	if _, err := s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ?, thumbnail_uploaded = 1, updated_at = ?
-		WHERE id = ? AND deleted_at IS NULL`, name, time.Now().UTC().Format(time.RFC3339Nano), bookID); err != nil {
-		s.removeThumb(name)
+	res, err := s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ?, thumbnail_uploaded = 1, updated_at = ?
+		WHERE id = ? AND deleted_at IS NULL`, name, time.Now().UTC().Format(time.RFC3339Nano), bookID)
+	if err := s.thumbStored(res, err, name); err != nil {
 		return err
 	}
 	s.removeThumb(old)
@@ -167,61 +185,68 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 	return nil
 }
 
-// syncArtwork looks at every live series of the library for local artwork.
-func (s *Service) syncArtwork(ctx context.Context, l lib) error {
+// syncArtwork looks at every live series of the library for local artwork. It
+// reports whether any series thumbnail changed.
+func (s *Service) syncArtwork(ctx context.Context, l lib) (bool, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM series WHERE library_id = ? AND deleted_at IS NULL`, l.id)
 	if err != nil {
-		return err
+		return false, err
 	}
 	var ids []string
 	for rows.Next() {
 		var id string
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
-			return err
+			return false, err
 		}
 		ids = append(ids, id)
 	}
 	rows.Close()
 	if err := rows.Err(); err != nil {
-		return err
+		return false, err
 	}
+	changed := false
 	for _, id := range ids {
-		if err := s.syncSeriesArtwork(ctx, l, id); err != nil {
-			return err
+		c, err := s.syncSeriesArtwork(ctx, l, id)
+		if err != nil {
+			return changed, err
 		}
+		changed = changed || c
 	}
-	return nil
+	return changed, nil
 }
 
-func (s *Service) syncSeriesArtwork(ctx context.Context, l lib, id string) error {
+// syncSeriesArtwork syncs one series' local artwork and reports whether its
+// thumbnail changed.
+func (s *Service) syncSeriesArtwork(ctx context.Context, l lib, id string) (bool, error) {
 	mu := s.coverLock(seriesCoverKey(id))
 	if err := mu.Lock(ctx); err != nil {
-		return err
+		return false, err
 	}
 	defer mu.Unlock()
 	sr, err := s.loadSeriesArt(ctx, id)
 	if errors.Is(err, ErrNotFound) {
-		return nil // trashed meanwhile
+		return false, nil // trashed meanwhile
 	}
 	if err != nil {
-		return err
+		return false, err
 	}
 	return s.syncSeriesArt(ctx, l, sr)
 }
 
 // syncSeriesArt makes the series' local artwork match its folder. The caller
-// holds the series' cover lock. An upload is never touched.
-func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) error {
+// holds the series' cover lock. An upload is never touched. It reports
+// whether the series' thumbnail changed.
+func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) (bool, error) {
 	if sr.source == "upload" {
-		return nil
+		return false, nil
 	}
 	if l.importArtwork && sr.dir != "" && sr.oneshot == "" {
 		name, info := findArtwork(l.root, sr.dir)
 		if name != "" {
 			sig := fmt.Sprintf("%d-%d", info.Size(), info.ModTime().UnixNano())
 			if sr.source == "local" && sr.sig == sig && sr.thumb != "" {
-				return nil
+				return false, nil
 			}
 			img, err := readArtwork(l.root, filepath.Join(sr.dir, name))
 			var jpg []byte
@@ -232,28 +257,30 @@ func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) error 
 			if err == nil {
 				thumb, err := s.writeThumb("series-"+sr.id, jpg)
 				if err != nil {
-					return err
+					return false, err
 				}
-				if _, err := s.DB.ExecContext(ctx, `UPDATE series SET thumbnail = ?, thumbnail_source = 'local', artwork_sig = ?, updated_at = ?
-					WHERE id = ? AND deleted_at IS NULL`, thumb, sig, time.Now().UTC().Format(time.RFC3339Nano), sr.id); err != nil {
-					s.removeThumb(thumb)
-					return err
+				res, err := s.DB.ExecContext(ctx, `UPDATE series SET thumbnail = ?, thumbnail_source = 'local', artwork_sig = ?, updated_at = ?
+					WHERE id = ? AND deleted_at IS NULL`, thumb, sig, time.Now().UTC().Format(time.RFC3339Nano), sr.id)
+				if err := s.thumbStored(res, err, thumb); errors.Is(err, ErrNotFound) {
+					return false, nil // trashed meanwhile; the old file stays
+				} else if err != nil {
+					return false, err
 				}
 				s.removeThumb(sr.thumb)
-				return nil
+				return true, nil
 			}
 			slog.Warn("local artwork", "series", sr.id, "file", name, "err", err)
 		}
 	}
 	if sr.source != "local" {
-		return nil
+		return false, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `UPDATE series SET thumbnail = '', thumbnail_source = '', artwork_sig = '', updated_at = ?
 		WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), sr.id); err != nil {
-		return err
+		return false, err
 	}
 	s.removeThumb(sr.thumb)
-	return nil
+	return true, nil
 }
 
 // artworkStems and artworkExts give the order in which a series folder's

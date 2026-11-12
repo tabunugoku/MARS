@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -192,6 +193,44 @@ func TestBulkReadStateRoundTrip(t *testing.T) {
 	r.json("POST", "/api/v1/books/read-state", map[string]any{"bookIds": []string{books[0].Id}, "read": false}, 204, nil)
 	if first := seriesBooks(t, r, sa.Id)[0]; first.Progress != nil {
 		t.Fatalf("book 0 still read: %+v", first.Progress)
+	}
+}
+
+// A read-state body without a boolean read is refused and writes nothing: a
+// missing or null read would otherwise decode as false and clear progress.
+func TestBulkReadStateNeedsRead(t *testing.T) {
+	e, a, _ := progressEnv(t)
+	sa := libSeries(t, e.admin, a.Id)
+	r := bulkReader(e, a)
+	r.json("POST", "/api/v1/series/read-state", map[string]any{"seriesIds": []string{sa.Id}, "read": true}, 204, nil)
+	books := seriesBooks(t, r, sa.Id)
+	if len(books) == 0 {
+		t.Fatal("no books to read")
+	}
+
+	for _, body := range []map[string]any{
+		{"seriesIds": []string{sa.Id}},
+		{"seriesIds": []string{sa.Id}, "read": nil},
+	} {
+		if rec := r.do("POST", "/api/v1/series/read-state", body); rec.Code != 400 || !strings.Contains(rec.Body.String(), "bad_request.read_required") {
+			t.Fatalf("series read-state %v: %d %s", body, rec.Code, rec.Body)
+		}
+	}
+	if rec := r.do("POST", "/api/v1/books/read-state", map[string]any{"bookIds": []string{books[0].Id}}); rec.Code != 400 || !strings.Contains(rec.Body.String(), "bad_request.read_required") {
+		t.Fatalf("books read-state without read: %d %s", rec.Code, rec.Body)
+	}
+	for _, bk := range seriesBooks(t, r, sa.Id) {
+		if bk.Progress == nil || !bk.Progress.Completed {
+			t.Fatalf("a refused read-state cleared progress: %+v", bk.Progress)
+		}
+	}
+
+	// read:false is still a real request.
+	r.json("POST", "/api/v1/series/read-state", map[string]any{"seriesIds": []string{sa.Id}, "read": false}, 204, nil)
+	for _, bk := range seriesBooks(t, r, sa.Id) {
+		if bk.Progress != nil {
+			t.Fatalf("read:false left progress: %+v", bk.Progress)
+		}
 	}
 }
 

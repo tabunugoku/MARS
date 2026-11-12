@@ -81,7 +81,8 @@ export function SeriesBulkDialog({
   seriesIds: string[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Runs after a save, success or not: the parent reloads and clears the selection. */
+  /** Runs after a successful save: the parent reloads and clears the selection. A failed
+   *  save keeps the dialog and the selection open so the user can retry. */
   onDone: () => void;
 }) {
   const t = useT(m);
@@ -127,17 +128,17 @@ export function SeriesBulkDialog({
   const changed = Object.keys(fields).length > 0;
 
   const submit = async () => {
-    if (!changed || !ageValid || saving) return;
+    if (!changed || !ageValid || saving || seriesIds.length === 0) return;
     setSaving(true);
     try {
       const n = await inChunks(seriesIds, (chunk) => api.bulkUpdateSeries({ ...fields, seriesIds: chunk }).then((r) => r.updated));
       toast.success(t("updated", { n }));
       onOpenChange(false);
+      onDone();
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
       setSaving(false);
-      onDone();
     }
   };
 
@@ -240,7 +241,7 @@ export function SeriesBulkDialog({
 
         <DialogFooter>
           <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
-          <Button variant="primary" disabled={!changed || !ageValid || saving} onClick={submit}>
+          <Button variant="primary" disabled={!changed || !ageValid || saving || seriesIds.length === 0} onClick={submit}>
             {t("submit")}
           </Button>
         </DialogFooter>

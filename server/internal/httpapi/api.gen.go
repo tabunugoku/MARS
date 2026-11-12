@@ -1462,19 +1462,19 @@ type ListSeriesParams struct {
 	Search *string         `form:"search,omitempty" json:"search,omitempty"`
 	Status *[]SeriesStatus `form:"status,omitempty" json:"status,omitempty"`
 
-	// Genres Any of these genres
+	// Genres Any of these genres; repeat the parameter for each value (values may contain commas)
 	Genres *[]string `form:"genres,omitempty" json:"genres,omitempty"`
 
-	// Tags Any of these tags
+	// Tags Any of these tags; repeat the parameter for each value (values may contain commas)
 	Tags *[]string `form:"tags,omitempty" json:"tags,omitempty"`
 
-	// Publishers Any of these publishers
+	// Publishers Any of these publishers; repeat the parameter for each value (values may contain commas)
 	Publishers *[]string `form:"publishers,omitempty" json:"publishers,omitempty"`
 
-	// Languages Any of these languages
+	// Languages Any of these languages; repeat the parameter for each value (values may contain commas)
 	Languages *[]string `form:"languages,omitempty" json:"languages,omitempty"`
 
-	// Authors Any of these author names (any role)
+	// Authors Any of these author names (any role); repeat the parameter for each value (values may contain commas)
 	Authors *[]string `form:"authors,omitempty" json:"authors,omitempty"`
 
 	// AgeRatingMax Age rating at most this; series without one are included
@@ -3566,7 +3566,7 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	// ------------- Optional query parameter "genres" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", false, false, "genres", r.URL.Query(), &params.Genres, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "genres", r.URL.Query(), &params.Genres, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -3579,7 +3579,7 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	// ------------- Optional query parameter "tags" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", false, false, "tags", r.URL.Query(), &params.Tags, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tags", r.URL.Query(), &params.Tags, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -3592,7 +3592,7 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	// ------------- Optional query parameter "publishers" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", false, false, "publishers", r.URL.Query(), &params.Publishers, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "publishers", r.URL.Query(), &params.Publishers, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -3605,7 +3605,7 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	// ------------- Optional query parameter "languages" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", false, false, "languages", r.URL.Query(), &params.Languages, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "languages", r.URL.Query(), &params.Languages, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -3618,7 +3618,7 @@ func (siw *ServerInterfaceWrapper) ListSeries(w http.ResponseWriter, r *http.Req
 
 	// ------------- Optional query parameter "authors" -------------
 
-	err = runtime.BindQueryParameterWithOptions("form", false, false, "authors", r.URL.Query(), &params.Authors, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "authors", r.URL.Query(), &params.Authors, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
 	if err != nil {
 		var requiredError *runtime.RequiredParameterError
 		if errors.As(err, &requiredError) {
@@ -10732,28 +10732,29 @@ var swaggerSpec = []string{
 	"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",
-	"WjYpMW9oos32OFBNiSaDK4DPeaZSqKqvB0dy3d3j9cqH1L3huzxnOV72zu/c+LRAnHTMCquX10jCG14G",
-	"9awftwj/6saXULX6H7uQ1gcbX07m813Hrqb5/sYX4yjAp0MSqWuF7utxS3Nfb2xh6Nrg6D+urJPoQj4t",
-	"bcRlaitKSFzXPKiHfvkMPtBo7/nnKFgj+jhQI3ppVcjzT6olkAvMKutVJJaoQpIB+VpijKI3K6Ph8tT1",
-	"zT0hRkTSWl+kRpmhMWwxXlrYm3baxrgT041GbGv4b9ynwbMMzWZc//2HpNZc4ie9AyIEHgimC3LBiV/h",
-	"FBsbO2FaLYS1vYiTiYVoL3vBP/uq4sfHx/FwkfGelavp1IAdj4efnld9qqozgJp6Wjhl/3VwhYRwQLWk",
-	"qT4FoSP95Z2TOZ+5FuFzCpGgBbU+C2bd11C474gu/YnaLv8dlR6Xsu17dc7K5G236KfrjNkoULOtrLRn",
-	"3xyzZKJP2x2zEedrMEd8KsB5F1qLDLXIdLGu9H65fmT9qxtmeuSb8gTsGCn5jXvxN1Jgp7XmoaIMNzwr",
-	"wJQU2s2hJgKuqluoMm9ioBxwA7Qjm5HWEWHb7EbaneW32I50KdXQVEexZnfSYPBjnw9y+/W8yrsvbOqr",
-	"wxa34lBZO9JxyKO4gyvmaa6X/qN64nalniDGNCxdwv4Rzkd/rT9f16MLttmy83H9GMJlmHeaC4a78a3D",
-	"e34V+aPDdP777YXvE7EnVdUu7x2Z3vZX9c/bfX+810vJ6GUWkKEL4L/fXsS+QBakzQ4UpR6vAafTLrdq",
-	"RVe9rcebLuPKGhUtNhrAjtdwLUn8C9ezaIoda5azCJ3u2qUsNlvGtK5k4c7iX7SQRZk+95AbtNUTaUwa",
-	"zareSM9asGwC+JVW5PiqW9F4+FF0/imqpDxjXNtbpa9ZSRD4bLmrjQtPH2xIE6+Q059Nz6kWMrm+UyfL",
-	"HXtiBpnvZdwGlIv4rB72AGzPADC38cPqV1cWc/8JEp1cn6vQQfy709XOO12NIf5AV+8n7nTVZB59Xa4G",
-	"ObNPIR9U6P072wX+DejLOqF9OeOh0Jrqtvp34rpB4lRkmCgmZLRkc75pJr33ssgVunlj+1sR4xo7fzIt",
-	"fQX0y2eMT6237iW++MOGijdUHdpdyKIz7cZsAZpstbLM1XcMolX6ALG4yPt9A99X6omScGDFAsnGFjmz",
-	"6toXkvY1nXMtpOu4iTSeqZnLYdDCusyBV2dXZ262A/ctKnJl9UvLtT1kl2ImTRWN1MI4JmSw8jOtflvY",
-	"ZYu8hvtO85f6yhOdNxJ5fEUOQd22nDaZKHUt6IT21+atD1OmB9L53Fpd6h+dcvtAm1mYUrnS4fBZGGs8",
-	"f7XcrLAUXdEbu7AROcVhRDUkWlHnyimkJO9+WfY1pcLjhurHOxKi615DQgXZEUaYAqRkGdlFrx99wX9Q",
-	"AUi4TGBkd1r3zWZ0tnOal0AxqkQNvY63CyW4+UjOcnv7a6c1UBTcESxye9fv9XiNj6/wzW1evTTBCBeg",
-	"VrfeAahdiYKuYkPaWreejAnmbA+JJEhEwyTzkd7YBcl89HXlVpEMrQhzIgOpr1iwh/Y0IH8MpLjSErZz",
-	"OeDQT5PauuJqeERaK0H66Av+MypprwLvgxL2tp/7NEYXdZvcqCNqy9j2+6mTuA7fb8sZXyIv8aDMgbFH",
-	"3BWow79QBiGJ1J19obPoJMKad0c3L6L7T/f/fwA=",
+	"WjYpMW9oos32OFBNiSaDK4DPeaZSqKqvB0dy3d3j9cqH1L3huzxnOV72zu/c+LRAc8o05OCt0hXkXTAx",
+	"eqVveFYA26N/DCEMIiunOiSLBTf7PcCZlUmDa2TtDa/b8tnWVo1jb2PN5Kwwc9BbW3k9wzbWn/kU3K0t",
+	"v5pgG6t3VOxTOoldaZXB/rb24qbb2E7Qn8PRaV6ZZNFvfloaxst8XhQLua4Zb9/iZvCBRnvPP0fBwtjH",
+	"gcLYS6vCi+6kWgL5/ayyXi9kiSokWc2vJQZmels6WmtPXbPgE4I5iah94SllWsqwmXxpYW/auSrxKP6r",
+	"G93n1nBauU+DZxmazShtWxONYPH4Se+ACIEHgumC/I7iVzjFbs5Og1ALYW0v4mRiIdrLXvDPvpT68fFx",
+	"PFxZvWflajo1YMfj4afnVZSraoegpp4WTtl/HVwhIRxQAW0qykHoSH95j2zOZ64v+pziQmhBrc+CpQZq",
+	"KNx35LX+7HSX9I+anstT9w1KZ2XGulv007UDbVTl2VYq3rPvCFoy0adtCdoIbjaYGD8V4FwqrUWG+oK6",
+	"AF96v1w/sv7VXUI98k15AnaMavDGvfgbqSrUWvNQJQonX7QqSTQSx4mAq5IeqkwWGaiB3ADtyA6sdRjc",
+	"Nluwdmf5LfZgXcqvNNVRrNmSNRjx2ed43X4Rs/LuC9s361jNrXiR1g7vHHKj7uCKeZrrpf+onrhHqyeI",
+	"MV1al7B/hMfVX+vP19/qIoy27HFdP3ByGeadjorhFoTr8J5fRf7o2KT/fnvhm2PsSVX1CHxH9sb9VU0D",
+	"d98U8PVSBn6Z+mToAvjvtxexrwoGabPtRqnHa8DptEsoW9FKcOtBtsu4skYZj41G7eM1XEsS/8JFPJpi",
+	"x5o1PEKnu3b9js3Wbq3Ld7iz+Bet3lHmDD7kBm01ghqTO7SqIdSzFiybAH6lFXn76v47Hn6UknCKKinP",
+	"GNf2VulrVhIEPltu5eNi8ge78MQr5PRn02irhUyu2dbJcpuimEHmGzi3AeXCXKuHPQDbMwDMbfyw+tXV",
+	"At1/guwu19wrdBD/bu+18/ZeY4g/0Mr8idt7NZlHX2uvQc7s8+YHFXr/znaBfwP6ss7iX07zKLSmYrX+",
+	"nbjuCjkVGWbHCRkt2Zxvmpn+vSxyhW7e2P5WxLjGzp9MS18B/fIZ41PrrXuJr3ixoYoVVVt6F6fpTLsx",
+	"W4AmW630PMMziFa9B8TiIu/3DXxfqSdKwoEVCyQbW+TMqmtfPdsXss61kK7NKNJ4pmYucUML69IlXp1d",
+	"nbnZDty3qMiVJT8t1/aQXYqZNFUIVgvjmJDBcte0+m1hly3yGu47Tdrqq8l03she8mVIBLUYc9pkotS1",
+	"oBPaX5u3PkyZHshhdGt1+Y50yu0DbaaeSuXqpcNnYazx/NVys8JSdEVv7MJG5BSHESWgaEWdK6eQkrz7",
+	"Za3blKqtGyqa70iIrnsNCVWhRxhh3pOSZTgbvX70Bf9BBSDhMoGRLXndN5vR2c5pXgLFqLo89DreLpTV",
+	"58NXy+3tr53LQaF/R7DI7V2/1+M1Pr7CN7d59dIEI1yAWt16B6B2dRm6ig1pa90iOiaYqD4kkiARDZPM",
+	"R3pjFyTz0RfTW0UytCJMBA3k+2KVItrTgPwxkNdLS9jO5YBDP00+74qr4RG5vATpoy/4z6hMxQq8D8pS",
+	"3H7C1xhd1G1yo46oLWPb76c45Dp8vy1nfIm8xIMyB8YecVeVD/9CGYQkUnf2hc6ikwgL/R3dvIjuP93/",
+	"/wEA",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,
