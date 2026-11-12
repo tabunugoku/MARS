@@ -51,7 +51,7 @@ func waitState(t *testing.T, q *Queue, id, want string) Task {
 
 func TestRunsAndFinishes(t *testing.T) {
 	q, ctx := newQueue(t, 2)
-	tk, err := q.Submit(ctx, "scan", "x", "", func(ctx context.Context, p func(float64)) error {
+	tk, err := q.Submit(ctx, "scan", Text{English: "x"}, "", func(ctx context.Context, p func(float64)) error {
 		p(0.5)
 		return nil
 	})
@@ -67,7 +67,7 @@ func TestRunsAndFinishes(t *testing.T) {
 func TestCancelRunningAndQueued(t *testing.T) {
 	q, ctx := newQueue(t, 1)
 	started := make(chan struct{})
-	running, err := q.Submit(ctx, "scan", "a", "L1", func(ctx context.Context, _ func(float64)) error {
+	running, err := q.Submit(ctx, "scan", Text{English: "a"}, "L1", func(ctx context.Context, _ func(float64)) error {
 		close(started)
 		<-ctx.Done()
 		return ctx.Err()
@@ -76,7 +76,7 @@ func TestCancelRunningAndQueued(t *testing.T) {
 		t.Fatal(err)
 	}
 	<-started
-	queued, _ := q.Submit(ctx, "analyze", "b", "L1", func(ctx context.Context, _ func(float64)) error {
+	queued, _ := q.Submit(ctx, "analyze", Text{English: "b"}, "L1", func(ctx context.Context, _ func(float64)) error {
 		t.Error("queued task ran after cancel")
 		return nil
 	})
@@ -96,14 +96,14 @@ func TestDedupQueued(t *testing.T) {
 	block := make(chan struct{})
 	t.Cleanup(func() { close(block) })
 	started := make(chan struct{})
-	q.Submit(ctx, "scan", "busy", "L0", func(ctx context.Context, _ func(float64)) error {
+	q.Submit(ctx, "scan", Text{English: "busy"}, "L0", func(ctx context.Context, _ func(float64)) error {
 		close(started)
 		<-block
 		return nil
 	})
 	<-started
-	a, _ := q.Submit(ctx, "scan", "s", "L1", func(context.Context, func(float64)) error { return nil })
-	b, _ := q.Submit(ctx, "scan", "s", "L1", func(context.Context, func(float64)) error { return nil })
+	a, _ := q.Submit(ctx, "scan", Text{English: "s"}, "L1", func(context.Context, func(float64)) error { return nil })
+	b, _ := q.Submit(ctx, "scan", Text{English: "s"}, "L1", func(context.Context, func(float64)) error { return nil })
 	if a.ID != b.ID {
 		t.Fatalf("not deduplicated: %s %s", a.ID, b.ID)
 	}
@@ -111,7 +111,7 @@ func TestDedupQueued(t *testing.T) {
 
 func TestFailureAndPanic(t *testing.T) {
 	q, ctx := newQueue(t, 1)
-	tk, _ := q.Submit(ctx, "scan", "p", "", func(context.Context, func(float64)) error { panic("boom") })
+	tk, _ := q.Submit(ctx, "scan", Text{English: "p"}, "", func(context.Context, func(float64)) error { panic("boom") })
 	got := waitState(t, q, tk.ID, "failed")
 	if got.Error == "" {
 		t.Fatal("no error text")

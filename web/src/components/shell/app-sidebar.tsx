@@ -17,6 +17,7 @@ import { SidebarSearchField } from "@/components/sidebar-app/search-field";
 import type { IconComponent } from "@/lib/icon-context";
 import { useEffect, useRef } from "react";
 import { api, useApi } from "@/api";
+import { defineMessages, useT } from "@/i18n";
 import { fontWeights } from "@/lib/font-weight";
 import { typeClass } from "@/lib/type-scale";
 import {
@@ -40,6 +41,53 @@ import { AppMark } from "@/components/brand/app-mark";
 import { motion } from "motion/react";
 
 const I = (c: unknown) => c as IconComponent;
+
+const m = defineMessages({
+  ja: {
+    homeLabel: "ComiNavi ホーム",
+    searchPlaceholder: "シリーズ・巻・著者を検索",
+    search: "検索",
+    home: "ホーム",
+    collections: "コレクション",
+    readLists: "リーディングリスト",
+    library: "ライブラリ",
+    all: "すべて",
+    settings: "設定",
+    reader: "リーダー",
+    account: "アカウント",
+    admin: "管理",
+    libraryAdmin: "ライブラリ設定",
+    users: "ユーザー",
+    tasks: "タスク",
+    media: "メディア管理",
+    server: "サーバー設定",
+    themeDark: "テーマ: ダーク",
+    themeLight: "テーマ: ライト",
+    logout: "ログアウト",
+  },
+  en: {
+    homeLabel: "ComiNavi home",
+    searchPlaceholder: "Search series, books, authors",
+    search: "Search",
+    home: "Home",
+    collections: "Collections",
+    readLists: "Read lists",
+    library: "Library",
+    all: "All",
+    settings: "Settings",
+    reader: "Reader",
+    account: "Account",
+    admin: "Admin",
+    libraryAdmin: "Libraries",
+    users: "Users",
+    tasks: "Tasks",
+    media: "Media issues",
+    server: "Server settings",
+    themeDark: "Theme: dark",
+    themeLight: "Theme: light",
+    logout: "Sign out",
+  },
+});
 
 function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconComponent; label: string; badge?: string | number; exact?: boolean }) {
   const { pathname } = useLocation();
@@ -116,6 +164,7 @@ export function AppSidebar() {
   const { theme, toggle } = useTheme();
   const { data: libs, reload: reloadLibs } = useApi(() => api.libraries(), []);
   const { data: me } = useApi(() => api.me(), []);
+  const t = useT(m);
   // Running and queued tasks, for the badge on タスク (administrators only).
   const { data: tasks, reload: reloadTasks } = useApi(
     () => (me?.role === "admin" ? api.tasks() : Promise.resolve([])),
@@ -127,7 +176,7 @@ export function AppSidebar() {
   return (
     <Sidebar variant="inset">
       <SidebarHeader className="pl-4">
-        <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label="ComiNavi ホーム">
+        <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label={t("homeLabel")}>
           <AppMark size={28} className="-ml-1" />
           <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
             ComiNavi
@@ -140,23 +189,23 @@ export function AppSidebar() {
             navigate(`/search?q=${encodeURIComponent(String(q ?? ""))}`);
           }}
         >
-          <SidebarSearchField name="q" placeholder="シリーズ・巻・著者を検索" aria-label="検索" shortcut="/" />
+          <SidebarSearchField name="q" placeholder={t("searchPlaceholder")} aria-label={t("search")} shortcut="/" />
         </form>
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup className="pl-4">
           <SidebarMenu>
-            <NavRow to="/" exact icon={I(House)} label="ホーム" />
-            <NavRow to="/collections" icon={I(Grid2x2)} label="コレクション" />
-            <NavRow to="/readlists" icon={I(Bookmarks)} label="リーディングリスト" />
+            <NavRow to="/" exact icon={I(House)} label={t("home")} />
+            <NavRow to="/collections" icon={I(Grid2x2)} label={t("collections")} />
+            <NavRow to="/readlists" icon={I(Bookmarks)} label={t("readLists")} />
           </SidebarMenu>
         </SidebarGroup>
 
         <SidebarGroup collapsible className="pl-4">
-          <SidebarGroupLabel>ライブラリ</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("library")}</SidebarGroupLabel>
           <SidebarMenu>
-            <NavRow to="/libraries/all" icon={I(LibraryBig)} label="すべて" />
+            <NavRow to="/libraries/all" icon={I(LibraryBig)} label={t("all")} />
             {libs?.map((l) => (
               <NavRow key={l.id} to={`/libraries/${l.id}`} icon={LibraryGlyph(l.kind)} label={l.name} badge={l.seriesCount} />
             ))}
@@ -166,22 +215,22 @@ export function AppSidebar() {
         {/* Settings split by who they belong to: 設定 is the signed-in
             user's own (everyone), 管理 is the server's (admins only). */}
         <SidebarGroup collapsible className="pl-4">
-          <SidebarGroupLabel>設定</SidebarGroupLabel>
+          <SidebarGroupLabel>{t("settings")}</SidebarGroupLabel>
           <SidebarMenu>
-            <NavRow to="/settings/reader" icon={I(BookOpen)} label="リーダー" />
-            <NavRow to="/settings/account" icon={I(CircleUser)} label="アカウント" />
+            <NavRow to="/settings/reader" icon={I(BookOpen)} label={t("reader")} />
+            <NavRow to="/settings/account" icon={I(CircleUser)} label={t("account")} />
           </SidebarMenu>
         </SidebarGroup>
 
         {me?.role === "admin" && (
           <SidebarGroup collapsible className="pl-4">
-            <SidebarGroupLabel>管理</SidebarGroupLabel>
+            <SidebarGroupLabel>{t("admin")}</SidebarGroupLabel>
             <SidebarMenu>
-              <NavRow to="/admin/libraries" icon={I(LibraryBig)} label="ライブラリ設定" />
-              <NavRow to="/admin/users" icon={I(Users)} label="ユーザー" />
-              <NavRow to="/admin/tasks" icon={I(Activity)} label="タスク" badge={activeTasks || undefined} />
-              <NavRow to="/admin/media" icon={I(FileAlert)} label="メディア管理" />
-              <NavRow to="/admin/settings" icon={I(Settings)} label="サーバー設定" />
+              <NavRow to="/admin/libraries" icon={I(LibraryBig)} label={t("libraryAdmin")} />
+              <NavRow to="/admin/users" icon={I(Users)} label={t("users")} />
+              <NavRow to="/admin/tasks" icon={I(Activity)} label={t("tasks")} badge={activeTasks || undefined} />
+              <NavRow to="/admin/media" icon={I(FileAlert)} label={t("media")} />
+              <NavRow to="/admin/settings" icon={I(Settings)} label={t("server")} />
             </SidebarMenu>
           </SidebarGroup>
         )}
@@ -200,10 +249,10 @@ export function AppSidebar() {
               <MenuItem
                 index={0}
                 icon={I(theme === "dark" ? Moon : Sun)}
-                label={theme === "dark" ? "テーマ: ダーク" : "テーマ: ライト"}
+                label={theme === "dark" ? t("themeDark") : t("themeLight")}
                 onSelect={() => toggle()}
               />
-              <MenuItem index={1} icon={I(LogOut)} label="ログアウト" onSelect={() => void api.logout().finally(() => location.assign("/login"))} />
+              <MenuItem index={1} icon={I(LogOut)} label={t("logout")} onSelect={() => void api.logout().finally(() => location.assign("/login"))} />
             </>
           }
         />

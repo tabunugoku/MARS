@@ -382,7 +382,7 @@ func TestBookMediaErrorAndWatch(t *testing.T) {
 	// An archive's own reason shows without its prefix; one naming a path
 	// does not show at all (paths are for administrators).
 	for raw, want := range map[string]string{
-		"archive: unsupported: PDF page 1 is not a single image": "PDF page 1 is not a single image",
+		"archive: unsupported: PDF page 1 is not a single image": "PDF の 1 ページは1枚の画像ではありません",
 		"open /srv/comics/A/b.cbz: permission denied":           "ファイルを読み込めませんでした",
 		`archive: unsupported: "C:\lib\x.foo"`:            "ファイルを読み込めませんでした",
 	} {

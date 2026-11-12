@@ -6,6 +6,7 @@ import { fontWeights } from "@/lib/font-weight";
 import { useIcons } from "@/lib/icon-context";
 import { nestedRadius, useShape } from "@/lib/shape-context";
 import { useSize, type SizeVariant } from "@/lib/size-context";
+import { uiText } from "@/i18n/ui";
 
 // ---------------------------------------------------------------------------
 // A single-line text field drawn like the Select trigger: a fixed --border
@@ -145,7 +146,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
             // Arrow keys already step the focused input, so the buttons stay
             // out of the tab order and keep focus where it is.
             tabIndex={-1}
-            aria-label={direction === 1 ? "増やす" : "減らす"}
+            aria-label={direction === 1 ? uiText("increase") : uiText("decrease")}
             disabled={props.disabled || props.readOnly}
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => step(direction)}

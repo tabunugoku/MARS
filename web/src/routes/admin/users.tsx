@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Bin, Download, Film, SquarePen } from "@keyline-icons/react";
 import { api, errorMessage, useApi, type Library, type Role, type User, type UserCreate, type UserUpdate } from "@/api";
+import { defineMessages, useT } from "@/i18n";
 import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +26,92 @@ import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog, IconAction, TableSkeleton, relTime } from "./_parts";
 
-const HEADS = ["名前", "メール", "役割", "権限", "使えるライブラリ", "最終アクセス", "操作"];
+const m = defineMessages({
+  ja: {
+    title: "ユーザー",
+    colName: "名前",
+    colEmail: "メール",
+    colRole: "役割",
+    colAccess: "権限",
+    colLibraries: "使えるライブラリ",
+    colLastActive: "最終アクセス",
+    colActions: "操作",
+    addUser: "ユーザーを追加",
+    emptyTitle: "ユーザーがいません",
+    emptyBody: "家族や友人を追加すると、それぞれの権限で読めるようになります",
+    roleAdmin: "管理者",
+    roleUser: "一般",
+    canDownload: "ダウンロード可",
+    cannotDownload: "ダウンロード不可",
+    canStream: "ストリーミング可",
+    cannotStream: "ストリーミング不可",
+    all: "すべて",
+    listSep: "、",
+    none: "なし",
+    edit: "編集",
+    delete: "削除",
+    editUser: "ユーザーを編集",
+    name: "名前",
+    email: "メール",
+    password: "パスワード",
+    newPassword: "新しいパスワード（変更するときだけ）",
+    role: "役割",
+    allowDownload: "ファイルのダウンロードを許可",
+    allowStream: "ページのストリーミングを許可",
+    libraries: "ライブラリ",
+    allLibraries: "すべてのライブラリ",
+    cancel: "キャンセル",
+    save: "保存",
+    add: "追加",
+    userSaved: "ユーザーを保存しました",
+    userAdded: "ユーザーを追加しました",
+    userDeleted: "ユーザーを削除しました",
+    deleteTitle: "ユーザーを削除しますか",
+    deleteBody: "「{name}」を削除します。このユーザーはサインインできなくなります。",
+  },
+  en: {
+    title: "Users",
+    colName: "Name",
+    colEmail: "Email",
+    colRole: "Role",
+    colAccess: "Access",
+    colLibraries: "Libraries",
+    colLastActive: "Last active",
+    colActions: "Actions",
+    addUser: "Add user",
+    emptyTitle: "No users",
+    emptyBody: "Add family or friends. Each can read with their own access.",
+    roleAdmin: "Admin",
+    roleUser: "Regular",
+    canDownload: "Downloads allowed",
+    cannotDownload: "Downloads not allowed",
+    canStream: "Streaming allowed",
+    cannotStream: "Streaming not allowed",
+    all: "All",
+    listSep: ", ",
+    none: "None",
+    edit: "Edit",
+    delete: "Delete",
+    editUser: "Edit user",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    newPassword: "New password (only to change it)",
+    role: "Role",
+    allowDownload: "Allow file downloads",
+    allowStream: "Allow page streaming",
+    libraries: "Libraries",
+    allLibraries: "All libraries",
+    cancel: "Cancel",
+    save: "Save",
+    add: "Add",
+    userSaved: "User saved",
+    userAdded: "User added",
+    userDeleted: "User deleted",
+    deleteTitle: "Delete user?",
+    deleteBody: "\"{name}\" will be deleted. This user can no longer sign in.",
+  },
+});
 
 type UserForm = {
   name: string;
@@ -67,6 +153,7 @@ const toForm = (u: User): UserForm => ({
 });
 
 export default function Screen() {
+  const t = useT(m);
   const { data, error, reload } = useApi(() => Promise.all([api.users(), api.libraries()]), []);
   // editing: the user being edited, or null when the dialog adds a new one.
   const [dlg, setDlg] = useState<{ open: boolean; editing: User | null }>({ open: false, editing: null });
@@ -80,6 +167,7 @@ export default function Screen() {
   const libs: Library[] = data?.[1] ?? [];
   const names = new Map(libs.map((l) => [l.id, l.name]));
   const set = (patch: Partial<UserForm>) => setForm((f) => ({ ...f, ...patch }));
+  const heads = [t("colName"), t("colEmail"), t("colRole"), t("colAccess"), t("colLibraries"), t("colLastActive"), t("colActions")];
 
   const togglePick = (id: string) =>
     set({ picked: form.picked.includes(id) ? form.picked.filter((x) => x !== id) : [...form.picked, id] });
@@ -109,7 +197,7 @@ export default function Screen() {
         if (!form.allLibs && !sameSet(form.picked, editing.libraryIds)) changes.libraryIds = form.picked;
         if (Object.keys(changes).length > 0) {
           await api.updateUser(editing.id, changes);
-          toast.success("ユーザーを保存しました");
+          toast.success(t("userSaved"));
         }
       } else {
         const body: UserCreate = {
@@ -123,7 +211,7 @@ export default function Screen() {
           libraryIds: form.allLibs ? [] : form.picked,
         };
         await api.createUser(body);
-        toast.success("ユーザーを追加しました");
+        toast.success(t("userAdded"));
       }
       setDlg({ open: false, editing: null });
       reload();
@@ -138,7 +226,7 @@ export default function Screen() {
     setBusyId(u.id);
     try {
       await api.deleteUser(u.id);
-      toast.success("ユーザーを削除しました");
+      toast.success(t("userDeleted"));
       reload();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -155,20 +243,20 @@ export default function Screen() {
 
   const add = (
     <Button variant="primary" onClick={openAdd}>
-      ユーザーを追加
+      {t("addUser")}
     </Button>
   );
 
   return (
     <Page>
-      <PageHeader title="ユーザー" actions={users && users.length > 0 ? add : undefined} />
+      <PageHeader title={t("title")} actions={users && users.length > 0 ? add : undefined} />
 
       {error && !users && <LoadError message={error} onRetry={reload} />}
 
-      {!error && !users && <TableSkeleton heads={HEADS} rows={3} />}
+      {!error && !users && <TableSkeleton heads={heads} rows={3} />}
 
       {users && users.length === 0 && (
-        <EmptyState title="ユーザーがいません" body="家族や友人を追加すると、それぞれの権限で読めるようになります" action={add} />
+        <EmptyState title={t("emptyTitle")} body={t("emptyBody")} action={add} />
       )}
 
       {users && users.length > 0 && (
@@ -176,7 +264,7 @@ export default function Screen() {
           <Table>
             <TableHeader>
               <TableRow>
-                {HEADS.map((h) => (
+                {heads.map((h) => (
                   <TableHead key={h}>{h}</TableHead>
                 ))}
               </TableRow>
@@ -193,25 +281,25 @@ export default function Screen() {
                     </TableCell>
                     <TableCell className="font-mono">{u.email}</TableCell>
                     <TableCell>
-                      <Badge variant="solid">{u.role === "admin" ? "管理者" : "一般"}</Badge>
+                      <Badge variant="solid">{u.role === "admin" ? t("roleAdmin") : t("roleUser")}</Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Download size={16} className={u.canDownload ? "text-foreground" : "text-muted-foreground"} aria-hidden />
-                        <span className="sr-only">{u.canDownload ? "ダウンロード可" : "ダウンロード不可"}</span>
+                        <span className="sr-only">{u.canDownload ? t("canDownload") : t("cannotDownload")}</span>
                         <Film size={16} className={u.canStream ? "text-foreground" : "text-muted-foreground"} aria-hidden />
-                        <span className="sr-only">{u.canStream ? "ストリーミング可" : "ストリーミング不可"}</span>
+                        <span className="sr-only">{u.canStream ? t("canStream") : t("cannotStream")}</span>
                       </div>
                     </TableCell>
                     <TableCell className={cn(typeClass("caption"), "max-w-[260px] truncate")}>
-                      {u.allLibraries ? "すべて" : u.libraryIds.map((id) => names.get(id) ?? id).join("、")}
+                      {u.allLibraries ? t("all") : u.libraryIds.map((id) => names.get(id) ?? id).join(t("listSep"))}
                     </TableCell>
-                    <TableCell className="whitespace-nowrap">{u.lastActive ? relTime(u.lastActive) : "なし"}</TableCell>
+                    <TableCell className="whitespace-nowrap">{u.lastActive ? relTime(u.lastActive) : t("none")}</TableCell>
                     <TableCell>
                       <div className="flex justify-end gap-1">
-                        <IconAction label="編集" icon={SquarePen} onClick={() => !busy && openEdit(u)} />
+                        <IconAction label={t("edit")} icon={SquarePen} onClick={() => !busy && openEdit(u)} />
                         <IconAction
-                          label="削除"
+                          label={t("delete")}
                           icon={Bin}
                           onClick={() => {
                             if (busy) return;
@@ -232,21 +320,21 @@ export default function Screen() {
       <Dialog open={dlg.open} onOpenChange={(o) => !saving && setDlg((d) => ({ ...d, open: o }))}>
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>{dlg.editing ? "ユーザーを編集" : "ユーザーを追加"}</DialogTitle>
+            <DialogTitle>{dlg.editing ? t("editUser") : t("addUser")}</DialogTitle>
           </DialogHeader>
           <FieldGroup>
             <div className="grid gap-3 sm:grid-cols-2">
               <Field>
-                <FieldLabel htmlFor="user-name">名前</FieldLabel>
+                <FieldLabel htmlFor="user-name">{t("name")}</FieldLabel>
                 <Input id="user-name" value={form.name} onChange={(e) => set({ name: e.target.value })} />
               </Field>
               <Field>
-                <FieldLabel htmlFor="user-email">メール</FieldLabel>
+                <FieldLabel htmlFor="user-email">{t("email")}</FieldLabel>
                 <Input id="user-email" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} />
               </Field>
             </div>
             <Field>
-              <FieldLabel htmlFor="user-password">{dlg.editing ? "新しいパスワード（変更するときだけ）" : "パスワード"}</FieldLabel>
+              <FieldLabel htmlFor="user-password">{dlg.editing ? t("newPassword") : t("password")}</FieldLabel>
               <Input
                 id="user-password"
                 type="password"
@@ -256,29 +344,29 @@ export default function Screen() {
               />
             </Field>
             <div className="flex flex-col gap-1.5">
-              <span className={cn(typeClass("body"), "text-muted-foreground")}>役割</span>
+              <span className={cn(typeClass("body"), "text-muted-foreground")}>{t("role")}</span>
               <RadioGroup value={form.role} onValueChange={(v) => set({ role: v as Role })}>
-                <RadioItem index={0} value="admin" label="管理者" />
-                <RadioItem index={1} value="user" label="一般" />
+                <RadioItem index={0} value="admin" label={t("roleAdmin")} />
+                <RadioItem index={1} value="user" label={t("roleUser")} />
               </RadioGroup>
             </div>
             <div className="flex flex-col">
               <Switch
-                label="ファイルのダウンロードを許可"
+                label={t("allowDownload")}
                 checked={form.canDownload}
                 onToggle={() => set({ canDownload: !form.canDownload })}
               />
               <Switch
-                label="ページのストリーミングを許可"
+                label={t("allowStream")}
                 checked={form.canStream}
                 onToggle={() => set({ canStream: !form.canStream })}
               />
             </div>
-            <div role="group" aria-label="ライブラリ" className="flex flex-col gap-1.5">
-              <span className={cn(typeClass("body"), "text-muted-foreground")}>ライブラリ</span>
+            <div role="group" aria-label={t("libraries")} className="flex flex-col gap-1.5">
+              <span className={cn(typeClass("body"), "text-muted-foreground")}>{t("libraries")}</span>
               <label className={cn(typeClass("body"), "flex items-center gap-2 text-foreground")}>
                 <Checkbox checked={form.allLibs} onCheckedChange={(c) => set({ allLibs: c })} />
-                すべてのライブラリ
+                {t("allLibraries")}
               </label>
               {libs.map((l) => (
                 <label
@@ -300,9 +388,9 @@ export default function Screen() {
             </div>
           </FieldGroup>
           <DialogFooter>
-            <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+            <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
             <Button variant="primary" disabled={saving || !valid} onClick={save}>
-              {dlg.editing ? "保存" : "追加"}
+              {dlg.editing ? t("save") : t("add")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -311,9 +399,9 @@ export default function Screen() {
       <ConfirmDialog
         open={removeOpen}
         onOpenChange={setRemoveOpen}
-        title="ユーザーを削除しますか"
-        body={`「${removing?.name ?? ""}」を削除します。このユーザーはサインインできなくなります。`}
-        confirmLabel="削除"
+        title={t("deleteTitle")}
+        body={t("deleteBody", { name: removing?.name ?? "" })}
+        confirmLabel={t("delete")}
         onConfirm={() => {
           if (removing) void remove(removing);
         }}

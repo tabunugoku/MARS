@@ -24,6 +24,7 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: node scripts/check-budget.mjs
+      - run: npm run i18n:check
       - uses: actions/upload-artifact@v4
         with:
           name: web-dist

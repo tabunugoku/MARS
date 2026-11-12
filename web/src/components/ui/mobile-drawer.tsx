@@ -6,6 +6,7 @@ import { motion } from "motion/react";
 import { spring, exitFallbackMs } from "@/lib/springs";
 import { useSurface, SurfaceProvider } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
+import { uiText } from "@/i18n/ui";
 
 // Built on Radix Dialog: it provides scroll lock, focus trap, focus restore,
 // Esc + outside-click dismissal, while leaving the slide animation to
@@ -76,7 +77,7 @@ export function MobileDrawer({
           <DialogPrimitive.Content
             asChild
             forceMount
-            aria-label="ナビゲーション"
+            aria-label={uiText("navigation")}
             // Radix warns when Content has no Description; opting out with an
             // explicit undefined clears the rendered attribute, which is what
             // the DescriptionWarning in @radix-ui/react-dialog checks.

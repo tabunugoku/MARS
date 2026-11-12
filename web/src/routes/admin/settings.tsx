@@ -15,17 +15,112 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
 import { ConfirmDialog, IconAction, relTime } from "./_parts";
 
-const SIZE_LABEL: Record<ServerSettings["thumbnailSize"], string> = { small: "小", medium: "中", large: "大", xlarge: "特大" };
-const BACKDROP_LABEL: Record<ServerSettings["loginBackdrop"], string> = { compass: "羅針盤", covers: "表紙の壁" };
-const BACKDROP_NOTE: Record<ServerSettings["loginBackdrop"], string> = {
-  compass: "ログイン前の画面には ComiNavi の羅針盤だけが表示されます",
-  covers: "最近追加したシリーズの表紙を並べます。ログインしていない人にも表紙が見えます",
-};
-const RESTART_NOTE = "変更はサーバーを再起動すると反映されます";
+const m = defineMessages({
+  ja: {
+    title: "サーバー設定",
+    general: "一般",
+    port: "ポート",
+    restartNote: "変更はサーバーを再起動すると反映されます",
+    portNote: "変更はサーバーを再起動すると反映されます。環境変数 COMINAVI_PORT があるときは、そちらが使われます（Docker イメージでは 25600 に決まっています）",
+    taskThreads: "タスクの同時実行数",
+    thumbnails: "サムネイル",
+    thumbSize: "サイズ",
+    sizeSmall: "小",
+    sizeMedium: "中",
+    sizeLarge: "大",
+    sizeXlarge: "特大",
+    thumbFormat: "形式",
+    webpLater: "WebP と AVIF は後で対応します",
+    thumbNote: "新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。",
+    auth: "認証",
+    rememberDays: "ログイン保持の日数",
+    loginScreen: "ログイン画面",
+    backdropCompass: "羅針盤",
+    backdropCovers: "表紙の壁",
+    backdropCompassNote: "ログイン前の画面には ComiNavi の羅針盤だけが表示されます",
+    backdropCoversNote: "最近追加したシリーズの表紙を並べます。ログインしていない人にも表紙が見えます",
+    integrations: "連携",
+    apiKeys: "API キー",
+    noApiKeys: "APIキーはまだありません",
+    keyCreated: "作成",
+    keyLastUsed: "最終使用",
+    keyNever: "なし",
+    delete: "削除",
+    keyNameLabel: "APIキーの名前",
+    name: "名前",
+    create: "作成",
+    keyNote: "「{name}」のキー。この画面を閉じると、キーは二度と表示されません",
+    close: "閉じる",
+    copy: "コピー",
+    keyDeleted: "APIキーを削除しました",
+    keyCopied: "APIキーをコピーしました",
+    copyFailed: "コピーできませんでした",
+    settingsSaved: "設定を保存しました",
+    collections: "コレクション",
+    autoDeleteCollections: "空のコレクションを自動で削除する",
+    deleteKeyTitle: "APIキーを削除しますか",
+    deleteKeyBody: "「{name}」を使っているアプリは接続できなくなります。",
+  },
+  en: {
+    title: "Server settings",
+    general: "General",
+    port: "Port",
+    restartNote: "Changes take effect after the server restarts",
+    portNote: "Changes take effect after the server restarts. If the COMINAVI_PORT environment variable is set, it is used instead (the Docker image uses 25600)",
+    taskThreads: "Concurrent tasks",
+    thumbnails: "Thumbnails",
+    thumbSize: "Size",
+    sizeSmall: "Small",
+    sizeMedium: "Medium",
+    sizeLarge: "Large",
+    sizeXlarge: "Extra large",
+    thumbFormat: "Format",
+    webpLater: "WebP and AVIF will come later",
+    thumbNote: "Applies to newly made thumbnails. To remake existing ones, use Regenerate covers on a series or library.",
+    auth: "Authentication",
+    rememberDays: "Days to stay signed in",
+    loginScreen: "Sign-in screen",
+    backdropCompass: "Compass",
+    backdropCovers: "Cover wall",
+    backdropCompassNote: "Only the ComiNavi compass is shown before sign-in",
+    backdropCoversNote: "Shows covers of recently added series. People who are not signed in can see them too.",
+    integrations: "Integrations",
+    apiKeys: "API keys",
+    noApiKeys: "No API keys yet",
+    keyCreated: "Created",
+    keyLastUsed: "Last used",
+    keyNever: "Never",
+    delete: "Delete",
+    keyNameLabel: "API key name",
+    name: "Name",
+    create: "Create",
+    keyNote: "Key for \"{name}\". It is not shown again after you close this screen",
+    close: "Close",
+    copy: "Copy",
+    keyDeleted: "API key deleted",
+    keyCopied: "API key copied",
+    copyFailed: "Could not copy",
+    settingsSaved: "Settings saved",
+    collections: "Collections",
+    autoDeleteCollections: "Delete empty collections automatically",
+    deleteKeyTitle: "Delete this API key?",
+    deleteKeyBody: "Apps using \"{name}\" will no longer be able to connect.",
+  },
+});
 
 export default function Screen() {
+  const t = useT(m);
+  const sizeLabel: Record<ServerSettings["thumbnailSize"], string> = {
+    small: t("sizeSmall"),
+    medium: t("sizeMedium"),
+    large: t("sizeLarge"),
+    xlarge: t("sizeXlarge"),
+  };
+  const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompass"), covers: t("backdropCovers") };
+  const backdropNote: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompassNote"), covers: t("backdropCoversNote") };
   const { data, error, reload } = useApi(() => api.settings(), []);
   const keys = useApi(() => api.apiKeys(), []);
   // The last copy the server returned; drafts are compared against it.
@@ -49,7 +144,7 @@ export default function Screen() {
   if (!cur) {
     return (
       <Page>
-        <PageHeader title="サーバー設定" />
+        <PageHeader title={t("title")} />
         {error ? (
           <LoadError message={error} onRetry={reload} />
         ) : (
@@ -78,7 +173,7 @@ export default function Screen() {
     try {
       setSaved(await api.saveSettings(changes));
       setDraft(null);
-      toast.success("設定を保存しました");
+      toast.success(t("settingsSaved"));
     } catch (err) {
       // Keep the draft so nothing typed is lost.
       toast.error(errorMessage(err));
@@ -109,7 +204,7 @@ export default function Screen() {
     setKeyBusyId(k.id);
     try {
       await api.deleteApiKey(k.id);
-      toast.success("APIキーを削除しました");
+      toast.success(t("keyDeleted"));
       if (createdKey?.id === k.id) setCreatedKey(null);
       keys.reload();
     } catch (err) {
@@ -122,22 +217,22 @@ export default function Screen() {
   const copyKey = async (key: string) => {
     try {
       await navigator.clipboard.writeText(key);
-      toast.success("APIキーをコピーしました");
+      toast.success(t("keyCopied"));
     } catch {
-      toast.error("コピーできませんでした");
+      toast.error(t("copyFailed"));
     }
   };
 
   return (
     <Page>
-      <PageHeader title="サーバー設定" />
+      <PageHeader title={t("title")} />
 
       <div className="max-w-[640px] space-y-10">
         <section>
-          <SectionTitle>一般</SectionTitle>
+          <SectionTitle>{t("general")}</SectionTitle>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="set-port">ポート</FieldLabel>
+              <FieldLabel htmlFor="set-port">{t("port")}</FieldLabel>
               <Input
                 id="set-port"
                 type="number"
@@ -148,7 +243,7 @@ export default function Screen() {
                 onChange={(e) => patch({ port: Number(e.target.value) })}
               />
               <FieldDescription>
-                {RESTART_NOTE}。環境変数 COMINAVI_PORT があるときは、そちらが使われます（Docker イメージでは 25600 に決まっています）
+                {t("portNote")}
               </FieldDescription>
             </Field>
             <Slider
@@ -157,32 +252,32 @@ export default function Screen() {
               min={1}
               max={16}
               step={1}
-              label="タスクの同時実行数"
+              label={t("taskThreads")}
               formatValue={(v) => `${v}`}
             />
-            <FieldDescription>{RESTART_NOTE}</FieldDescription>
+            <FieldDescription>{t("restartNote")}</FieldDescription>
           </FieldGroup>
         </section>
 
         <section>
-          <SectionTitle>サムネイル</SectionTitle>
+          <SectionTitle>{t("thumbnails")}</SectionTitle>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="set-thumb-size">サイズ</FieldLabel>
+              <FieldLabel htmlFor="set-thumb-size">{t("thumbSize")}</FieldLabel>
               <Select value={cur.thumbnailSize} onValueChange={(v) => patch({ thumbnailSize: v as ServerSettings["thumbnailSize"] })}>
                 <SelectTrigger id="set-thumb-size" className="w-full" />
                 <SelectContent>
-                  {(Object.keys(SIZE_LABEL) as ServerSettings["thumbnailSize"][]).map((k, i) => (
+                  {(Object.keys(sizeLabel) as ServerSettings["thumbnailSize"][]).map((k, i) => (
                     <SelectItem key={k} index={i} value={k}>
-                      {SIZE_LABEL[k]}
+                      {sizeLabel[k]}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <FieldDescription>新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。</FieldDescription>
+              <FieldDescription>{t("thumbNote")}</FieldDescription>
             </Field>
             <Field>
-              <FieldLabel id="set-thumb-format">形式</FieldLabel>
+              <FieldLabel id="set-thumb-format">{t("thumbFormat")}</FieldLabel>
               <RadioGroup
                 aria-labelledby="set-thumb-format"
                 value={cur.thumbnailFormat}
@@ -190,16 +285,16 @@ export default function Screen() {
               >
                 <RadioItem index={0} value="jpeg" label="JPEG" />
               </RadioGroup>
-              <FieldDescription>WebP と AVIF は後で対応します</FieldDescription>
+              <FieldDescription>{t("webpLater")}</FieldDescription>
             </Field>
           </FieldGroup>
         </section>
 
         <section>
-          <SectionTitle>認証</SectionTitle>
+          <SectionTitle>{t("auth")}</SectionTitle>
           <FieldGroup>
             <Field>
-              <FieldLabel htmlFor="set-remember">ログイン保持の日数</FieldLabel>
+              <FieldLabel htmlFor="set-remember">{t("rememberDays")}</FieldLabel>
               <Input
                 id="set-remember"
                 type="number"
@@ -210,31 +305,31 @@ export default function Screen() {
               />
             </Field>
             <Field>
-              <FieldLabel id="set-login-backdrop">ログイン画面</FieldLabel>
+              <FieldLabel id="set-login-backdrop">{t("loginScreen")}</FieldLabel>
               <RadioGroup
                 aria-labelledby="set-login-backdrop"
                 aria-describedby="set-login-backdrop-note"
                 value={cur.loginBackdrop}
                 onValueChange={(v) => patch({ loginBackdrop: v as ServerSettings["loginBackdrop"] })}
               >
-                {(Object.keys(BACKDROP_LABEL) as ServerSettings["loginBackdrop"][]).map((k, i) => (
-                  <RadioItem key={k} index={i} value={k} label={BACKDROP_LABEL[k]} />
+                {(Object.keys(backdropLabel) as ServerSettings["loginBackdrop"][]).map((k, i) => (
+                  <RadioItem key={k} index={i} value={k} label={backdropLabel[k]} />
                 ))}
               </RadioGroup>
-              <FieldDescription id="set-login-backdrop-note">{BACKDROP_NOTE[cur.loginBackdrop]}</FieldDescription>
+              <FieldDescription id="set-login-backdrop-note">{backdropNote[cur.loginBackdrop]}</FieldDescription>
             </Field>
           </FieldGroup>
         </section>
 
         <section>
-          <SectionTitle>連携</SectionTitle>
+          <SectionTitle>{t("integrations")}</SectionTitle>
           <FieldGroup>
             {/* OPDS returns with the OPDS server (a later phase); Kobo sync is hidden until then too. */}
             <Field>
-              <FieldLabel id="set-api-keys">API キー</FieldLabel>
+              <FieldLabel id="set-api-keys">{t("apiKeys")}</FieldLabel>
               {keys.error && !keys.data && <LoadError message={keys.error} onRetry={keys.reload} />}
               {keys.data && keys.data.length === 0 && (
-                <p className={cn(typeClass("caption"), "text-muted-foreground")}>APIキーはまだありません</p>
+                <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("noApiKeys")}</p>
               )}
               {keys.data && keys.data.length > 0 && (
                 <ul aria-labelledby="set-api-keys" className="flex flex-col gap-1">
@@ -243,12 +338,12 @@ export default function Screen() {
                       <div className="min-w-0 flex-1">
                         <p className={cn(typeClass("body"), "truncate text-foreground")}>{k.name}</p>
                         <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                          作成 <span className="font-mono">{formatDate(k.createdAt)}</span> · 最終使用{" "}
-                          {k.lastUsed ? relTime(k.lastUsed) : "なし"}
+                          {t("keyCreated")} <span className="font-mono">{formatDate(k.createdAt)}</span> · {t("keyLastUsed")}{" "}
+                          {k.lastUsed ? relTime(k.lastUsed) : t("keyNever")}
                         </p>
                       </div>
                       <IconAction
-                        label="削除"
+                        label={t("delete")}
                         icon={Bin}
                         onClick={() => {
                           if (keyBusyId) return;
@@ -262,8 +357,8 @@ export default function Screen() {
               )}
               <div className="flex gap-2">
                 <Input
-                  aria-label="APIキーの名前"
-                  placeholder="名前"
+                  aria-label={t("keyNameLabel")}
+                  placeholder={t("name")}
                   value={keyName}
                   disabled={creatingKey}
                   onChange={(e) => setKeyName(e.target.value)}
@@ -272,20 +367,20 @@ export default function Screen() {
                   }}
                 />
                 <Button variant="secondary" disabled={creatingKey || !keyName.trim()} onClick={() => void createKey()}>
-                  作成
+                  {t("create")}
                 </Button>
               </div>
               {createdKey && (
                 <div className="space-y-2 rounded-lg bg-card p-3">
                   <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                    「{createdKey.name}」のキー。この画面を閉じると、キーは二度と表示されません
+                    {t("keyNote", { name: createdKey.name })}
                   </p>
                   <div className="flex items-center gap-1">
                     <code className="min-w-0 flex-1 break-all font-mono text-foreground">{createdKey.key}</code>
-                    <IconAction label="コピー" icon={Copy} onClick={() => void copyKey(createdKey.key)} />
+                    <IconAction label={t("copy")} icon={Copy} onClick={() => void copyKey(createdKey.key)} />
                   </div>
                   <Button variant="ghost" onClick={() => setCreatedKey(null)}>
-                    閉じる
+                    {t("close")}
                   </Button>
                 </div>
               )}
@@ -294,9 +389,9 @@ export default function Screen() {
         </section>
 
         <section>
-          <SectionTitle>コレクション</SectionTitle>
+          <SectionTitle>{t("collections")}</SectionTitle>
           <Switch
-            label="空のコレクションを自動で削除する"
+            label={t("autoDeleteCollections")}
             checked={cur.deleteEmptyCollections}
             onToggle={() => patch({ deleteEmptyCollections: !cur.deleteEmptyCollections })}
           />
@@ -308,9 +403,9 @@ export default function Screen() {
       <ConfirmDialog
         open={removeKeyOpen}
         onOpenChange={setRemoveKeyOpen}
-        title="APIキーを削除しますか"
-        body={`「${removingKey?.name ?? ""}」を使っているアプリは接続できなくなります。`}
-        confirmLabel="削除"
+        title={t("deleteKeyTitle")}
+        body={t("deleteKeyBody", { name: removingKey?.name ?? "" })}
+        confirmLabel={t("delete")}
         onConfirm={() => {
           if (removingKey) void removeKey(removingKey);
         }}

@@ -38,6 +38,7 @@ import {
 import type { IconComponent } from "@/lib/icon-context";
 import { resolveSlotTemplate, SlotElement } from "@/components/ui/sidebar-core";
 import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
+import { uiText } from "@/i18n/ui";
 
 // SSR-safe layout effect (client components still server-render in Next).
 const useIsoLayoutEffect =
@@ -1078,7 +1079,7 @@ const SidebarMenuButton = forwardRef<HTMLButtonElement, SidebarMenuButtonProps>(
           </span>
         )}
         <MenuRowLabel content={content} lit={lit} emphasized={effectiveActive} textClass={textClass} />
-        {status === "unread" && <span className="sr-only">、未読あり</span>}
+        {status === "unread" && <span className="sr-only">{uiText("unread")}</span>}
       </>
     );
 

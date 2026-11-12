@@ -20,24 +20,126 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    notFound: "巻が見つかりません",
+    notFoundBody: "シリーズからもう一度探してください",
+    series: "シリーズ",
+    listSep: "、",
+    author: "{name}（{role}）",
+    roleWriter: "作",
+    rolePenciller: "画",
+    roleColorist: "色",
+    roleTranslator: "翻訳",
+    roleEditor: "編集",
+    roleCover: "表紙",
+    mediaReady: "正常",
+    mediaFailed: "エラー",
+    mediaUnsupported: "非対応",
+    mediaOutdated: "要再スキャン",
+    coverRegenerated: "表紙を作り直しました",
+    coverPicked: "{n}ページ目を表紙にしました",
+    incognito: "シークレットモードで読む",
+    download: "ファイルをダウンロード",
+    addToReadList: "リーディングリストに追加",
+    regenerate: "表紙を作り直す",
+    choosePage: "表紙のページを選ぶ",
+    markedUnread: "未読にしました",
+    markedRead: "既読にしました",
+    prev: "前の巻",
+    next: "次の巻",
+    volume: "第{n}巻",
+    pages: "{n}ページ",
+    badgeRead: "既読",
+    pageOf: "{page} / {total} ページ",
+    progress: "読書の進捗",
+    openInBrowser: "ブラウザで開く",
+    continueReading: "続きから読む",
+    startReading: "読む",
+    readFromStart: "最初から読む",
+    markUnread: "未読にする",
+    markRead: "既読にする",
+    more: "その他",
+    analysisPending: "解析が終わっていません",
+    releaseDate: "発売日",
+    notSet: "未設定",
+    authors: "著者",
+    pagesTitle: "ページ",
+    pickPrompt: "表紙にするページを選んでください",
+    cancel: "やめる",
+    pageCover: "{n}ページ目を表紙にする",
+    coverMark: "・表紙",
+    showAll: "すべてのページを表示（{n}）",
+    filesTitle: "ファイル",
+    path: "パス",
+    format: "形式",
+    size: "サイズ",
+    mediaStatus: "メディア状態",
+    cantOpen: "アーカイブを開けません",
+    unsupportedFormat: "この形式は読めません",
+  },
+  en: {
+    notFound: "Book not found",
+    notFoundBody: "Find it again from the series",
+    series: "Series",
+    listSep: ", ",
+    author: "{name} ({role})",
+    roleWriter: "Writer",
+    rolePenciller: "Penciller",
+    roleColorist: "Colorist",
+    roleTranslator: "Translator",
+    roleEditor: "Editor",
+    roleCover: "Cover",
+    mediaReady: "OK",
+    mediaFailed: "Error",
+    mediaUnsupported: "Unsupported",
+    mediaOutdated: "Needs rescan",
+    coverRegenerated: "Thumbnail regenerated",
+    coverPicked: "Page {n} set as the cover",
+    incognito: "Read in incognito mode",
+    download: "Download file",
+    addToReadList: "Add to read list",
+    regenerate: "Regenerate thumbnail",
+    choosePage: "Choose cover page",
+    markedUnread: "Marked as unread",
+    markedRead: "Marked as read",
+    prev: "Previous book",
+    next: "Next book",
+    volume: "Book {n}",
+    pages: "{n} pages",
+    badgeRead: "Read",
+    pageOf: "{page} / {total} pages",
+    progress: "Reading progress",
+    openInBrowser: "Open in browser",
+    continueReading: "Continue reading",
+    startReading: "Read",
+    readFromStart: "Read from start",
+    markUnread: "Mark as unread",
+    markRead: "Mark as read",
+    more: "More",
+    analysisPending: "Analysis is not finished yet",
+    releaseDate: "Release date",
+    notSet: "Not set",
+    authors: "Authors",
+    pagesTitle: "Pages",
+    pickPrompt: "Choose the page to use as the cover",
+    cancel: "Cancel",
+    pageCover: "Use page {n} as the cover",
+    coverMark: "· Cover",
+    showAll: "Show all pages ({n})",
+    filesTitle: "Files",
+    path: "Path",
+    format: "Format",
+    size: "Size",
+    mediaStatus: "Media status",
+    cantOpen: "Can't open the archive",
+    unsupportedFormat: "This format can't be read",
+  },
+});
 
 const PREVIEW_PAGES = 24;
-
-const roleLabel: Record<Author["role"], string> = {
-  writer: "作",
-  penciller: "画",
-  colorist: "色",
-  translator: "翻訳",
-  editor: "編集",
-  cover: "表紙",
-};
-
-const mediaLabel: Record<MediaStatus, string> = {
-  ready: "正常",
-  error: "エラー",
-  unsupported: "非対応",
-  outdated: "要再スキャン",
-};
 
 export default function Screen() {
   const { bookId = "" } = useParams();
@@ -46,6 +148,7 @@ export default function Screen() {
 }
 
 function BookPage({ id }: { id: string }) {
+  const t = useT(m);
   const navigate = useNavigate();
   const { data, error, reload } = useApi(async () => {
     const book = await api.book(id);
@@ -102,18 +205,32 @@ function BookPage({ id }: { id: string }) {
   if (!data) {
     return (
       <Page>
-        <EmptyState title="巻が見つかりません" body="シリーズからもう一度探してください" />
+        <EmptyState title={t("notFound")} body={t("notFoundBody")} />
       </Page>
     );
   }
 
   const { book, series, adjacent } = data;
+  const roles: Record<Author["role"], string> = {
+    writer: t("roleWriter"),
+    penciller: t("rolePenciller"),
+    colorist: t("roleColorist"),
+    translator: t("roleTranslator"),
+    editor: t("roleEditor"),
+    cover: t("roleCover"),
+  };
+  const mediaLabel: Record<MediaStatus, string> = {
+    ready: t("mediaReady"),
+    error: t("mediaFailed"),
+    unsupported: t("mediaUnsupported"),
+    outdated: t("mediaOutdated"),
+  };
   const completed = !!book.progress?.completed;
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
   const dots = Math.min(book.pageCount, 60);
   const shownPages = allPages ? data.pages.length : Math.min(PREVIEW_PAGES, data.pages.length);
-  const authors = book.authors.map((a) => `${a.name}（${roleLabel[a.role]}）`).join("、");
+  const authors = book.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
   // Marking read needs the page count and a readable archive.
   const canMarkRead = book.pageCount > 0 && book.mediaStatus === "ready";
   // A PDF whose pages are not single images cannot go to the reader: offer the
@@ -124,7 +241,7 @@ function BookPage({ id }: { id: string }) {
     try {
       await api.regenerateBookThumbnail(book.id);
       bumpCover(book.id, book.seriesId); // the <img> fetches it anew
-      toast.success("表紙を作り直しました");
+      toast.success(t("coverRegenerated"));
     } catch (err) {
       toast.error(errorMessage(err));
     }
@@ -136,7 +253,7 @@ function BookPage({ id }: { id: string }) {
       await api.setBookCover(book.id, n);
       setPicking(false);
       bumpCover(book.id, book.seriesId);
-      toast.success(`${n}ページ目を表紙にしました`);
+      toast.success(t("coverPicked", { n }));
       reload();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -147,13 +264,13 @@ function BookPage({ id }: { id: string }) {
 
   // その他 menu, numbered in the order shown.
   const menu: { label: string; onSelect: () => void }[] = [
-    { label: "シークレットモードで読む", onSelect: () => navigate(`/read/${book.id}?incognito=1`) },
+    { label: t("incognito"), onSelect: () => navigate(`/read/${book.id}?incognito=1`) },
   ];
-  if (canDownload) menu.push({ label: "ファイルをダウンロード", onSelect: () => startDownload(bookFileUrl(book.id)) });
+  if (canDownload) menu.push({ label: t("download"), onSelect: () => startDownload(bookFileUrl(book.id)) });
   // Same rule as editing read lists (server: UpdateReadList is admin only).
   if (isAdmin) {
     menu.push({
-      label: "リーディングリストに追加",
+      label: t("addToReadList"),
       onSelect: () => {
         setAddKey((k) => k + 1);
         setAddOpen(true);
@@ -161,9 +278,9 @@ function BookPage({ id }: { id: string }) {
     });
   }
   if (isAdmin && book.mediaStatus === "ready") {
-    menu.push({ label: "表紙を作り直す", onSelect: regenerate });
+    menu.push({ label: t("regenerate"), onSelect: regenerate });
     menu.push({
-      label: "表紙のページを選ぶ",
+      label: t("choosePage"),
       onSelect: () => {
         setPicking(true);
         document.getElementById("pages")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -176,7 +293,7 @@ function BookPage({ id }: { id: string }) {
     try {
       if (completed) await api.clearProgress(book.id);
       else await api.setProgress(book.id, book.pageCount, true);
-      toast.success(completed ? "未読にしました" : "既読にしました");
+      toast.success(completed ? t("markedUnread") : t("markedRead"));
       reload();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -193,27 +310,27 @@ function BookPage({ id }: { id: string }) {
           className={cn(typeClass("caption"), "inline-flex min-w-0 items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3.5 pointer-coarse:py-3.5")}
         >
           <ChevronLeft size={14} className="shrink-0" />
-          <span className="truncate">{series?.title ?? "シリーズ"}</span>
+          <span className="truncate">{series?.title ?? t("series")}</span>
         </Link>
         <div className="flex shrink-0 items-center gap-1">
-          <Tooltip content="前の巻">
+          <Tooltip content={t("prev")}>
             <Button
               variant="ghost"
               size="icon"
               className="pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-label="前の巻"
+              aria-label={t("prev")}
               disabled={!adjacent.prev}
               onClick={() => adjacent.prev && navigate(`/books/${adjacent.prev.id}`)}
             >
               <ChevronLeft />
             </Button>
           </Tooltip>
-          <Tooltip content="次の巻">
+          <Tooltip content={t("next")}>
             <Button
               variant="ghost"
               size="icon"
               className="pointer-coarse:h-11 pointer-coarse:w-11"
-              aria-label="次の巻"
+              aria-label={t("next")}
               disabled={!adjacent.next}
               onClick={() => adjacent.next && navigate(`/books/${adjacent.next.id}`)}
             >
@@ -233,18 +350,18 @@ function BookPage({ id }: { id: string }) {
             {book.title}
           </h1>
           <p className={cn(typeClass("body"), "font-mono text-muted-foreground")}>
-            第{book.number}巻 · {book.pageCount}ページ · {book.format.toUpperCase()} · {formatBytes(book.sizeBytes)}
+            {t("volume", { n: book.number })} · {t("pages", { n: book.pageCount })} · {book.format.toUpperCase()} · {formatBytes(book.sizeBytes)}
           </p>
 
           <div className="mt-1 space-y-1.5">
             {completed ? (
-              <Badge variant="dot">既読</Badge>
+              <Badge variant="dot">{t("badgeRead")}</Badge>
             ) : book.progress ? (
               <>
                 <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
-                  {page} / {book.pageCount} ページ
+                  {t("pageOf", { page, total: book.pageCount })}
                 </p>
-                <DotTrack total={dots} value={Math.round((pct / 100) * dots)} label="読書の進捗" />
+                <DotTrack total={dots} value={Math.round((pct / 100) * dots)} label={t("progress")} />
               </>
             ) : null}
           </div>
@@ -254,52 +371,52 @@ function BookPage({ id }: { id: string }) {
               canStream && (
                 <Button variant="primary" asChild>
                   <a href={bookInlineUrl(book.id)} target="_blank" rel="noopener">
-                    ブラウザで開く
+                    {t("openInBrowser")}
                   </a>
                 </Button>
               )
             ) : (
               <>
                 <BrandAction to={`/read/${book.id}`} icon={Play}>
-                  {book.progress && !completed ? "続きから読む" : "読む"}
+                  {book.progress && !completed ? t("continueReading") : t("startReading")}
                 </BrandAction>
                 <Button variant="secondary" asChild>
-                  <Link to={`/read/${book.id}?page=1`}>最初から読む</Link>
+                  <Link to={`/read/${book.id}?page=1`}>{t("readFromStart")}</Link>
                 </Button>
               </>
             )}
             <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead}>
-              {completed ? "未読にする" : "既読にする"}
+              {completed ? t("markUnread") : t("markRead")}
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="secondary">その他</Button>} />
+              <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
               <DropdownContent align="start" sideOffset={4}>
-                {menu.map((m, i) => (
-                  <MenuItem key={m.label} index={i} label={m.label} onSelect={m.onSelect} />
+                {menu.map((item, i) => (
+                  <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
                 ))}
               </DropdownContent>
             </DropdownMenu>
           </div>
           {isAdmin && <AddToReadListDialog key={addKey} bookId={book.id} open={addOpen} onOpenChange={setAddOpen} />}
           {!canMarkRead && book.mediaStatus === "outdated" && (
-            <p className={cn(typeClass("caption"), "text-muted-foreground")}>解析が終わっていません</p>
+            <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("analysisPending")}</p>
           )}
 
           <dl className="mt-4 max-w-2xl divide-y divide-border">
-            <Fact label="発売日">{book.releaseDate ? formatDate(book.releaseDate) : "未設定"}</Fact>
-            <Fact label="ISBN">{book.isbn || "未設定"}</Fact>
-            <Fact label="著者">{authors || "未設定"}</Fact>
+            <Fact label={t("releaseDate")}>{book.releaseDate ? formatDate(book.releaseDate) : t("notSet")}</Fact>
+            <Fact label="ISBN">{book.isbn || t("notSet")}</Fact>
+            <Fact label={t("authors")}>{authors || t("notSet")}</Fact>
           </dl>
         </div>
       </div>
 
       <section id="pages" className="mt-10 scroll-mt-20">
-        <SectionTitle>ページ</SectionTitle>
+        <SectionTitle>{t("pagesTitle")}</SectionTitle>
         {picking && (
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <p className={cn(typeClass("body"), "text-muted-foreground")}>表紙にするページを選んでください</p>
+            <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("pickPrompt")}</p>
             <Button variant="ghost" size="compact" className="pointer-coarse:h-11" onClick={() => setPicking(false)}>
-              やめる
+              {t("cancel")}
             </Button>
           </div>
         )}
@@ -309,7 +426,7 @@ function BookPage({ id }: { id: string }) {
               key={n}
               to={picking ? undefined : `/read/${book.id}?page=${n}`}
               onPick={picking && !busy ? () => chooseCover(n) : undefined}
-              label={picking ? `${n}ページ目を表紙にする` : undefined}
+              label={picking ? t("pageCover", { n }) : undefined}
             >
               <img
                 src={data.pages[n - 1].thumbnailUrl}
@@ -322,27 +439,27 @@ function BookPage({ id }: { id: string }) {
               />
               <span className={cn(typeClass("micro"), "mt-1 block text-center text-muted-foreground tabular-nums")}>
                 {n}
-                {n === book.coverPage && "・表紙"}
+                {n === book.coverPage && t("coverMark")}
               </span>
             </PageTile>
           ))}
         </div>
         {!allPages && book.pageCount > PREVIEW_PAGES && (
           <Button variant="secondary" className="mt-4" onClick={() => setAllPages(true)}>
-            すべてのページを表示（{book.pageCount}）
+            {t("showAll", { n: book.pageCount })}
           </Button>
         )}
       </section>
 
       <section className="mt-10">
-        <SectionTitle>ファイル</SectionTitle>
+        <SectionTitle>{t("filesTitle")}</SectionTitle>
         <dl className="max-w-2xl divide-y divide-border">
-          <Fact label="パス">
+          <Fact label={t("path")}>
             <span className="break-all font-mono">{book.path}</span>
           </Fact>
-          <Fact label="形式">{book.format.toUpperCase()}</Fact>
-          <Fact label="サイズ">{formatBytes(book.sizeBytes)}</Fact>
-          <Fact label="メディア状態">
+          <Fact label={t("format")}>{book.format.toUpperCase()}</Fact>
+          <Fact label={t("size")}>{formatBytes(book.sizeBytes)}</Fact>
+          <Fact label={t("mediaStatus")}>
             <div className="flex flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
                 {book.mediaStatus === "error" ? (
@@ -352,8 +469,8 @@ function BookPage({ id }: { id: string }) {
                 ) : (
                   <Badge variant="dot">{mediaLabel[book.mediaStatus]}</Badge>
                 )}
-                {book.mediaStatus === "error" && <span className="text-muted-foreground">アーカイブを開けません</span>}
-                {book.mediaStatus === "unsupported" && <span className="text-muted-foreground">この形式は読めません</span>}
+                {book.mediaStatus === "error" && <span className="text-muted-foreground">{t("cantOpen")}</span>}
+                {book.mediaStatus === "unsupported" && <span className="text-muted-foreground">{t("unsupportedFormat")}</span>}
               </div>
               {(book.mediaStatus === "error" || book.mediaStatus === "unsupported") && book.mediaError && (
                 <p className={cn(typeClass("caption"), "text-muted-foreground break-words")}>{book.mediaError}</p>

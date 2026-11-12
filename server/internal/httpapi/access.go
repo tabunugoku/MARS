@@ -62,7 +62,7 @@ func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {
 	case adminOnly:
 		return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
 			if !currentUser(ctx).IsAdmin() {
-				writeError(w, http.StatusForbidden, "管理者だけが使える操作です")
+				writeError(r.Context(), w, http.StatusForbidden, "forbidden.admin_only")
 				return nil, nil
 			}
 			return f(ctx, w, r, req)
@@ -70,7 +70,7 @@ func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {
 	}
 	return func(ctx context.Context, w http.ResponseWriter, r *http.Request, req any) (any, error) {
 		slog.Error("operation has no access rule", "op", op)
-		writeError(w, http.StatusForbidden, "この操作は許可されていません")
+		writeError(r.Context(), w, http.StatusForbidden, "forbidden.operation")
 		return nil, nil
 	}
 }

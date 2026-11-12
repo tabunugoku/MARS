@@ -1,9 +1,28 @@
 import { api, useApi } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader } from "@/components/media/layout";
+import { defineMessages, useT } from "@/i18n";
 import { ListCard, ListGrid, ListGridSkeleton, NewListDialog, ViewSwitch } from "../collections/_parts";
 
+const m = defineMessages({
+  ja: {
+    title: "リーディングリスト",
+    count: ({ n }) => `${n} 件`,
+    books: ({ n }) => `本 ${n}`,
+    emptyTitle: "リーディングリストがありません",
+    emptyBody: "新規作成から巻を順番に並べると、ここに表示されます",
+  },
+  en: {
+    title: "Read lists",
+    count: ({ n }) => (n === 1 ? "1 read list" : `${n} read lists`),
+    books: ({ n }) => (n === 1 ? "1 book" : `${n} books`),
+    emptyTitle: "No read lists",
+    emptyBody: "Create one and put books in order. It will show up here",
+  },
+});
+
 export default function Screen() {
+  const t = useT(m);
   const { data, error, reload } = useApi(async () => {
     const [lists, me] = await Promise.all([api.readLists(), api.me()]);
     // Only the first four books of each list are shown as covers.
@@ -15,8 +34,8 @@ export default function Screen() {
   return (
     <Page>
       <PageHeader
-        title="リーディングリスト"
-        meta={data ? `${data.lists.length} 件` : undefined}
+        title={t("title")}
+        meta={data ? t("count", { n: data.lists.length }) : undefined}
         actions={data?.isAdmin ? <NewListDialog kind="readlist" /> : undefined}
       />
       <ViewSwitch current="readlists" />
@@ -26,7 +45,7 @@ export default function Screen() {
       ) : !data ? (
         <ListGridSkeleton />
       ) : data.lists.length === 0 ? (
-        <EmptyState title="リーディングリストがありません" body="新規作成から巻を順番に並べると、ここに表示されます" />
+        <EmptyState title={t("emptyTitle")} body={t("emptyBody")} />
       ) : (
         <ListGrid>
           {data.lists.map((l) => (
@@ -34,7 +53,7 @@ export default function Screen() {
               key={l.id}
               to={`/readlists/${l.id}`}
               name={l.name}
-              count={`本 ${l.bookIds.length}`}
+              count={t("books", { n: l.bookIds.length })}
               covers={l.bookIds
                 .slice(0, 4)
                 .map((id) => data.byId.get(id))

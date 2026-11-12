@@ -7,10 +7,45 @@ import Input from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { applyUserLocale, defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    setupTitle: "初期設定",
+    setupBody: "最初の管理者アカウントを作ります。",
+    token: "セットアップトークン",
+    tokenHint: "サーバーの起動時のログと DATA/setup-token に書かれています",
+    name: "名前",
+    email: "メールアドレス",
+    password: "パスワード",
+    passwordHint: "8 文字以上",
+    passwordTooShort: "8 文字以上にしてください",
+    confirmPassword: "パスワード（確認）",
+    mismatch: "パスワードが一致しません",
+    required: "入力してください",
+    start: "はじめる",
+  },
+  en: {
+    setupTitle: "First-time setup",
+    setupBody: "This creates the first admin account.",
+    token: "Setup token",
+    tokenHint: "Shown in the server start-up log and in DATA/setup-token",
+    name: "Name",
+    email: "Email",
+    password: "Password",
+    passwordHint: "At least 8 characters",
+    passwordTooShort: "Use at least 8 characters",
+    confirmPassword: "Confirm password",
+    mismatch: "Passwords do not match",
+    required: "Required",
+    start: "Get started",
+  },
+});
 
 // The first-run form: no user exists yet. The server signs the new admin in
 // on success, so the app goes straight to its start page.
 export function SetupForm() {
+  const t = useT(m);
   const navigate = useNavigate();
   const [token, setToken] = useState("");
   const [name, setName] = useState("");
@@ -35,7 +70,8 @@ export function SetupForm() {
     if (Object.values(next).some(Boolean)) return;
     setSending(true);
     try {
-      await api.setup({ token: token.trim(), name: name.trim(), email: email.trim(), password: pass });
+      const admin = await api.setup({ token: token.trim(), name: name.trim(), email: email.trim(), password: pass });
+      applyUserLocale(admin.locale);
       navigate("/", { replace: true });
     } catch (err) {
       setServerError(errorMessage(err));
@@ -54,14 +90,14 @@ export function SetupForm() {
 
       <div className="flex flex-col gap-2">
         <h1 className={typeClass("display")} style={{ fontVariationSettings: fontWeights.bold }}>
-          初期設定
+          {t("setupTitle")}
         </h1>
-        <p className={cn(typeClass("body"), "text-muted-foreground")}>最初の管理者アカウントを作ります。</p>
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("setupBody")}</p>
       </div>
 
       <div className="flex flex-col gap-4">
         <Field data-invalid={errors.token || undefined}>
-          <FieldLabel htmlFor="setup-token">セットアップトークン</FieldLabel>
+          <FieldLabel htmlFor="setup-token">{t("token")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="setup-token"
@@ -71,12 +107,12 @@ export function SetupForm() {
             onChange={(e) => setToken(e.target.value)}
             aria-invalid={errors.token || undefined}
           />
-          <FieldDescription>サーバーの起動時のログと DATA/setup-token に書かれています</FieldDescription>
-          {errors.token && <FieldError>入力してください</FieldError>}
+          <FieldDescription>{t("tokenHint")}</FieldDescription>
+          {errors.token && <FieldError>{t("required")}</FieldError>}
         </Field>
 
         <Field data-invalid={errors.name || undefined}>
-          <FieldLabel htmlFor="setup-name">名前</FieldLabel>
+          <FieldLabel htmlFor="setup-name">{t("name")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="setup-name"
@@ -86,11 +122,11 @@ export function SetupForm() {
             onChange={(e) => setName(e.target.value)}
             aria-invalid={errors.name || undefined}
           />
-          {errors.name && <FieldError>入力してください</FieldError>}
+          {errors.name && <FieldError>{t("required")}</FieldError>}
         </Field>
 
         <Field data-invalid={errors.email || undefined}>
-          <FieldLabel htmlFor="setup-email">メールアドレス</FieldLabel>
+          <FieldLabel htmlFor="setup-email">{t("email")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="setup-email"
@@ -101,11 +137,11 @@ export function SetupForm() {
             onChange={(e) => setEmail(e.target.value)}
             aria-invalid={errors.email || undefined}
           />
-          {errors.email && <FieldError>入力してください</FieldError>}
+          {errors.email && <FieldError>{t("required")}</FieldError>}
         </Field>
 
         <Field data-invalid={errors.pass || undefined}>
-          <FieldLabel htmlFor="setup-pass">パスワード</FieldLabel>
+          <FieldLabel htmlFor="setup-pass">{t("password")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="setup-pass"
@@ -116,12 +152,12 @@ export function SetupForm() {
             onChange={(e) => setPass(e.target.value)}
             aria-invalid={errors.pass || undefined}
           />
-          <FieldDescription>8 文字以上</FieldDescription>
-          {errors.pass && <FieldError>8 文字以上にしてください</FieldError>}
+          <FieldDescription>{t("passwordHint")}</FieldDescription>
+          {errors.pass && <FieldError>{t("passwordTooShort")}</FieldError>}
         </Field>
 
         <Field data-invalid={errors.confirm || undefined}>
-          <FieldLabel htmlFor="setup-confirm">パスワード（確認）</FieldLabel>
+          <FieldLabel htmlFor="setup-confirm">{t("confirmPassword")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="setup-confirm"
@@ -132,7 +168,7 @@ export function SetupForm() {
             onChange={(e) => setConfirm(e.target.value)}
             aria-invalid={errors.confirm || undefined}
           />
-          {errors.confirm && <FieldError>パスワードが一致しません</FieldError>}
+          {errors.confirm && <FieldError>{t("mismatch")}</FieldError>}
         </Field>
       </div>
 
@@ -155,7 +191,7 @@ export function SetupForm() {
         )}
         style={{ fontVariationSettings: fontWeights.semibold }}
       >
-        <span className="[text-box:trim-both_cap_alphabetic]">はじめる</span>
+        <span className="[text-box:trim-both_cap_alphabetic]">{t("start")}</span>
       </button>
     </form>
   );

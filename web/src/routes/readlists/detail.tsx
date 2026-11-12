@@ -20,6 +20,60 @@ import { FluidHoverHighlight } from "@/components/fluid-hover-highlight";
 import { useFluidHover, useRegisterFluidHoverItem } from "@/hooks/use-fluid-hover";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    readLists: "リーディングリスト",
+    readFromStart: "最初から読む",
+    notFound: "リーディングリストが見つかりません",
+    emptyTitle: "巻がありません",
+    emptyAdmin: "巻の「その他」メニューの「リーディングリストに追加」から追加できます。",
+    renamed: "名前を変更しました",
+    deleted: "削除しました",
+    conflict: "ほかの画面で変更されました。読み込み直します",
+    moreActions: "その他の操作",
+    rename: "名前を変更",
+    delete: "削除",
+    deleteTitle: "リーディングリストを削除",
+    name: "名前",
+    cancel: "キャンセル",
+    save: "保存",
+    deleteBody: "「{name}」を削除します。巻は削除されません。",
+    read: "既読",
+    unread: "未読",
+    progress: "読書の進捗",
+    pages: "{page}/{pageCount}ページ",
+    up: "上へ",
+    down: "下へ",
+    removeFromList: "リストから外す",
+  },
+  en: {
+    readLists: "Read lists",
+    readFromStart: "Read from start",
+    notFound: "Read list not found",
+    emptyTitle: "No books",
+    emptyAdmin: "Add books from a book's More menu, with Add to read list.",
+    renamed: "Name changed",
+    deleted: "Deleted",
+    conflict: "Changed on another screen. Reloading",
+    moreActions: "More actions",
+    rename: "Rename",
+    delete: "Delete",
+    deleteTitle: "Delete read list",
+    name: "Name",
+    cancel: "Cancel",
+    save: "Save",
+    deleteBody: 'Delete "{name}". Books are not deleted.',
+    read: "Read",
+    unread: "Unread",
+    progress: "Reading progress",
+    pages: "{page}/{pageCount} pages",
+    up: "Up",
+    down: "Down",
+    removeFromList: "Remove from list",
+  },
+});
 
 /** The items in the order of ids; items whose id is not listed are dropped. */
 function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
@@ -28,6 +82,7 @@ function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
 }
 
 export default function Screen() {
+  const t = useT(m);
   const { readListId = "" } = useParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
@@ -77,7 +132,7 @@ export default function Screen() {
   if (!rl) {
     return (
       <Page>
-        <EmptyState title="リーディングリストが見つかりません" />
+        <EmptyState title={t("notFound")} />
       </Page>
     );
   }
@@ -96,7 +151,7 @@ export default function Screen() {
     api
       .updateReadList(rl.id, { name: name.trim() })
       .then(() => {
-        toast.success("名前を変更しました");
+        toast.success(t("renamed"));
         setDialog(null);
         reload();
       })
@@ -109,7 +164,7 @@ export default function Screen() {
     api
       .deleteReadList(rl.id)
       .then(() => {
-        toast.success("削除しました");
+        toast.success(t("deleted"));
         navigate("/readlists");
       })
       .catch((err: unknown) => toast.error(errorMessage(err)))
@@ -129,7 +184,7 @@ export default function Screen() {
       .catch((err: unknown) => {
         setBusy(false);
         if (err instanceof ApiError && err.status === 409) {
-          toast.error("ほかの画面で変更されました。読み込み直します");
+          toast.error(t("conflict"));
           reload();
         } else {
           toast.error(errorMessage(err));
@@ -152,24 +207,24 @@ export default function Screen() {
   return (
     <Page>
       <PageHeader
-        back={{ to: "/readlists", label: "リーディングリスト" }}
+        back={{ to: "/readlists", label: t("readLists") }}
         title={rl.name}
         meta={rl.summary || undefined}
         actions={
           <>
-            {next && <BrandAction to={`/read/${next.id}`} icon={Play}>最初から読む</BrandAction>}
+            {next && <BrandAction to={`/read/${next.id}`} icon={Play}>{t("readFromStart")}</BrandAction>}
             {isAdmin && (
               <DropdownMenu>
-                <Tooltip content="その他の操作">
+                <Tooltip content={t("moreActions")}>
                   <span className="inline-flex">
-                    <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
+                    <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")} />}>
                       <MoreHorizontal size={16} />
                     </DropdownTrigger>
                   </span>
                 </Tooltip>
                 <DropdownContent align="end">
-                  <MenuItem index={0} label="名前を変更" icon={SquarePen} onSelect={() => openDialog("rename")} />
-                  <MenuItem index={1} label="削除" onSelect={() => openDialog("delete")} />
+                  <MenuItem index={0} label={t("rename")} icon={SquarePen} onSelect={() => openDialog("rename")} />
+                  <MenuItem index={1} label={t("delete")} onSelect={() => openDialog("delete")} />
                 </DropdownContent>
               </DropdownMenu>
             )}
@@ -182,31 +237,31 @@ export default function Screen() {
           {dialog === "rename" ? (
             <>
               <DialogHeader>
-                <DialogTitle>名前を変更</DialogTitle>
+                <DialogTitle>{t("rename")}</DialogTitle>
               </DialogHeader>
               <Field>
-                <FieldLabel htmlFor="readlist-name">名前</FieldLabel>
+                <FieldLabel htmlFor="readlist-name">{t("name")}</FieldLabel>
                 <Input id="readlist-name" value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
               <DialogFooter>
-                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
                 <Button variant="primary" disabled={!name.trim() || busy} onClick={save}>
-                  保存
+                  {t("save")}
                 </Button>
               </DialogFooter>
             </>
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>リーディングリストを削除</DialogTitle>
+                <DialogTitle>{t("deleteTitle")}</DialogTitle>
               </DialogHeader>
               <p className={cn(typeClass("body"), "text-muted-foreground")}>
-                「{rl.name}」を削除します。巻は削除されません。
+                {t("deleteBody", { name: rl.name })}
               </p>
               <DialogFooter>
-                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
                 <Button variant="destructive" disabled={busy} onClick={remove}>
-                  削除
+                  {t("delete")}
                 </Button>
               </DialogFooter>
             </>
@@ -215,10 +270,7 @@ export default function Screen() {
       </Dialog>
 
       {shown.length === 0 ? (
-        <EmptyState
-          title="巻がありません"
-          body={isAdmin ? "巻の「その他」メニューの「リーディングリストに追加」から追加できます。" : undefined}
-        />
+        <EmptyState title={t("emptyTitle")} body={isAdmin ? t("emptyAdmin") : undefined} />
       ) : (
         <BookRows books={shown} titles={titles} editable={isAdmin} busy={busy} onMove={moveBook} onRemove={removeBook} />
       )}
@@ -287,6 +339,7 @@ function BookRow({
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (bookId: string) => void;
 }) {
+  const t = useT(m);
   const ref = useRef<HTMLAnchorElement>(null);
   useRegisterFluidHoverItem(register, index, ref);
   const p = book.progress;
@@ -309,51 +362,51 @@ function BookRow({
         </div>
         <div className="w-24 shrink-0 text-right">
           {p?.completed ? (
-            <span className={cn(typeClass("caption"), "text-muted-foreground")}>既読</span>
+            <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("read")}</span>
           ) : p ? (
             <div className="space-y-1">
-              <DotTrack total={10} value={Math.round(pct / 10)} label="読書の進捗" size="sm" className="justify-end" />
+              <DotTrack total={10} value={Math.round(pct / 10)} label={t("progress")} size="sm" className="justify-end" />
               <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
-                {p.page}/{book.pageCount}ページ
+                {t("pages", { page: p.page, pageCount: book.pageCount })}
               </p>
             </div>
           ) : (
-            <span className={cn(typeClass("caption"), "text-muted-foreground")}>未読</span>
+            <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("unread")}</span>
           )}
         </div>
       </Link>
       {editable && (
         <div className="relative z-10 flex shrink-0 items-center">
-          <Tooltip content="上へ">
+          <Tooltip content={t("up")}>
             <Button
               variant="ghost"
               size="icon"
               className="touch-hit relative"
-              aria-label="上へ"
+              aria-label={t("up")}
               disabled={busy || index === 0}
               onClick={() => onMove(index, -1)}
             >
               <ArrowUp size={16} />
             </Button>
           </Tooltip>
-          <Tooltip content="下へ">
+          <Tooltip content={t("down")}>
             <Button
               variant="ghost"
               size="icon"
               className="touch-hit relative"
-              aria-label="下へ"
+              aria-label={t("down")}
               disabled={busy || index === count - 1}
               onClick={() => onMove(index, 1)}
             >
               <ArrowDown size={16} />
             </Button>
           </Tooltip>
-          <Tooltip content="リストから外す">
+          <Tooltip content={t("removeFromList")}>
             <Button
               variant="ghost"
               size="icon"
               className="touch-hit relative"
-              aria-label="リストから外す"
+              aria-label={t("removeFromList")}
               disabled={busy}
               onClick={() => onRemove(book.id)}
             >

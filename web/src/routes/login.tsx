@@ -12,7 +12,25 @@ import Input from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { applyUserLocale, defineMessages, useT } from "@/i18n";
 import { SetupForm } from "./login-setup";
+
+const m = defineMessages({
+  ja: {
+    signIn: "ログイン",
+    username: "ユーザー名またはメールアドレス",
+    password: "パスワード",
+    required: "入力してください",
+    keepSignedIn: "ログイン状態を保持する",
+  },
+  en: {
+    signIn: "Sign in",
+    username: "Username or email",
+    password: "Password",
+    required: "Required",
+    keepSignedIn: "Keep me signed in",
+  },
+});
 
 export default function Screen() {
   const { data: screen, error, reload } = useApi(() => api.loginScreen(), []);
@@ -49,6 +67,7 @@ export default function Screen() {
 }
 
 function SignInForm() {
+  const t = useT(m);
   const navigate = useNavigate();
   const location = useLocation();
   const [user, setUser] = useState("");
@@ -66,7 +85,9 @@ function SignInForm() {
     if (next.user || next.pass) return;
     setSending(true);
     try {
-      await api.login({ username: user.trim(), password: pass, remember: keep });
+      const signedIn = await api.login({ username: user.trim(), password: pass, remember: keep });
+      // The account's own language applies before the next screen draws.
+      applyUserLocale(signedIn.locale);
       navigate(safeNext(new URLSearchParams(location.search).get("next")), { replace: true });
     } catch (err) {
       setServerError(errorMessage(err));
@@ -84,12 +105,12 @@ function SignInForm() {
       </div>
 
       <h1 className={typeClass("display")} style={{ fontVariationSettings: fontWeights.bold }}>
-        ログイン
+        {t("signIn")}
       </h1>
 
       <div className="flex flex-col gap-4">
         <Field data-invalid={errors.user || undefined}>
-          <FieldLabel htmlFor="login-user">ユーザー名またはメールアドレス</FieldLabel>
+          <FieldLabel htmlFor="login-user">{t("username")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="login-user"
@@ -99,11 +120,11 @@ function SignInForm() {
             onChange={(e) => setUser(e.target.value)}
             aria-invalid={errors.user || undefined}
           />
-          {errors.user && <FieldError>入力してください</FieldError>}
+          {errors.user && <FieldError>{t("required")}</FieldError>}
         </Field>
 
         <Field data-invalid={errors.pass || undefined}>
-          <FieldLabel htmlFor="login-pass">パスワード</FieldLabel>
+          <FieldLabel htmlFor="login-pass">{t("password")}</FieldLabel>
           <Input
             className="pointer-coarse:h-11"
             id="login-pass"
@@ -114,13 +135,13 @@ function SignInForm() {
             onChange={(e) => setPass(e.target.value)}
             aria-invalid={errors.pass || undefined}
           />
-          {errors.pass && <FieldError>入力してください</FieldError>}
+          {errors.pass && <FieldError>{t("required")}</FieldError>}
         </Field>
 
         <Field orientation="horizontal">
           <Checkbox id="login-keep" checked={keep} onCheckedChange={setKeep} />
           {/* The label is the touch target: a full 44px row beside the 16px box. */}
-          <FieldLabel htmlFor="login-keep" className="pointer-coarse:-my-3.5 pointer-coarse:py-3.5">ログイン状態を保持する</FieldLabel>
+          <FieldLabel htmlFor="login-keep" className="pointer-coarse:-my-3.5 pointer-coarse:py-3.5">{t("keepSignedIn")}</FieldLabel>
         </Field>
       </div>
 
@@ -143,7 +164,7 @@ function SignInForm() {
         )}
         style={{ fontVariationSettings: fontWeights.semibold }}
       >
-        <span className="[text-box:trim-both_cap_alphabetic]">ログイン</span>
+        <span className="[text-box:trim-both_cap_alphabetic]">{t("signIn")}</span>
       </button>
     </form>
   );

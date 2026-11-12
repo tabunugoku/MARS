@@ -19,14 +19,14 @@ import (
 
 // The downloads are served by serveBookFile / serveSeriesZip (see New), so
 // they can stream; the strict handlers only satisfy the generated interface.
-func (s *server) DownloadBook(context.Context, DownloadBookRequestObject) (DownloadBookResponseObject, error) {
-	return DownloadBook404JSONResponse{notFound("not routed")}, nil
+func (s *server) DownloadBook(ctx context.Context, _ DownloadBookRequestObject) (DownloadBookResponseObject, error) {
+	return DownloadBook404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
-func (s *server) DownloadSeries(context.Context, DownloadSeriesRequestObject) (DownloadSeriesResponseObject, error) {
-	return DownloadSeries404JSONResponse{notFound("not routed")}, nil
+func (s *server) DownloadSeries(ctx context.Context, _ DownloadSeriesRequestObject) (DownloadSeriesResponseObject, error) {
+	return DownloadSeries404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
 
-const noDownload = "このアカウントではファイルをダウンロードできません"
+const noDownload = "forbidden.download"
 
 // serveBookFile sends a book's original file. Visibility is checked before
 // the permission, as for pages, so a book outside the caller's libraries
@@ -41,41 +41,41 @@ func (s *server) serveBookFile(w http.ResponseWriter, r *http.Request) {
 	if q := r.URL.Query().Get("inline"); q != "" {
 		v, err := strconv.ParseBool(q)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, "inline が正しくありません")
+			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.inline")
 			return
 		}
 		inline = v
 	}
 	b, ok, err := s.oneBook(ctx, r.PathValue("bookId"))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "ファイルを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.file_unreadable")
 		return
 	}
 	if !ok {
-		writeError(w, http.StatusNotFound, "本が見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.book")
 		return
 	}
 	if inline {
 		if !canStream(ctx) {
-			writeError(w, http.StatusForbidden, "このアカウントでは本を読めません")
+			writeError(r.Context(), w, http.StatusForbidden, "forbidden.read")
 			return
 		}
 		if string(b.Format) != "pdf" {
-			writeError(w, http.StatusBadRequest, "PDF だけをブラウザで開けます")
+			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.pdf_only")
 			return
 		}
 	} else if !canDownload(ctx) {
-		writeError(w, http.StatusForbidden, noDownload)
+		writeError(r.Context(), w, http.StatusForbidden, noDownload)
 		return
 	}
 	f, err := s.Library.OpenBookFile(ctx, b.Id)
 	if errors.Is(err, library.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "ファイルが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.file")
 		return
 	}
 	if err != nil {
 		slog.Error("download", "book", b.Id, "err", err)
-		writeError(w, http.StatusInternalServerError, "ファイルを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.file_unreadable")
 		return
 	}
 	defer f.Close()
@@ -102,24 +102,24 @@ func (s *server) serveSeriesZip(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	x, ok, err := s.oneSeries(ctx, r.PathValue("seriesId"))
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "ファイルを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.file_unreadable")
 		return
 	}
 	if !ok {
-		writeError(w, http.StatusNotFound, "シリーズが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.series")
 		return
 	}
 	if !canDownload(ctx) {
-		writeError(w, http.StatusForbidden, noDownload)
+		writeError(r.Context(), w, http.StatusForbidden, noDownload)
 		return
 	}
 	books, err := s.listBooks(ctx, ` AND b.series_id = ?`, `ORDER BY b.number_sort, b.path`, x.Id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "ファイルを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.file_unreadable")
 		return
 	}
 	if len(books) == 0 {
-		writeError(w, http.StatusNotFound, "シリーズに本がありません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.series_books")
 		return
 	}
 	// Check every file before the first byte: once the ZIP has started an
@@ -127,7 +127,7 @@ func (s *server) serveSeriesZip(w http.ResponseWriter, r *http.Request) {
 	for _, b := range books {
 		f, err := s.Library.OpenBookFile(ctx, b.Id)
 		if err != nil {
-			writeError(w, http.StatusNotFound, "ファイルが見つかりません: "+path.Base(b.Path))
+			writeError(r.Context(), w, http.StatusNotFound, "not_found.file_named", path.Base(b.Path))
 			return
 		}
 		f.Close()
@@ -260,43 +260,43 @@ func rfc5987(s string) string {
 func thumbErr(err error) string {
 	switch {
 	case errors.Is(err, library.ErrNotReady):
-		return "この本はまだ解析されていません"
+		return "bad_request.not_analyzed"
 	case errors.Is(err, library.ErrBadPage):
-		return "そのページはありません"
+		return "bad_request.no_page"
 	}
-	return "表紙を作れませんでした"
+	return "bad_request.cover_failed"
 }
 
 func (s *server) RegenerateBookThumbnail(ctx context.Context, req RegenerateBookThumbnailRequestObject) (RegenerateBookThumbnailResponseObject, error) {
 	err := s.Library.RegenerateThumbnail(ctx, req.BookId)
 	switch {
 	case errors.Is(err, library.ErrNotFound):
-		return RegenerateBookThumbnail404JSONResponse{notFound("本が見つかりません")}, nil
+		return RegenerateBookThumbnail404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	case err != nil:
 		slog.Warn("thumbnail", "book", req.BookId, "err", err)
-		return RegenerateBookThumbnail400JSONResponse{badRequest(thumbErr(err))}, nil
+		return RegenerateBookThumbnail400JSONResponse{badRequest(ctx, thumbErr(err))}, nil
 	}
 	return RegenerateBookThumbnail204Response{}, nil
 }
 
 func (s *server) SetBookCover(ctx context.Context, req SetBookCoverRequestObject) (SetBookCoverResponseObject, error) {
 	if req.Body == nil {
-		return SetBookCover400JSONResponse{badRequest("本文がありません")}, nil
+		return SetBookCover400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	err := s.Library.SetCover(ctx, req.BookId, req.Body.Page)
 	switch {
 	case errors.Is(err, library.ErrNotFound):
-		return SetBookCover404JSONResponse{notFound("本が見つかりません")}, nil
+		return SetBookCover404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	case err != nil:
 		slog.Warn("cover", "book", req.BookId, "err", err)
-		return SetBookCover400JSONResponse{badRequest(thumbErr(err))}, nil
+		return SetBookCover400JSONResponse{badRequest(ctx, thumbErr(err))}, nil
 	}
 	b, ok, err := s.oneBook(ctx, req.BookId)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return SetBookCover404JSONResponse{notFound("本が見つかりません")}, nil
+		return SetBookCover404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	return SetBookCover200JSONResponse(b), nil
 }
@@ -307,25 +307,25 @@ func (s *server) RegenerateSeriesThumbnails(ctx context.Context, req RegenerateS
 		return nil, err
 	}
 	if !ok {
-		return RegenerateSeriesThumbnails404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return RegenerateSeriesThumbnails404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	t, err := s.Library.QueueThumbnails(ctx, x.LibraryId, x.Id)
 	if errors.Is(err, library.ErrNotFound) {
-		return RegenerateSeriesThumbnails404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return RegenerateSeriesThumbnails404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return RegenerateSeriesThumbnails202JSONResponse(toTask(t)), nil
+	return RegenerateSeriesThumbnails202JSONResponse(toTask(ctx, t)), nil
 }
 
 func (s *server) RegenerateLibraryThumbnails(ctx context.Context, req RegenerateLibraryThumbnailsRequestObject) (RegenerateLibraryThumbnailsResponseObject, error) {
 	t, err := s.Library.QueueThumbnails(ctx, req.LibraryId, "")
 	if errors.Is(err, library.ErrNotFound) {
-		return RegenerateLibraryThumbnails404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return RegenerateLibraryThumbnails404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return RegenerateLibraryThumbnails202JSONResponse(toTask(t)), nil
+	return RegenerateLibraryThumbnails202JSONResponse(toTask(ctx, t)), nil
 }

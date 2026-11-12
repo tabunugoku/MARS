@@ -1,11 +1,25 @@
 // The one place that talks HTTP to the Go server (relative /api/v1, so the
 // dev server's proxy and the embedded build both work).
 
+import { defineMessages, getLocale, translate } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    offline: "サーバーに接続できませんでした",
+  },
+  en: {
+    offline: "Could not reach the server",
+  },
+});
+
 export class ApiError extends Error {
   readonly status: number;
-  constructor(status: number, message: string) {
+  /** The server's stable error code (e.g. "not_found.book"); "" when absent. */
+  readonly code: string;
+  constructor(status: number, message: string, code = "") {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -41,7 +55,10 @@ export async function request<T>(method: string, path: string, body?: unknown, o
     method,
     credentials: "same-origin",
     keepalive: opts.keepalive,
-    headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+    headers: {
+      "Accept-Language": getLocale(),
+      ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+    },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   if (res.ok) {
@@ -51,14 +68,16 @@ export async function request<T>(method: string, path: string, body?: unknown, o
   }
   if (res.status === 404 && opts.nullOn404) return null as T;
   if (res.status === 401 && !opts.public) toLogin();
-  let message = "サーバーに接続できませんでした";
+  let message = translate(m, "offline");
+  let code = "";
   try {
-    const e = (await res.json()) as { message?: string };
+    const e = (await res.json()) as { message?: string; code?: string };
     if (e.message) message = e.message;
+    if (e.code) code = e.code;
   } catch {
     /* not JSON: keep the generic message */
   }
-  throw new ApiError(res.status, message);
+  throw new ApiError(res.status, message, code);
 }
 
 /** GETs one page of a list; X-Total-Count is the length of the whole list. */

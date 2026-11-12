@@ -13,8 +13,48 @@ import { Button } from "@/components/ui/button";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
 
-type Row = { title: string; books?: Book[]; series?: Series[] };
+const m = defineMessages({
+  ja: {
+    home: "ホーム",
+    inProgress: "読みかけ",
+    upNext: "次に読む",
+    recentBooks: "最近追加された巻",
+    newSeries: "新しいシリーズ",
+    recentUpdated: "最近更新されたシリーズ",
+    recentRead: "最近読んだ巻",
+    noBooks: "まだ本がありません",
+    noBooksBody: "管理 → ライブラリ設定でフォルダを追加すると、ここに表示されます",
+    addLibrary: "ライブラリを追加",
+    lastRead: "前回の続き",
+    readingProgress: "読書の進捗",
+    pagesLeft: ({ total, left }) => `${total} · 残り ${left} ページ`,
+    resume: "続きから読む",
+    bookDetails: "巻の詳細",
+  },
+  en: {
+    home: "Home",
+    inProgress: "In progress",
+    upNext: "Up next",
+    recentBooks: "Recently added books",
+    newSeries: "New series",
+    recentUpdated: "Recently updated series",
+    recentRead: "Recently read books",
+    noBooks: "No books yet",
+    noBooksBody: "Add a folder under Admin → Library settings to see it here",
+    addLibrary: "Add library",
+    lastRead: "Last read",
+    readingProgress: "Reading progress",
+    pagesLeft: ({ total, left }) => `${total} · ${left} pages left`,
+    resume: "Resume",
+    bookDetails: "Book details",
+  },
+});
+
+type Key = keyof typeof m.ja;
+
+type Row = { title: Key; books?: Book[]; series?: Series[] };
 
 // Chart-coordinate style date for the context line: 2026.11.09
 const ymd = (iso: string) => {
@@ -23,6 +63,7 @@ const ymd = (iso: string) => {
 };
 
 export default function Screen() {
+  const t = useT(m);
   const { data, reload } = useApi(
     async () => {
       const d = await api.dashboard();
@@ -43,7 +84,7 @@ export default function Screen() {
   if (!data) {
     return (
       <Page>
-        <h1 className="sr-only">ホーム</h1>
+        <h1 className="sr-only">{t("home")}</h1>
         <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone" aria-hidden>
           <Block className="aspect-[2/3] w-[96px] shrink-0 rounded-[6px] sm:w-[120px]" />
           <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
@@ -73,23 +114,24 @@ export default function Screen() {
   }
 
   const hero = data.keep[0];
-  const rows: Row[] = [
-    { title: "読みかけ", books: data.keep.slice(1) },
-    { title: "次に読む", books: data.deck },
-    { title: "最近追加された巻", books: data.addedBooks },
-    { title: "新しいシリーズ", series: data.addedSeries },
-    { title: "最近更新されたシリーズ", series: data.updatedSeries },
-    { title: "最近読んだ巻", books: data.read },
-  ].filter((r) => (r.books ?? r.series ?? []).length > 0);
+  const sections: Row[] = [
+    { title: "inProgress", books: data.keep.slice(1) },
+    { title: "upNext", books: data.deck },
+    { title: "recentBooks", books: data.addedBooks },
+    { title: "newSeries", series: data.addedSeries },
+    { title: "recentUpdated", series: data.updatedSeries },
+    { title: "recentRead", books: data.read },
+  ];
+  const rows = sections.filter((r) => (r.books ?? r.series ?? []).length > 0);
 
   if (!hero && rows.length === 0) {
     return (
       <Page>
-        <h1 className="sr-only">ホーム</h1>
+        <h1 className="sr-only">{t("home")}</h1>
         <EmptyState
-          title="まだ本がありません"
-          body="管理 → ライブラリ設定でフォルダを追加すると、ここに表示されます"
-          action={<BrandAction to="/admin/libraries">ライブラリを追加</BrandAction>}
+          title={t("noBooks")}
+          body={t("noBooksBody")}
+          action={<BrandAction to="/admin/libraries">{t("addLibrary")}</BrandAction>}
         />
       </Page>
     );
@@ -101,7 +143,7 @@ export default function Screen() {
 
   return (
     <Page>
-      <h1 className="sr-only">ホーム</h1>
+      <h1 className="sr-only">{t("home")}</h1>
 
       {hero && (
         <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone">
@@ -111,7 +153,7 @@ export default function Screen() {
           <div className="flex min-w-0 flex-1 flex-col gap-1">
             {hero.progress && (
               <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                前回の続き · <span className="font-mono tabular-nums">{ymd(hero.progress.readAt)}</span>
+                {t("lastRead")} · <span className="font-mono tabular-nums">{ymd(hero.progress.readAt)}</span>
               </p>
             )}
             <h2 className={cn(typeClass("title"), "line-clamp-2")} style={{ fontVariationSettings: fontWeights.semibold }}>
@@ -119,17 +161,17 @@ export default function Screen() {
             </h2>
             <p className={cn(typeClass("body"), "line-clamp-2 text-muted-foreground")}>{hero.title}</p>
             <div className="mt-auto space-y-1.5 pt-3">
-              <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label="読書の進捗" />
+              <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label={t("readingProgress")} />
               <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
-                P.<CountUp value={heroPage} /> / {hero.pageCount} · 残り {hero.pageCount - heroPage} ページ
+                P.<CountUp value={heroPage} /> / {t("pagesLeft", { total: hero.pageCount, left: hero.pageCount - heroPage })}
               </p>
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <BrandAction to={`/read/${hero.id}`} icon={Play}>
-                続きから読む
+                {t("resume")}
               </BrandAction>
               <Button variant="secondary" asChild>
-                <Link to={`/books/${hero.id}`}>巻の詳細</Link>
+                <Link to={`/books/${hero.id}`}>{t("bookDetails")}</Link>
               </Button>
             </div>
           </div>
@@ -137,7 +179,7 @@ export default function Screen() {
       )}
 
       {rows.map((row, ri) => (
-        <Shelf key={row.title} title={row.title}>
+        <Shelf key={row.title} title={t(row.title)}>
           {row.books
             ? row.books.map((b, i) => (
                 <ShelfItem key={b.id}>

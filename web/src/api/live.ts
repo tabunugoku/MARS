@@ -4,6 +4,7 @@
 // screens (lazy chunks), never from the shell, so the initial bundle stays
 // as it is.
 import { useEffect, useRef, useState } from "react";
+import { getLocale, subscribeLocale } from "@/i18n";
 import { bumpCover, retryCovers } from "@/lib/cover-retry";
 import type { components } from "./schema";
 
@@ -66,7 +67,8 @@ function open() {
   if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
   clearTimeout(retryTimer);
   retryTimer = undefined;
-  const es = new EventSource("/api/v1/events");
+  // The language goes along: the server words task labels in it.
+  const es = new EventSource(`/api/v1/events?lang=${getLocale()}`);
   source = es;
   es.onopen = () => {
     emit({ type: hadOpen ? "reconnect" : "open" });
@@ -104,6 +106,14 @@ function close(keepGap: boolean) {
   if (!keepGap) hadOpen = false;
   setUp(false);
 }
+
+// A language change closes and reopens the stream once, so the server words
+// task labels in the new language. The next open counts as a reconnect.
+subscribeLocale(() => {
+  if (!source) return;
+  close(true);
+  open();
+});
 
 if (typeof document !== "undefined") {
   document.addEventListener("visibilitychange", () => {

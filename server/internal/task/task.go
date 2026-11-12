@@ -24,17 +24,44 @@ type Func func(ctx context.Context, progress func(float64)) error
 type Task struct {
 	ID         string
 	Kind       string // scan | analyze | thumbnail | hash | trash
-	Label      string
+	Label      string // final text, or the English text when LabelCode is ""
+	LabelCode  string // catalog code the API renders Label from
+	LabelArg   string
 	LibraryID  string // "" when not tied to a library
 	State      string // queued | running | done | failed | cancelled
 	Progress   float64
-	Error      string
+	Error      string // final text, or the English text when ErrorCode is ""
+	ErrorCode  string // catalog code the API renders Error from
+	ErrorArg   string
 	CreatedAt  time.Time
 	StartedAt  *time.Time
 	FinishedAt *time.Time
 }
 
 var ErrNotFound = errors.New("task: not found")
+
+// Text is a task label: Code names a catalog entry the API renders in the
+// request's language, filled with Arg; English is stored for logs and for
+// rows without a code.
+type Text struct {
+	Code    string
+	Arg     string
+	English string
+}
+
+// CodedError is a task failure the API renders from a catalog code. Its
+// Error text is English, for logs and the stored error.
+type CodedError struct {
+	Code string
+	Arg  string
+	Err  error
+}
+
+func (e *CodedError) Error() string { return e.Err.Error() }
+func (e *CodedError) Unwrap() error { return e.Err }
+
+// taskCols lists the columns scanTask reads, in its order.
+const taskCols = `id, kind, label, COALESCE(library_id, ''), state, progress, error, created_at, started_at, finished_at, label_code, label_arg, error_code, error_arg`
 
 type job struct {
 	id     string
@@ -88,7 +115,7 @@ func now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
 // workers. It returns at once; workers stop when ctx is cancelled.
 func (q *Queue) Run(ctx context.Context) error {
 	if _, err := q.db.ExecContext(ctx,
-		`UPDATE tasks SET state = 'failed', error = 'サーバーの再起動で中断しました', finished_at = ? WHERE state = 'running'`, now()); err != nil {
+		`UPDATE tasks SET state = 'failed', error = 'Interrupted by a server restart', error_code = 'task.interrupted_restart', finished_at = ? WHERE state = 'running'`, now()); err != nil {
 		return err
 	}
 	if _, err := q.db.ExecContext(ctx,
@@ -104,14 +131,14 @@ func (q *Queue) Run(ctx context.Context) error {
 // Submit queues fn. When a task of the same kind for the same library is
 // still queued (not yet running), that task is returned instead, so repeated
 // scan requests do not pile up.
-func (q *Queue) Submit(ctx context.Context, kind, label, libraryID string, fn Func) (Task, error) {
+func (q *Queue) Submit(ctx context.Context, kind string, label Text, libraryID string, fn Func) (Task, error) {
 	return q.SubmitKey(ctx, kind, kind, label, libraryID, fn)
 }
 
 // SubmitKey is Submit that deduplicates on key instead of kind, for work of
 // one kind that must not be folded into another queued task of that kind
 // (a deep analysis into a normal one, one series' thumbnails into another's).
-func (q *Queue) SubmitKey(ctx context.Context, kind, key, label, libraryID string, fn Func) (Task, error) {
+func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, libraryID string, fn Func) (Task, error) {
 	q.mu.Lock()
 	for _, j := range q.live {
 		if j.key == key && j.libID == libraryID && libraryID != "" {
@@ -128,8 +155,8 @@ func (q *Queue) SubmitKey(ctx context.Context, kind, key, label, libraryID strin
 		lib = libraryID
 	}
 	if _, err := q.db.ExecContext(ctx,
-		`INSERT INTO tasks (id, kind, label, library_id, state, created_at) VALUES (?, ?, ?, ?, 'queued', ?)`,
-		j.id, kind, label, lib, now()); err != nil {
+		`INSERT INTO tasks (id, kind, label, label_code, label_arg, library_id, state, created_at) VALUES (?, ?, ?, ?, ?, ?, 'queued', ?)`,
+		j.id, kind, label.English, label.Code, label.Arg, lib, now()); err != nil {
 		q.mu.Unlock()
 		cancel()
 		return Task{}, err
@@ -200,7 +227,7 @@ func (q *Queue) run(parent context.Context, j *job) {
 	if err != nil {
 		// The row stays 'queued' with nothing behind it; record that.
 		slog.Error("task start", "id", j.id, "err", err)
-		q.execRetry(db, `UPDATE tasks SET state = 'failed', error = ?, finished_at = ? WHERE id = ?`, "開始できませんでした", now(), j.id)
+		q.execRetry(db, `UPDATE tasks SET state = 'failed', error = 'Could not start', error_code = 'task.start_failed', finished_at = ? WHERE id = ?`, now(), j.id)
 		q.publish(db, j.id)
 		return
 	}
@@ -243,18 +270,22 @@ func (q *Queue) run(parent context.Context, j *job) {
 	}
 
 	err = safeRun(ctx, j.fn, progress)
-	state, msg := "done", ""
+	state, msg, code, arg := "done", "", "", ""
 	switch {
 	case err == nil:
 	case ctx.Err() != nil:
 		state = "cancelled"
 	default:
 		state, msg = "failed", err.Error()
+		var ce *CodedError
+		if errors.As(err, &ce) {
+			code, arg = ce.Code, ce.Arg
+		}
 		slog.Error("task failed", "id", j.id, "kind", j.kind, "err", err)
 	}
 	if _, err := q.execRetry(db,
-		`UPDATE tasks SET state = ?, error = ?, progress = CASE WHEN ? = 'done' THEN 1 ELSE progress END, finished_at = ? WHERE id = ?`,
-		state, msg, state, now(), j.id); err != nil {
+		`UPDATE tasks SET state = ?, error = ?, error_code = ?, error_arg = ?, progress = CASE WHEN ? = 'done' THEN 1 ELSE progress END, finished_at = ? WHERE id = ?`,
+		state, msg, code, arg, state, now(), j.id); err != nil {
 		slog.Error("task finish", "id", j.id, "err", err)
 	}
 	q.publish(db, j.id)
@@ -281,7 +312,7 @@ func safeRun(ctx context.Context, fn Func, progress func(float64)) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("task panic", "panic", r)
-			err = errors.New("内部エラーで中断しました")
+			err = &CodedError{Code: "task.internal_error", Err: errors.New("Stopped by an internal error")}
 		}
 	}()
 	return fn(ctx, progress)
@@ -291,11 +322,11 @@ func safeRun(ctx context.Context, fn Func, progress func(float64)) (err error) {
 func (q *Queue) List(ctx context.Context) ([]Task, error) {
 	rows, err := q.db.QueryContext(ctx, `
 		SELECT * FROM (
-		  SELECT id, kind, label, COALESCE(library_id, ''), state, progress, error, created_at, started_at, finished_at
+		  SELECT `+taskCols+`
 		  FROM tasks WHERE state IN ('running', 'queued')
 		  UNION ALL
 		  SELECT * FROM (
-		    SELECT id, kind, label, COALESCE(library_id, ''), state, progress, error, created_at, started_at, finished_at
+		    SELECT `+taskCols+`
 		    FROM tasks WHERE state NOT IN ('running', 'queued') ORDER BY created_at DESC LIMIT 50))
 		ORDER BY CASE state WHEN 'running' THEN 0 WHEN 'queued' THEN 1 ELSE 2 END, created_at DESC`)
 	if err != nil {
@@ -314,7 +345,7 @@ func (q *Queue) List(ctx context.Context) ([]Task, error) {
 }
 
 func (q *Queue) get(ctx context.Context, id string) (Task, error) {
-	row := q.db.QueryRowContext(ctx, `SELECT id, kind, label, COALESCE(library_id, ''), state, progress, error, created_at, started_at, finished_at FROM tasks WHERE id = ?`, id)
+	row := q.db.QueryRowContext(ctx, `SELECT `+taskCols+` FROM tasks WHERE id = ?`, id)
 	t, err := scanTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return t, ErrNotFound
@@ -328,7 +359,8 @@ func scanTask(s scanner) (Task, error) {
 	var t Task
 	var created string
 	var started, finished sql.NullString
-	if err := s.Scan(&t.ID, &t.Kind, &t.Label, &t.LibraryID, &t.State, &t.Progress, &t.Error, &created, &started, &finished); err != nil {
+	if err := s.Scan(&t.ID, &t.Kind, &t.Label, &t.LibraryID, &t.State, &t.Progress, &t.Error, &created, &started, &finished,
+		&t.LabelCode, &t.LabelArg, &t.ErrorCode, &t.ErrorArg); err != nil {
 		return t, err
 	}
 	t.CreatedAt, _ = time.Parse(time.RFC3339Nano, created)

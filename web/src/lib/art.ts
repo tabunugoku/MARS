@@ -28,7 +28,7 @@ export function coverArt(seed: number, title: string, label?: string): string {
   const paper = `oklch(0.96 0.01 ${hue})`;
   const cx = 60 + r() * 180, cy = 80 + r() * 200, rad = 40 + r() * 90;
   const tilt = -30 + r() * 60;
-  const vertical = /[぀-ヿ一-鿿]/.test(title);
+  const vertical = /[\u3040-\u30ff\u4e00-\u9fff]/.test(title); // kana and kanji: set vertically
   const chars = [...title].slice(0, 10);
   const titleSvg = vertical
     ? chars

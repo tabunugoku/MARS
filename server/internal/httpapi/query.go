@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -103,7 +105,7 @@ func bookQuery(ctx context.Context) (string, []any) {
 	WHERE b.deleted_at IS NULL AND ` + cond, append([]any{uid}, args...)
 }
 
-func scanBook(r scanner) (Book, error) {
+func scanBook(ctx context.Context, r scanner) (Book, error) {
 	var x Book
 	var release, readAt sql.NullString
 	var page sql.NullInt64
@@ -114,7 +116,7 @@ func scanBook(r scanner) (Book, error) {
 		&page, &completed, &readAt)
 	x.Authors, x.Tags, x.Format, x.MediaStatus = authors(au), strs(tags), BookFormat(format), MediaStatus(status)
 	x.LockedFields = strs(locked)
-	mediaErr = publicMediaError(mediaErr)
+	mediaErr = publicMediaError(ctx, mediaErr)
 	x.MediaError = &mediaErr
 	if release.Valid {
 		x.ReleaseDate = &release.String
@@ -136,7 +138,7 @@ func (s *server) listBooks(ctx context.Context, where, tail string, args ...any)
 	defer rows.Close()
 	out := []Book{}
 	for rows.Next() {
-		x, err := scanBook(rows)
+		x, err := scanBook(ctx, rows)
 		if err != nil {
 			return nil, err
 		}
@@ -148,24 +150,64 @@ func (s *server) listBooks(ctx context.Context, where, tail string, args ...any)
 // oneBook returns a visible book; ok is false when there is none.
 func (s *server) oneBook(ctx context.Context, id string) (x Book, ok bool, err error) {
 	q, args := bookQuery(ctx)
-	x, err = scanBook(s.DB.QueryRowContext(ctx, q+` AND b.id = ?`, append(args, id)...))
+	x, err = scanBook(ctx, s.DB.QueryRowContext(ctx, q+` AND b.id = ?`, append(args, id)...))
 	if errors.Is(err, sql.ErrNoRows) {
 		return x, false, nil
 	}
 	return x, err == nil, err
 }
 
-// publicMediaError is the reason shown with a book that cannot be read. Only
-// the archive package's own "unsupported" reasons are shown; any other error
-// (an OS error, for one) may name paths under the library root, which only
-// administrators see, in the media issues list.
-func publicMediaError(raw string) string {
+// publicMediaError is the reason shown with a book that cannot be read, in
+// the request's language. Only the archive package's own "unsupported"
+// reasons are shown, translated where the catalog knows them; any other
+// error (an OS error, for one) may name paths under the library root, which
+// only administrators see, in the media issues list.
+func publicMediaError(ctx context.Context, raw string) string {
 	const prefix = "archive: unsupported: "
 	switch {
 	case raw == "":
 		return ""
 	case strings.HasPrefix(raw, prefix) && !strings.ContainsAny(raw, `/\`):
-		return strings.TrimPrefix(raw, prefix)
+		return archiveReason(ctx, strings.TrimPrefix(raw, prefix))
 	}
-	return "ファイルを読み込めませんでした"
+	return msg(ctx, "media.file_unreadable")
+}
+
+var (
+	pdfPageRe = regexp.MustCompile(`^PDF page (\d+) (.+)$`)
+	pdfOverRe = regexp.MustCompile(`^PDF over (\d+) MB$`)
+)
+
+// pdfPageReasons maps the reason after "PDF page N " to its catalog code.
+var pdfPageReasons = map[string]string{
+	"is not a single image":              "media.pdf_not_single_image",
+	"uses an unsupported image encoding": "media.pdf_encoding",
+	"image is too large":                 "media.pdf_too_large",
+	"cannot be read":                     "media.pdf_unreadable",
+	"cannot be decoded":                  "media.pdf_undecodable",
+	"has no image data":                  "media.pdf_no_image",
+	"uses CMYK colour":                   "media.pdf_cmyk",
+	"uses an image mask":                 "media.pdf_mask",
+}
+
+// archiveReason translates one of the archive's known reasons; any other
+// reason is shown as the archive wrote it (English).
+func archiveReason(ctx context.Context, reason string) string {
+	switch reason {
+	case "encrypted PDF":
+		return msg(ctx, "media.pdf_encrypted")
+	case "not a readable PDF":
+		return msg(ctx, "media.pdf_not_readable")
+	}
+	if m := pdfPageRe.FindStringSubmatch(reason); m != nil {
+		if code, ok := pdfPageReasons[m[2]]; ok {
+			page, _ := strconv.Atoi(m[1])
+			return msg(ctx, code, page)
+		}
+	}
+	if m := pdfOverRe.FindStringSubmatch(reason); m != nil {
+		mb, _ := strconv.Atoi(m[1])
+		return msg(ctx, "media.pdf_too_big", mb)
+	}
+	return reason
 }

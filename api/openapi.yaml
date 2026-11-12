@@ -299,6 +299,11 @@ paths:
         the stream is closed; on reconnecting, refetch what is shown. A user
         may hold 16 streams and the server 512; past that the request is
         answered 429 with Retry-After.
+      parameters:
+        - name: lang
+          in: query
+          description: "Language of task labels and errors in the stream (EventSource cannot send Accept-Language). Any request may use it; it wins over Accept-Language."
+          schema: { type: string, enum: [ja, en] }
       responses:
         "200":
           description: Event stream
@@ -1064,9 +1069,10 @@ components:
   schemas:
     Error:
       type: object
-      required: [message]
+      required: [message, code]
       properties:
-        message: { type: string }
+        message: { type: string, description: "Human-readable, in the request's language (Accept-Language: en gives English, anything else Japanese)" }
+        code: { type: string, description: "Stable machine-readable reason, e.g. not_found.book; clients may key their own text on it" }
     LibraryKind:
       type: string
       enum: [manga, webtoon, comics, books]
@@ -1267,7 +1273,7 @@ components:
       enum: [admin, user]
     User:
       type: object
-      required: [id, name, email, role, canDownload, canStream, allLibraries, libraryIds, lastActive]
+      required: [id, name, email, role, canDownload, canStream, allLibraries, libraryIds, lastActive, locale]
       properties:
         id: { type: string }
         name: { type: string }
@@ -1278,6 +1284,11 @@ components:
         allLibraries: { type: boolean }
         libraryIds: { type: array, items: { type: string }, description: "Libraries the user may see when allLibraries is false" }
         lastActive: { type: string, nullable: true }
+        locale: { $ref: "#/components/schemas/Locale" }
+    Locale:
+      type: string
+      enum: ["", ja, en]
+      description: "Interface language the user chose; empty follows the browser"
     UserCreate:
       type: object
       required: [name, email, password, role]
@@ -1566,3 +1577,4 @@ components:
       required: [name]
       properties:
         name: { type: string }
+        locale: { $ref: "#/components/schemas/Locale" }

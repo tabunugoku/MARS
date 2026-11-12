@@ -157,9 +157,9 @@ export const readLists: ReadList[] = [
 ];
 
 export const users: User[] = [
-  { id: "u-1", name: "admin", email: "admin@example.test", role: "admin", canDownload: true, canStream: true, allLibraries: true, libraryIds: [], lastActive: daysAgo(0) },
-  { id: "u-2", name: "ゆう", email: "yu@example.test", role: "user", canDownload: true, canStream: true, allLibraries: false, libraryIds: ["lib-manga", "lib-webtoon"], lastActive: daysAgo(1) },
-  { id: "u-3", name: "kids", email: "kids@example.test", role: "user", canDownload: false, canStream: true, allLibraries: false, libraryIds: ["lib-manga"], lastActive: daysAgo(8) },
+  { id: "u-1", name: "admin", email: "admin@example.test", role: "admin", canDownload: true, canStream: true, allLibraries: true, libraryIds: [], lastActive: daysAgo(0), locale: "" },
+  { id: "u-2", name: "ゆう", email: "yu@example.test", role: "user", canDownload: true, canStream: true, allLibraries: false, libraryIds: ["lib-manga", "lib-webtoon"], lastActive: daysAgo(1), locale: "" },
+  { id: "u-3", name: "kids", email: "kids@example.test", role: "user", canDownload: false, canStream: true, allLibraries: false, libraryIds: ["lib-manga"], lastActive: daysAgo(8), locale: "" },
 ];
 
 export const tasks: Task[] = [

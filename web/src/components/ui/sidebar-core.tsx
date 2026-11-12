@@ -32,6 +32,7 @@ import { useSurface, SurfaceProvider } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
+import { uiText } from "@/i18n/ui";
 
 // SSR-safe layout effect (client components still server-render in Next).
 const useIsoLayoutEffect =
@@ -772,7 +773,7 @@ const SidebarShell = forwardRef<HTMLDivElement, SidebarShellProps>(
                 intent delay, click mode on press. */}
             <button
               type="button"
-              aria-label="サイドバーを一時表示"
+              aria-label={uiText("peekSidebar")}
               aria-expanded={isPeeking}
               className={cn(
                 "group/peek-strip absolute inset-y-0 z-40 w-3 cursor-pointer outline-none",
@@ -968,7 +969,7 @@ const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
                 re-applies it — otherwise the shortcut row would sit taller
                 than a tooltip without a chip. */}
             <span className="[text-box:trim-both_cap_alphabetic]">
-              {collapsed ? "サイドバーを開く" : "サイドバーを閉じる"}
+              {collapsed ? uiText("expandSidebar") : uiText("collapseSidebar")}
             </span>
             <ShortcutKbd>{shortcutKey}</ShortcutKbd>
           </span>
@@ -979,7 +980,7 @@ const SidebarTrigger = forwardRef<HTMLButtonElement, SidebarTriggerProps>(
           variant="ghost"
           size={size ?? iconSize}
           data-sidebar="trigger"
-          aria-label="サイドバーの表示切り替え"
+          aria-label={uiText("toggleSidebar")}
           onClick={(event) => {
             onClick?.(event);
             toggleSidebar();
@@ -1124,7 +1125,7 @@ const SidebarRail = forwardRef<HTMLButtonElement, SidebarRailProps>(
           }}
           type="button"
           data-sidebar="rail"
-          aria-label="サイドバーの幅を変える"
+          aria-label={uiText("resizeSidebar")}
           tabIndex={-1}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}

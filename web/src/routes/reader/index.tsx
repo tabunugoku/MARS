@@ -17,6 +17,60 @@ import { cn } from "@/lib/utils";
 import { BrandAction } from "@/components/media/brand-action";
 import { usePageSwipe } from "./use-page-swipe";
 import { ReaderSettings } from "./settings";
+import { defineMessages, translate, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    notReadable: "この本はまだ読めません（解析が済んでいないか、ページがありません）",
+    notFound: "この本は見つかりませんでした",
+    backHome: "ホームへ戻る",
+    progressSaveFailed: "読書の位置を保存できませんでした：{error}",
+    prefsSaveFailed: "表示設定を保存できませんでした：{error}",
+    close: "閉じる",
+    pageList: "ページ一覧",
+    displaySettings: "表示設定",
+    fullscreen: "全画面",
+    exitFullscreen: "全画面を終了",
+    incognito: "シークレット",
+    dirRtl: "右から左",
+    dirLtr: "左から右",
+    dirVertical: "縦",
+    pageAlt: "{page}ページ",
+    halfRightAlt: "{page}ページ（右半分）",
+    halfLeftAlt: "{page}ページ（左半分）",
+    page: "ページ",
+    finished: "{title}を読み終わりました",
+    readNext: "次の巻を読む（{title}）",
+    latestVolume: "このシリーズの最新巻です。",
+    backToSeries: "シリーズに戻る",
+    jumpTo: "{page}ページへ",
+  },
+  en: {
+    notReadable: "This book can't be read yet (it isn't analyzed or has no pages)",
+    notFound: "This book wasn't found",
+    backHome: "Back to home",
+    progressSaveFailed: "Couldn't save your reading position: {error}",
+    prefsSaveFailed: "Couldn't save display settings: {error}",
+    close: "Close",
+    pageList: "Page list",
+    displaySettings: "Display settings",
+    fullscreen: "Full screen",
+    exitFullscreen: "Exit full screen",
+    incognito: "Incognito",
+    dirRtl: "Right to left",
+    dirLtr: "Left to right",
+    dirVertical: "Vertical",
+    pageAlt: "Page {page}",
+    halfRightAlt: "Page {page}, right half",
+    halfLeftAlt: "Page {page}, left half",
+    page: "Page",
+    finished: "You finished {title}",
+    readNext: "Read next volume ({title})",
+    latestVolume: "This is the latest volume in the series.",
+    backToSeries: "Back to series",
+    jumpTo: "Go to page {page}",
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Reader. Priorities, in order: a page turn never waits (neighbours are
@@ -121,7 +175,7 @@ function useProgressSaver(
         // Let the next flush retry.
         if (sent.current === key) sent.current = "";
         moved.current = true;
-        if (!leaving) toast.error(`読書の位置を保存できませんでした：${errorMessage(err)}`);
+        if (!leaving) toast.error(translate(m, "progressSaveFailed", { error: errorMessage(err) }));
       });
     },
     [bookId, disabled],
@@ -165,6 +219,7 @@ export default function Reader() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const incognito = params.get("incognito") === "1";
+  const t = useT(m);
 
   const { data, loading, error } = useApi(async () => {
     const book = await api.book(bookId);
@@ -183,9 +238,9 @@ export default function Reader() {
     return (
       <div className="fixed inset-0 flex flex-col items-center justify-center gap-3 bg-black text-white">
         <p className={typeClass("title")}>
-          {error ?? (data ? "この本はまだ読めません（解析が済んでいないか、ページがありません）" : "この本は見つかりませんでした")}
+          {error ?? (data ? t("notReadable") : t("notFound"))}
         </p>
-        <Link to="/" className={cn(typeClass("body"), "text-white/70 underline-offset-4 hover:underline")}>ホームへ戻る</Link>
+        <Link to="/" className={cn(typeClass("body"), "text-white/70 underline-offset-4 hover:underline")}>{t("backHome")}</Link>
       </div>
     );
   }
@@ -240,7 +295,8 @@ function ReaderBody({
       }),
     [book.seriesId, book.id],
   );
-  const saveError = (err: unknown) => toast.error(`表示設定を保存できませんでした：${errorMessage(err)}`);
+  const t = useT(m);
+  const saveError = (err: unknown) => toast.error(translate(m, "prefsSaveFailed", { error: errorMessage(err) }));
   const saveSeries = (p: SeriesReaderPrefs) => void setSeriesPrefs(book.seriesId, p).catch(saveError);
   const saveBook = (p: SeriesReaderPrefs) => void setBookPrefs(book.id, p).catch(saveError);
   const changeScope = (s: ReaderScope) => {
@@ -463,7 +519,7 @@ function ReaderBody({
         style={{ pointerEvents: chrome ? "auto" : "none" }}
         inert={!chrome}
       >
-        <IconBtn label="閉じる" onClick={onExit}>
+        <IconBtn label={t("close")} onClick={onExit}>
           <ChevronLeft size={20} />
         </IconBtn>
         <div className="min-w-0 flex-1">
@@ -475,16 +531,16 @@ function ReaderBody({
         {incognito && (
           <span className={cn(typeClass("caption"), "inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5")}>
             <EyeOff size={14} />
-            シークレット
+            {t("incognito")}
           </span>
         )}
-        <IconBtn label="ページ一覧" onClick={() => setPanel((p) => (p === "pages" ? "none" : "pages"))} pressed={panel === "pages"}>
+        <IconBtn label={t("pageList")} onClick={() => setPanel((p) => (p === "pages" ? "none" : "pages"))} pressed={panel === "pages"}>
           <Grid2x2 size={18} />
         </IconBtn>
-        <IconBtn label="表示設定" onClick={() => setPanel((p) => (p === "settings" ? "none" : "settings"))} pressed={panel === "settings"}>
+        <IconBtn label={t("displaySettings")} onClick={() => setPanel((p) => (p === "settings" ? "none" : "settings"))} pressed={panel === "settings"}>
           <Settings size={18} />
         </IconBtn>
-        <IconBtn label={fullscreen ? "全画面を終了" : "全画面"} onClick={toggleFullscreen}>
+        <IconBtn label={fullscreen ? t("exitFullscreen") : t("fullscreen")} onClick={toggleFullscreen}>
           {fullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
         </IconBtn>
       </motion.header>
@@ -503,8 +559,8 @@ function ReaderBody({
               P.{currentPage} / {pageCount}
             </span>
             <DotRail value={currentPage} max={pageCount} rtl={forward === -1} onChange={goToPage} />
-            <span className={cn(typeClass("caption"), "w-16 text-right text-white/60")}>
-              {prefs.direction === "rtl" ? "右から左" : prefs.direction === "ltr" ? "左から右" : "縦"}
+            <span className={cn(typeClass("caption"), "min-w-16 shrink-0 whitespace-nowrap text-right text-white/60")}>
+              {prefs.direction === "rtl" ? t("dirRtl") : prefs.direction === "ltr" ? t("dirLtr") : t("dirVertical")}
             </span>
           </div>
         </motion.footer>
@@ -544,6 +600,7 @@ function IconBtn({ label, onClick, children, pressed }: { label: string; onClick
 }
 
 function PageImg({ src, page, fit, className }: { src: string; page: number; fit: ReaderPrefs["fit"]; className?: string }) {
+  const t = useT(m);
   const fitCls = {
     // Fills the stage both ways and keeps the aspect, so low-resolution scans grow too.
     screen: "size-full object-contain",
@@ -551,7 +608,7 @@ function PageImg({ src, page, fit, className }: { src: string; page: number; fit
     width: "w-full h-auto max-h-none",
     original: "max-w-none max-h-none",
   }[fit];
-  return <img src={src} alt={`${page}ページ`} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
+  return <img src={src} alt={t("pageAlt", { page })} draggable={false} decoding="sync" className={cn(fitCls, className)} />;
 }
 
 /** Whether a media query matches now; follows changes (rotation, resize). */
@@ -570,13 +627,14 @@ function useMatchMedia(query: string): boolean {
 /** One half of a landscape page, as large as the stage allows: a box with
  *  the half's aspect, sized with container units, cropping the image. */
 function HalfPage({ src, page, width, height, side }: { src: string; page: number; width: number; height: number; side: "left" | "right" }) {
+  const t = useT(m);
   const ar = width / 2 / height;
   return (
     <div className="flex size-full items-center justify-center" style={{ containerType: "size" }}>
       <div className="overflow-hidden" style={{ width: `min(100cqw, ${100 * ar}cqh)`, height: `min(100cqh, ${100 / ar}cqw)` }}>
         <img
           src={src}
-          alt={`${page}ページ（${side === "right" ? "右" : "左"}半分）`}
+          alt={side === "right" ? t("halfRightAlt", { page }) : t("halfLeftAlt", { page })}
           draggable={false}
           decoding="sync"
           className={cn("size-full object-cover", side === "right" ? "object-right" : "object-left")}
@@ -631,37 +689,39 @@ function Preload({ urls }: { urls: string[] }) {
 }
 
 function EndCard({ book, next, seriesId, incognito }: { book: Book; next: Book | null; seriesId: string; incognito: boolean }) {
+  const t = useT(m);
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 px-6 text-center" onPointerDown={(e) => e.stopPropagation()}>
       <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-        {book.title}を読み終わりました
+        {t("finished", { title: book.title })}
       </p>
       {next ? (
         <>
           <img src={next.thumbnailUrl} alt="" className="w-32 rounded-md shadow-lg" />
-          <BrandAction to={`/read/${next.id}?page=1${incognito ? "&incognito=1" : ""}`}>次の巻を読む（{next.title}）</BrandAction>
+          <BrandAction to={`/read/${next.id}?page=1${incognito ? "&incognito=1" : ""}`}>{t("readNext", { title: next.title })}</BrandAction>
         </>
       ) : (
-        <p className={cn(typeClass("body"), "opacity-70")}>このシリーズの最新巻です。</p>
+        <p className={cn(typeClass("body"), "opacity-70")}>{t("latestVolume")}</p>
       )}
       <Link to={`/series/${seriesId}`} className={cn(typeClass("body"), "opacity-70 underline-offset-4 hover:underline")}>
-        シリーズに戻る
+        {t("backToSeries")}
       </Link>
     </div>
   );
 }
 
 function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; current: number; rtl: boolean; onPick: (p: number) => void; onClose: () => void }) {
+  const t = useT(m);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>(`[data-page="${current}"]`)?.scrollIntoView({ inline: "center", block: "nearest" });
   }, [current]);
   return (
-    <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/8 bg-reader pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white" role="dialog" aria-label="ページ一覧">
+    <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/8 bg-reader pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white" role="dialog" aria-label={t("pageList")}>
       <div className="mb-2 flex items-center justify-between pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),4px)]">
-        <p className={typeClass("subtitle")}>ページ一覧</p>
+        <p className={typeClass("subtitle")}>{t("pageList")}</p>
         <button type="button" onClick={onClose} className={cn(typeClass("caption"), "-my-2 inline-flex h-11 items-center rounded px-3 text-white/70 hover:text-white")}>
-          <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
+          <span className="[text-box:trim-both_cap_alphabetic]">{t("close")}</span>
         </button>
       </div>
       <div ref={ref} dir={rtl ? "rtl" : "ltr"} className="shelf-scroll flex gap-2 overflow-x-auto px-4 pb-1">
@@ -673,7 +733,7 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
             onClick={() => onPick(p)}
             style={{ contentVisibility: "auto", containIntrinsicSize: "64px 120px" }}
             className={cn("w-16 shrink-0 rounded outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]", p === current && "ring-2 ring-[var(--brand)]")}
-            aria-label={`${p}ページへ`}
+            aria-label={t("jumpTo", { page: p })}
             aria-current={p === current ? "page" : undefined}
           >
             <img src={thumbnailUrl} alt="" loading="lazy" className="aspect-[2/3] w-full rounded object-cover" />
@@ -714,6 +774,7 @@ function WebtoonView({
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const byUser = useRef(false);
+  const t = useT(m);
   const activeRef = useRef(active);
   useEffect(() => {
     activeRef.current = active;
@@ -766,7 +827,7 @@ function WebtoonView({
             key={p}
             data-page={p}
             src={url}
-            alt={`${p}ページ`}
+            alt={t("pageAlt", { page: p })}
             loading={Math.abs(p - startPage) < 3 ? "eager" : "lazy"}
             className="block w-full [content-visibility:auto]"
             style={{ aspectRatio: `${width || 800} / ${height || 1280}` }}
@@ -785,6 +846,7 @@ function WebtoonView({
  *  books fill from the right). The real control is a native range input laid
  *  over it at opacity 0, so keyboard, touch and screen readers keep working. */
 function DotRail({ value, max, rtl, onChange }: { value: number; max: number; rtl: boolean; onChange: (page: number) => void }) {
+  const t = useT(m);
   const p = max > 1 ? (value - 1) / (max - 1) : 0;
   const side = rtl ? "right" : "left";
   const dots = "[background-image:radial-gradient(currentColor_1.5px,transparent_2px)] [background-size:9px_9px] [background-position:0_50%]";
@@ -806,7 +868,7 @@ function DotRail({ value, max, rtl, onChange }: { value: number; max: number; rt
         max={max}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        aria-label="ページ"
+        aria-label={t("page")}
         dir={rtl ? "rtl" : "ltr"}
         className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
       />

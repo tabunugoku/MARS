@@ -149,7 +149,7 @@ func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksReque
 		return nil, err
 	}
 	if !ok {
-		return GetAdjacentBooks404JSONResponse{notFound("本が見つかりません")}, nil
+		return GetAdjacentBooks404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	prev, err := s.listBooks(ctx, ` AND b.series_id = ? AND (b.number_sort, b.path) < (?, ?)`,
 		`ORDER BY b.number_sort DESC, b.path DESC LIMIT 1`, cur.SeriesId, cur.NumberSort, cur.Path)

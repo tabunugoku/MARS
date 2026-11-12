@@ -26,13 +26,13 @@ func (s *server) Setup(context.Context, SetupRequestObject) (SetupResponseObject
 
 // ─── Reading users ───────────────────────────────────────────────────────────
 
-const userCols = `id, name, email, role, can_download, can_stream, all_libraries, last_active`
+const userCols = `id, name, email, role, can_download, can_stream, all_libraries, last_active, locale`
 
 func scanUser(r scanner) (User, error) {
 	var u User
 	var role string
 	var last sql.NullString
-	err := r.Scan(&u.Id, &u.Name, &u.Email, &role, &u.CanDownload, &u.CanStream, &u.AllLibraries, &last)
+	err := r.Scan(&u.Id, &u.Name, &u.Email, &role, &u.CanDownload, &u.CanStream, &u.AllLibraries, &last, &u.Locale)
 	u.Role = Role(role)
 	if last.Valid {
 		u.LastActive = &last.String
@@ -71,11 +71,19 @@ func (s *server) GetMe(ctx context.Context, _ GetMeRequestObject) (GetMeResponse
 
 func (s *server) UpdateMe(ctx context.Context, req UpdateMeRequestObject) (UpdateMeResponseObject, error) {
 	n := strings.TrimSpace(req.Body.Name)
-	if msg := checkName(n); msg != "" {
-		return UpdateMe400JSONResponse{badRequest(msg)}, nil
+	if code := checkName(n); code != "" {
+		return UpdateMe400JSONResponse{badRequest(ctx, code)}, nil
+	}
+	// A nil locale keeps the stored one; "" means follow the browser.
+	var locale any
+	if req.Body.Locale != nil {
+		if !req.Body.Locale.Valid() {
+			return UpdateMe400JSONResponse{badRequest(ctx, "bad_request.locale")}, nil
+		}
+		locale = string(*req.Body.Locale)
 	}
 	uid := currentUser(ctx).ID
-	if _, err := s.DB.ExecContext(ctx, `UPDATE users SET name = ? WHERE id = ?`, n, uid); err != nil {
+	if _, err := s.DB.ExecContext(ctx, `UPDATE users SET name = ?, locale = COALESCE(?, locale) WHERE id = ?`, n, locale, uid); err != nil {
 		return nil, err
 	}
 	u, err := s.userByID(ctx, uid)
@@ -125,12 +133,12 @@ func (s *server) ListUsers(ctx context.Context, _ ListUsersRequestObject) (ListU
 
 func checkName(n string) string {
 	if c := utf8.RuneCountInString(n); c < 1 || c > 64 {
-		return "名前は1〜64文字にしてください"
+		return "bad_request.name_length"
 	}
 	// No "@": sign-in accepts a name or an email, so a name must never
 	// read as someone else's email.
 	if strings.ContainsRune(n, '@') || strings.IndexFunc(n, unicode.IsControl) >= 0 {
-		return "名前に @ や制御文字は使えません"
+		return "bad_request.name_chars"
 	}
 	return ""
 }
@@ -139,7 +147,7 @@ func checkEmail(e string) string {
 	at := strings.IndexByte(e, '@')
 	if len(e) > 254 || at < 1 || at != strings.LastIndexByte(e, '@') || at == len(e)-1 ||
 		strings.IndexFunc(e, func(r rune) bool { return unicode.IsSpace(r) || unicode.IsControl(r) }) >= 0 {
-		return "メールアドレスの形式が正しくありません"
+		return "bad_request.email"
 	}
 	return ""
 }
@@ -150,7 +158,7 @@ func uniqueViolation(err error) bool {
 	return err != nil && strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
 
-const takenMsg = "その名前かメールアドレスはすでに使われています"
+const takenMsg = "bad_request.name_taken"
 
 // checkLibraries reports a message when an id does not name a library.
 func checkLibraries(ctx context.Context, tx *sql.Tx, idList []string) (string, error) {
@@ -158,7 +166,7 @@ func checkLibraries(ctx context.Context, tx *sql.Tx, idList []string) (string, e
 		var one int
 		err := tx.QueryRowContext(ctx, `SELECT 1 FROM libraries WHERE id = ?`, id).Scan(&one)
 		if errors.Is(err, sql.ErrNoRows) {
-			return "存在しないライブラリが指定されています", nil
+			return "bad_request.unknown_library", nil
 		}
 		if err != nil {
 			return "", err
@@ -196,11 +204,11 @@ func (s *server) insertUser(ctx context.Context, c UserCreate) (id, msg string, 
 		return "", msg, nil
 	}
 	if !validRole(c.Role) {
-		return "", "権限の種類が正しくありません", nil
+		return "", "bad_request.role", nil
 	}
 	hash, err := auth.HashPassword(c.Password)
 	if errors.Is(err, auth.ErrWeakPassword) {
-		return "", "パスワードは8〜256文字にしてください", nil
+		return "", "bad_request.password_length", nil
 	}
 	if err != nil {
 		return "", "", err
@@ -242,7 +250,7 @@ func (s *server) CreateUser(ctx context.Context, req CreateUserRequestObject) (C
 		return nil, err
 	}
 	if msg != "" {
-		return CreateUser400JSONResponse{badRequest(msg)}, nil
+		return CreateUser400JSONResponse{badRequest(ctx, msg)}, nil
 	}
 	u, err := s.userByID(ctx, id)
 	if err != nil {
@@ -259,7 +267,7 @@ func adminsLeft(ctx context.Context, tx *sql.Tx) (int, error) {
 	return n, err
 }
 
-const lastAdminMsg = "管理者が1人もいなくなるため、この変更はできません"
+const lastAdminMsg = "bad_request.last_admin"
 
 func (s *server) UpdateUser(ctx context.Context, req UpdateUserRequestObject) (UpdateUserResponseObject, error) {
 	b := req.Body
@@ -268,27 +276,27 @@ func (s *server) UpdateUser(ctx context.Context, req UpdateUserRequestObject) (U
 	if b.Name != nil {
 		n := strings.TrimSpace(*b.Name)
 		if msg := checkName(n); msg != "" {
-			return UpdateUser400JSONResponse{badRequest(msg)}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, msg)}, nil
 		}
 		set, args = append(set, "name = ?"), append(args, n)
 	}
 	if b.Email != nil {
 		e := strings.TrimSpace(*b.Email)
 		if msg := checkEmail(e); msg != "" {
-			return UpdateUser400JSONResponse{badRequest(msg)}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, msg)}, nil
 		}
 		set, args = append(set, "email = ?"), append(args, e)
 	}
 	if b.Role != nil {
 		if !validRole(*b.Role) {
-			return UpdateUser400JSONResponse{badRequest("権限の種類が正しくありません")}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, "bad_request.role")}, nil
 		}
 		set, args = append(set, "role = ?"), append(args, string(*b.Role))
 	}
 	if b.Password != nil {
 		hash, err := auth.HashPassword(*b.Password)
 		if errors.Is(err, auth.ErrWeakPassword) {
-			return UpdateUser400JSONResponse{badRequest("パスワードは8〜256文字にしてください")}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, "bad_request.password_length")}, nil
 		}
 		if err != nil {
 			return nil, err
@@ -308,14 +316,14 @@ func (s *server) UpdateUser(ctx context.Context, req UpdateUserRequestObject) (U
 	defer tx.Rollback()
 	var one int
 	if err := tx.QueryRowContext(ctx, `SELECT 1 FROM users WHERE id = ?`, req.UserId).Scan(&one); errors.Is(err, sql.ErrNoRows) {
-		return UpdateUser404JSONResponse{notFound("ユーザーが見つかりません")}, nil
+		return UpdateUser404JSONResponse{notFound(ctx, "not_found.user")}, nil
 	} else if err != nil {
 		return nil, err
 	}
 	if len(set) > 0 {
 		_, err := tx.ExecContext(ctx, `UPDATE users SET `+strings.Join(set, ", ")+` WHERE id = ?`, append(args, req.UserId)...)
 		if uniqueViolation(err) {
-			return UpdateUser400JSONResponse{badRequest(takenMsg)}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, takenMsg)}, nil
 		}
 		if err != nil {
 			return nil, err
@@ -325,7 +333,7 @@ func (s *server) UpdateUser(ctx context.Context, req UpdateUserRequestObject) (U
 		if msg, err := checkLibraries(ctx, tx, *b.LibraryIds); err != nil {
 			return nil, err
 		} else if msg != "" {
-			return UpdateUser400JSONResponse{badRequest(msg)}, nil
+			return UpdateUser400JSONResponse{badRequest(ctx, msg)}, nil
 		}
 		if err := setLibraries(ctx, tx, req.UserId, *b.LibraryIds); err != nil {
 			return nil, err
@@ -334,7 +342,7 @@ func (s *server) UpdateUser(ctx context.Context, req UpdateUserRequestObject) (U
 	if n, err := adminsLeft(ctx, tx); err != nil {
 		return nil, err
 	} else if n == 0 {
-		return UpdateUser400JSONResponse{badRequest(lastAdminMsg)}, nil
+		return UpdateUser400JSONResponse{badRequest(ctx, lastAdminMsg)}, nil
 	}
 	if b.Password != nil {
 		// A new password signs the user out everywhere, except the
@@ -368,7 +376,7 @@ func deleteSessionsTx(ctx context.Context, tx *sql.Tx, userID, keepToken string)
 
 func (s *server) DeleteUser(ctx context.Context, req DeleteUserRequestObject) (DeleteUserResponseObject, error) {
 	if req.UserId == currentUser(ctx).ID {
-		return DeleteUser400JSONResponse{badRequest("自分自身は削除できません")}, nil
+		return DeleteUser400JSONResponse{badRequest(ctx, "bad_request.self_delete")}, nil
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -380,12 +388,12 @@ func (s *server) DeleteUser(ctx context.Context, req DeleteUserRequestObject) (D
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return DeleteUser404JSONResponse{notFound("ユーザーが見つかりません")}, nil
+		return DeleteUser404JSONResponse{notFound(ctx, "not_found.user")}, nil
 	}
 	if n, err := adminsLeft(ctx, tx); err != nil {
 		return nil, err
 	} else if n == 0 {
-		return DeleteUser400JSONResponse{badRequest(lastAdminMsg)}, nil
+		return DeleteUser400JSONResponse{badRequest(ctx, lastAdminMsg)}, nil
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -399,7 +407,7 @@ func (s *server) ChangePassword(ctx context.Context, req ChangePasswordRequestOb
 	me := currentUser(ctx)
 	key := "password:" + me.ID
 	if ok, _ := s.Limiter.Begin(key, time.Now()); !ok {
-		return ChangePassword400JSONResponse{badRequest("失敗が続いたため、しばらく変更できません")}, nil
+		return ChangePassword400JSONResponse{badRequest(ctx, "too_many_requests.password")}, nil
 	}
 	failed := false
 	defer func() { s.Limiter.End(key, failed, time.Now()) }()
@@ -409,18 +417,18 @@ func (s *server) ChangePassword(ctx context.Context, req ChangePasswordRequestOb
 	}
 	ok, err := auth.VerifyPassword(ctx, hash, req.Body.CurrentPassword)
 	if errors.Is(err, auth.ErrBusy) {
-		return ChangePassword400JSONResponse{badRequest("混み合っています。少し待ってからもう一度お試しください")}, nil
+		return ChangePassword400JSONResponse{badRequest(ctx, "unavailable.busy")}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
 		failed = true
-		return ChangePassword400JSONResponse{badRequest("今のパスワードが違います")}, nil
+		return ChangePassword400JSONResponse{badRequest(ctx, "bad_request.current_password")}, nil
 	}
 	next, err := auth.HashPassword(req.Body.NewPassword)
 	if errors.Is(err, auth.ErrWeakPassword) {
-		return ChangePassword400JSONResponse{badRequest("パスワードは8〜256文字にしてください")}, nil
+		return ChangePassword400JSONResponse{badRequest(ctx, "bad_request.password_length")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -439,7 +447,7 @@ func (s *server) ChangePassword(ctx context.Context, req ChangePasswordRequestOb
 	if n, err := res.RowsAffected(); err != nil {
 		return nil, err
 	} else if n == 0 {
-		return ChangePassword400JSONResponse{badRequest("パスワードがほかで変更されました。もう一度お試しください")}, nil
+		return ChangePassword400JSONResponse{badRequest(ctx, "conflict.password_changed")}, nil
 	}
 	keep, _ := ctx.Value(tokenKey).(string)
 	if err := deleteSessionsTx(ctx, tx, me.ID, keep); err != nil {
@@ -474,14 +482,14 @@ func (s *server) CreateApiKey(ctx context.Context, req CreateApiKeyRequestObject
 	me := currentUser(ctx)
 	name := strings.TrimSpace(req.Body.Name)
 	if c := utf8.RuneCountInString(name); c < 1 || c > 64 || strings.IndexFunc(name, unicode.IsControl) >= 0 {
-		return CreateApiKey400JSONResponse{badRequest("名前は1〜64文字にしてください")}, nil
+		return CreateApiKey400JSONResponse{badRequest(ctx, "bad_request.name_length")}, nil
 	}
 	var n int
 	if err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM api_keys WHERE user_id = ?`, me.ID).Scan(&n); err != nil {
 		return nil, err
 	}
 	if n >= maxAPIKeys {
-		return CreateApiKey400JSONResponse{badRequest("API キーは50個までです")}, nil
+		return CreateApiKey400JSONResponse{badRequest(ctx, "bad_request.api_key_limit")}, nil
 	}
 	id, key, err := s.Auth.CreateAPIKey(ctx, me.ID, name)
 	if err != nil {
@@ -496,7 +504,7 @@ func (s *server) DeleteApiKey(ctx context.Context, req DeleteApiKeyRequestObject
 		return nil, err
 	}
 	if !ok {
-		return DeleteApiKey404JSONResponse{notFound("API キーが見つかりません")}, nil
+		return DeleteApiKey404JSONResponse{notFound(ctx, "not_found.api_key")}, nil
 	}
 	return DeleteApiKey204Response{}, nil
 }

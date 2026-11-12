@@ -47,11 +47,11 @@ func New(d Deps) http.Handler {
 	s := &server{d}
 	strict := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{requireAdmin}, StrictHTTPServerOptions{
 		RequestErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
-			writeError(w, http.StatusBadRequest, err.Error())
+			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
 			slog.Error("api", "path", r.URL.Path, "err", err)
-			writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+			writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		},
 	})
 	mux := http.NewServeMux()
@@ -66,14 +66,28 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("GET /series/{seriesId}/file", s.serveSeriesZip)
 	mux.HandleFunc("GET /public/covers/{seriesId}", s.servePublicCover)
 	mux.HandleFunc("GET /events", s.serveEvents)
-	mux.Handle("/", HandlerFromMux(strict, http.NewServeMux()))
-	return s.authenticate(mux)
+	// Any path no route matches answers as JSON, not as the mux's plain text.
+	api := http.NewServeMux()
+	api.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.route")
+	})
+	mux.Handle("/", HandlerWithOptions(strict, StdHTTPServerOptions{
+		BaseRouter: api,
+		// A query parameter that does not parse (limit=oops) gets the same JSON
+		// error as every other bad request, not the generated plain text.
+		ErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
+		},
+	}))
+	return withLocale(s.authenticate(mux))
 }
 
-func writeError(w http.ResponseWriter, code int, msg string) {
+// writeError answers with the error JSON: a code and its text in the
+// request's language (see msg).
+func writeError(ctx context.Context, w http.ResponseWriter, status int, code string, args ...any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	_ = json.NewEncoder(w).Encode(Error{Message: msg})
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(Error{Code: code, Message: msg(ctx, code, args...)})
 }
 
 func (s *server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHealthResponseObject, error) {

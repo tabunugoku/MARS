@@ -16,6 +16,64 @@ import { MenuItem } from "@/components/ui/menu-item";
 import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    notFound: "コレクションが見つかりません",
+    backToCollections: "コレクションへ戻る",
+    collections: "コレクション",
+    renamed: "名前を変更しました",
+    deleted: "削除しました",
+    conflict: "ほかの画面で変更されました。読み込み直します",
+    orderSaved: "並び順を保存しました",
+    removedFromCollection: "コレクションから外しました",
+    removeFromCollection: "コレクションから外す",
+    seriesCount: ({ n }) => `シリーズ ${n}`,
+    manualOrder: "手動の並び順",
+    autoOrder: "自動の並び順",
+    moreActions: "その他の操作",
+    rename: "名前を変更",
+    delete: "削除",
+    deleteTitle: "コレクションを削除",
+    name: "名前",
+    cancel: "キャンセル",
+    save: "保存",
+    deleteBody: "「{name}」を削除します。シリーズは削除されません。",
+    emptyTitle: "シリーズがありません",
+    emptyAdmin: "シリーズの「その他」メニューの「コレクションに追加」から追加できます。",
+    emptyUser: "管理者がシリーズを追加すると、ここに表示されます",
+    up: "上へ",
+    down: "下へ",
+  },
+  en: {
+    notFound: "Collection not found",
+    backToCollections: "Back to collections",
+    collections: "Collections",
+    renamed: "Name changed",
+    deleted: "Deleted",
+    conflict: "Changed on another screen. Reloading",
+    orderSaved: "Order saved",
+    removedFromCollection: "Removed from collection",
+    removeFromCollection: "Remove from collection",
+    seriesCount: ({ n }) => (n === 1 ? "1 series" : `${n} series`),
+    manualOrder: "Manual order",
+    autoOrder: "Automatic order",
+    moreActions: "More actions",
+    rename: "Rename",
+    delete: "Delete",
+    deleteTitle: "Delete collection",
+    name: "Name",
+    cancel: "Cancel",
+    save: "Save",
+    deleteBody: 'Delete "{name}". Series are not deleted.',
+    emptyTitle: "No series",
+    emptyAdmin: "Add series from a series' More menu, with Add to collection.",
+    emptyUser: "Series added by an admin will show up here",
+    up: "Up",
+    down: "Down",
+  },
+});
 
 /** The items in the order of ids; items whose id is not listed are dropped. */
 function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
@@ -24,6 +82,7 @@ function orderBy<T extends { id: string }>(xs: T[], ids: string[]): T[] {
 }
 
 export default function Screen() {
+  const t = useT(m);
   const { collectionId = "" } = useParams();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<"rename" | "delete" | null>(null);
@@ -61,7 +120,7 @@ export default function Screen() {
   if (!c) {
     return (
       <Page>
-        <EmptyState title="コレクションが見つかりません" action={<Button variant="secondary" onClick={() => navigate("/collections")}>コレクションへ戻る</Button>} />
+        <EmptyState title={t("notFound")} action={<Button variant="secondary" onClick={() => navigate("/collections")}>{t("backToCollections")}</Button>} />
       </Page>
     );
   }
@@ -79,7 +138,7 @@ export default function Screen() {
     api
       .updateCollection(c.id, { name: name.trim() })
       .then(() => {
-        toast.success("名前を変更しました");
+        toast.success(t("renamed"));
         setDialog(null);
         reload();
       })
@@ -92,7 +151,7 @@ export default function Screen() {
     api
       .deleteCollection(c.id)
       .then(() => {
-        toast.success("削除しました");
+        toast.success(t("deleted"));
         navigate("/collections");
       })
       .catch((err: unknown) => toast.error(errorMessage(err)))
@@ -113,7 +172,7 @@ export default function Screen() {
       .catch((err: unknown) => {
         setBusy(false);
         if (err instanceof ApiError && err.status === 409) {
-          toast.error("ほかの画面で変更されました。読み込み直します");
+          toast.error(t("conflict"));
           reload();
         } else {
           toast.error(errorMessage(err));
@@ -127,32 +186,32 @@ export default function Screen() {
     const target = index + by;
     if (index < 0 || target < 0 || target >= ids.length) return;
     [ids[index], ids[target]] = [ids[target], ids[index]];
-    commit(api.reorderCollection(c.id, ids), "並び順を保存しました");
+    commit(api.reorderCollection(c.id, ids), t("orderSaved"));
   };
 
   const removeFromCollection = (seriesId: string) => {
-    commit(api.removeCollectionSeries(c.id, seriesId), "コレクションから外しました");
+    commit(api.removeCollectionSeries(c.id, seriesId), t("removedFromCollection"));
   };
 
   return (
     <Page>
       <PageHeader
-        back={{ to: "/collections", label: "コレクション" }}
+        back={{ to: "/collections", label: t("collections") }}
         title={c.name}
-        meta={`シリーズ ${shown.length} · ${c.ordered ? "手動の並び順" : "自動の並び順"}`}
+        meta={`${t("seriesCount", { n: shown.length })} · ${c.ordered ? t("manualOrder") : t("autoOrder")}`}
         actions={
           isAdmin && (
             <DropdownMenu>
-              <Tooltip content="その他の操作">
+              <Tooltip content={t("moreActions")}>
                 <span className="inline-flex">
-                  <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
+                  <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")} />}>
                     <MoreHorizontal size={16} />
                   </DropdownTrigger>
                 </span>
               </Tooltip>
               <DropdownContent align="end">
-                <MenuItem index={0} label="名前を変更" icon={SquarePen} onSelect={() => openDialog("rename")} />
-                <MenuItem index={1} label="削除" onSelect={() => openDialog("delete")} />
+                <MenuItem index={0} label={t("rename")} icon={SquarePen} onSelect={() => openDialog("rename")} />
+                <MenuItem index={1} label={t("delete")} onSelect={() => openDialog("delete")} />
               </DropdownContent>
             </DropdownMenu>
           )
@@ -164,31 +223,31 @@ export default function Screen() {
           {dialog === "rename" ? (
             <>
               <DialogHeader>
-                <DialogTitle>名前を変更</DialogTitle>
+                <DialogTitle>{t("rename")}</DialogTitle>
               </DialogHeader>
               <Field>
-                <FieldLabel htmlFor="collection-name">名前</FieldLabel>
+                <FieldLabel htmlFor="collection-name">{t("name")}</FieldLabel>
                 <Input id="collection-name" value={name} onChange={(e) => setName(e.target.value)} />
               </Field>
               <DialogFooter>
-                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
                 <Button variant="primary" disabled={!name.trim() || busy} onClick={save}>
-                  保存
+                  {t("save")}
                 </Button>
               </DialogFooter>
             </>
           ) : (
             <>
               <DialogHeader>
-                <DialogTitle>コレクションを削除</DialogTitle>
+                <DialogTitle>{t("deleteTitle")}</DialogTitle>
               </DialogHeader>
               <p className={cn(typeClass("body"), "text-muted-foreground")}>
-                「{c.name}」を削除します。シリーズは削除されません。
+                {t("deleteBody", { name: c.name })}
               </p>
               <DialogFooter>
-                <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+                <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
                 <Button variant="destructive" disabled={busy} onClick={remove}>
-                  削除
+                  {t("delete")}
                 </Button>
               </DialogFooter>
             </>
@@ -197,10 +256,7 @@ export default function Screen() {
       </Dialog>
 
       {shown.length === 0 ? (
-        <EmptyState
-          title="シリーズがありません"
-          body={isAdmin ? "シリーズの「その他」メニューの「コレクションに追加」から追加できます。" : "管理者がシリーズを追加すると、ここに表示されます"}
-        />
+        <EmptyState title={t("emptyTitle")} body={isAdmin ? t("emptyAdmin") : t("emptyUser")} />
       ) : (
         <CoverGrid>
           {shown.map((s, i) => (
@@ -210,12 +266,12 @@ export default function Screen() {
                 <div className="flex items-center gap-1">
                   {c.ordered && (
                     <>
-                      <Tooltip content="上へ">
+                      <Tooltip content={t("up")}>
                         <span className="inline-flex">
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="上へ"
+                            aria-label={t("up")}
                             disabled={busy || i === 0}
                             onClick={() => move(s.id, -1)}
                           >
@@ -223,12 +279,12 @@ export default function Screen() {
                           </Button>
                         </span>
                       </Tooltip>
-                      <Tooltip content="下へ">
+                      <Tooltip content={t("down")}>
                         <span className="inline-flex">
                           <Button
                             variant="ghost"
                             size="icon"
-                            aria-label="下へ"
+                            aria-label={t("down")}
                             disabled={busy || i === shown.length - 1}
                             onClick={() => move(s.id, 1)}
                           >
@@ -238,12 +294,12 @@ export default function Screen() {
                       </Tooltip>
                     </>
                   )}
-                  <Tooltip content="コレクションから外す">
+                  <Tooltip content={t("removeFromCollection")}>
                     <span className="inline-flex">
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="コレクションから外す"
+                        aria-label={t("removeFromCollection")}
                         disabled={busy}
                         onClick={() => removeFromCollection(s.id)}
                       >

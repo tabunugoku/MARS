@@ -113,9 +113,9 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 	if err != nil {
 		return task.Task{}, err
 	}
-	key, label := "scan", l.name+" をスキャン"
+	key, label := "scan", task.Text{Code: "task.scan", Arg: l.name, English: "Scan " + l.name}
 	if deep {
-		key, label = "scan:deep", l.name+" を詳細スキャン"
+		key, label = "scan:deep", task.Text{Code: "task.scan_deep", Arg: l.name, English: "Deep scan " + l.name}
 	}
 	return s.Queue.SubmitKey(ctx, "scan", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
 		l, err := s.load(ctx, libraryID) // settings may have changed while queued
@@ -136,7 +136,8 @@ func (s *Service) queueScan(ctx context.Context, libraryID string, deep bool) (t
 		if err != nil {
 			mu.Unlock()
 			s.scans.leave()
-			return fmt.Errorf("フォルダを読めません: %w", err)
+			// The path goes into the English text only: the API's text has none.
+			return &task.CodedError{Code: "task.folder_unreadable", Err: fmt.Errorf("cannot read the folder %s: %w", l.root, err)}
 		}
 		progress(0.5)
 		st, err := scan.Sync(ctx, s.DB, l.id, l.kind, found, time.Now())
@@ -173,9 +174,9 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 	if err != nil {
 		return task.Task{}, err
 	}
-	key, label, which := "analyze", l.name+" の解析", ` AND media_status = 'outdated'`
+	key, label, which := "analyze", task.Text{Code: "task.analyze", Arg: l.name, English: "Analyze " + l.name}, ` AND media_status = 'outdated'`
 	if deep {
-		key, label, which = "analyze:deep", l.name+" の詳細解析", ""
+		key, label, which = "analyze:deep", task.Text{Code: "task.analyze_deep", Arg: l.name, English: "Deep analyze " + l.name}, ""
 	}
 	return s.Queue.SubmitKey(ctx, "analyze", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
 		l, err := s.load(ctx, libraryID)
@@ -401,7 +402,7 @@ func (s *Service) markBook(ctx context.Context, bookID string, v version, status
 // '..' and absolute paths.
 func resolve(root, rel string) (archive.Path, error) {
 	if !filepath.IsLocal(filepath.FromSlash(rel)) {
-		return archive.Path{}, fmt.Errorf("不正なパス: %q", rel)
+		return archive.Path{}, fmt.Errorf("invalid path: %q", rel)
 	}
 	// Containment is enforced when the file is opened: archive.OpenPath
 	// goes through os.Root, which refuses anything that resolves outside

@@ -21,6 +21,10 @@ ignores a stale one. `web/` talks to the Go API through
 app shell only and must never touch `/api`. On touch screens every control
 answers to 44 px (`.touch-hit` in `styles/tokens.css`). The invented sample data in `web/src/mock/` loads only
 when `VITE_API=mock` (`npm run dev:mock`) and never ships in a normal build.
+The interface is Japanese and English (`docs/i18n.md`): every UI string lives
+in a `defineMessages` block (ja and en) next to its code, server errors carry
+a `code` and a message in the request's `Accept-Language`, and
+`npm run i18n:check` (CI) fails on Japanese left outside a `ja:` block.
 
 ## Working agreement
 

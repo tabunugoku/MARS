@@ -19,22 +19,107 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/u
 import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, intlLocale, useT } from "@/i18n";
 
-const SORTS: { value: SeriesSort; label: string }[] = [
-  { value: "title", label: "タイトル" },
-  { value: "updated", label: "更新日" },
-  { value: "created", label: "追加日" },
-  { value: "bookCount", label: "巻数" },
+const m = defineMessages({
+  ja: {
+    allLibraries: "すべてのライブラリ",
+    library: "ライブラリ",
+    sortTitle: "タイトル",
+    sortUpdated: "更新日",
+    sortAdded: "追加日",
+    sortBookCount: "巻数",
+    readUnread: "未読",
+    readInProgress: "読みかけ",
+    readRead: "既読",
+    moreActions: "その他の操作",
+    scan: "スキャン",
+    scanStarted: "スキャンを開始しました",
+    markLibraryRead: "ライブラリを既読にする",
+    markLibraryUnread: "ライブラリを未読にする",
+    markedRead: "既読にしました",
+    markedUnread: "未読にしました",
+    libraryConfig: "ライブラリ設定",
+    libraryNotFound: "ライブラリが見つかりません",
+    libraryNotFoundBody: "ライブラリの一覧からもう一度選んでください",
+    seriesLabel: "シリーズ",
+    booksLabel: "本",
+    seriesTotal: ({ n }) => `${n} シリーズ`,
+    sortLabel: "並び順",
+    sortReverse: "並び順を逆にする",
+    sortAsc: "昇順",
+    sortDesc: "降順",
+    filters: "絞り込み",
+    filtersCount: ({ n }) => `絞り込み ${n}`,
+    readState: "既読状態",
+    status: "ステータス",
+    genres: "ジャンル",
+    clear: "クリア",
+    removeChip: "{label}を外す",
+    noMatch: "条件に合うシリーズがありません",
+    clearFilters: "絞り込みをクリア",
+    noSeries: "シリーズがありません",
+    noSeriesBody: "ライブラリをスキャンすると、ここに表示されます",
+  },
+  en: {
+    allLibraries: "All libraries",
+    library: "Library",
+    sortTitle: "Title",
+    sortUpdated: "Updated",
+    sortAdded: "Added",
+    sortBookCount: "Book count",
+    readUnread: "Unread",
+    readInProgress: "In progress",
+    readRead: "Read",
+    moreActions: "More actions",
+    scan: "Scan",
+    scanStarted: "Scan started",
+    markLibraryRead: "Mark library as read",
+    markLibraryUnread: "Mark library as unread",
+    markedRead: "Marked as read",
+    markedUnread: "Marked as unread",
+    libraryConfig: "Library settings",
+    libraryNotFound: "Library not found",
+    libraryNotFoundBody: "Pick it again from the library list",
+    seriesLabel: "Series",
+    booksLabel: "Books",
+    seriesTotal: ({ n }) => `${n} series`,
+    sortLabel: "Sort order",
+    sortReverse: "Reverse sort order",
+    sortAsc: "Ascending",
+    sortDesc: "Descending",
+    filters: "Filters",
+    filtersCount: ({ n }) => `Filters ${n}`,
+    readState: "Read state",
+    status: "Status",
+    genres: "Genres",
+    clear: "Clear",
+    removeChip: "Remove {label}",
+    noMatch: "No series match these filters",
+    clearFilters: "Clear filters",
+    noSeries: "No series yet",
+    noSeriesBody: "Scan the library and series will show up here",
+  },
+});
+
+type Key = keyof typeof m.ja;
+
+const SORTS: { value: SeriesSort; label: Key }[] = [
+  { value: "title", label: "sortTitle" },
+  { value: "updated", label: "sortUpdated" },
+  { value: "created", label: "sortAdded" },
+  { value: "bookCount", label: "sortBookCount" },
 ];
 type ReadState = "unread" | "inProgress" | "read";
-const READ_STATES: { value: ReadState; label: string }[] = [
-  { value: "unread", label: "未読" },
-  { value: "inProgress", label: "読みかけ" },
-  { value: "read", label: "既読" },
+const READ_STATES: { value: ReadState; label: Key }[] = [
+  { value: "unread", label: "readUnread" },
+  { value: "inProgress", label: "readInProgress" },
+  { value: "read", label: "readRead" },
 ];
 const STATUSES: SeriesStatus[] = ["ongoing", "ended", "hiatus", "abandoned"];
 
 export default function Screen() {
+  const t = useT(m);
   const { libraryId = "all" } = useParams();
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -79,7 +164,7 @@ export default function Screen() {
   const one = useApi(() => (isAll ? Promise.resolve(undefined) : api.library(libraryId)), [libraryId]);
   // Genre options of this scope, from the server (not from a full list).
   const genreList = useApi(() => api.genres(scope), [scope]);
-  const genres = [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, "ja"));
+  const genres = [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, intlLocale()));
   // A page at a time; a new scope, sort or filter starts again from the top.
   const seriesList = usePagedApi(
     (offset, limit) =>
@@ -117,10 +202,10 @@ export default function Screen() {
         { series: 0, books: 0, size: 0 },
       )
     : library && { series: library.seriesCount, books: library.bookCount, size: library.sizeBytes };
-  const title = isAll ? "すべてのライブラリ" : (library?.name ?? "ライブラリ");
+  const title = isAll ? t("allLibraries") : (library?.name ?? t("library"));
   const meta = totals ? (
     <span className="font-mono">
-      シリーズ <CountUp value={totals.series} /> · 本 <CountUp value={totals.books} /> · {formatBytes(totals.size)}
+      {t("seriesLabel")} <CountUp value={totals.series} /> · {t("booksLabel")} <CountUp value={totals.books} /> · {formatBytes(totals.size)}
     </span>
   ) : undefined;
 
@@ -146,31 +231,35 @@ export default function Screen() {
         ...(isAdmin
           ? [
               {
-                label: "スキャン",
+                label: t("scan"),
                 icon: Scan,
                 disabled: busy,
-                run: () => runAction(() => api.scanLibrary(libraryId), "スキャンを開始しました", false),
+                run: () => runAction(() => api.scanLibrary(libraryId), t("scanStarted"), false),
               },
             ]
           : []),
         {
-          label: "ライブラリを既読にする",
+          label: t("markLibraryRead"),
           icon: CircleCheck,
           disabled: busy,
-          run: () => runAction(() => api.markLibraryRead(libraryId, true), "既読にしました", true),
+          run: () => runAction(() => api.markLibraryRead(libraryId, true), t("markedRead"), true),
         },
         {
-          label: "ライブラリを未読にする",
+          label: t("markLibraryUnread"),
           icon: Circle,
           disabled: busy,
-          run: () => runAction(() => api.markLibraryRead(libraryId, false), "未読にしました", true),
+          run: () => runAction(() => api.markLibraryRead(libraryId, false), t("markedUnread"), true),
         },
-        ...(isAdmin ? [{ label: "ライブラリ設定", icon: Settings, disabled: false, run: () => navigate("/admin/libraries") }] : []),
+        ...(isAdmin ? [{ label: t("libraryConfig"), icon: Settings, disabled: false, run: () => navigate("/admin/libraries") }] : []),
       ];
 
+  const readLabel = (v: string) => {
+    const r = READ_STATES.find((x) => x.value === v);
+    return r ? t(r.label) : v;
+  };
   const chips = [
-    ...read.map((v) => ({ key: `read-${v}`, label: READ_STATES.find((r) => r.value === v)?.label ?? v, remove: () => toggle("read", read, v) })),
-    ...status.map((v) => ({ key: `status-${v}`, label: statusLabel[v], remove: () => toggle("status", status, v) })),
+    ...read.map((v) => ({ key: `read-${v}`, label: readLabel(v), remove: () => toggle("read", read, v) })),
+    ...status.map((v) => ({ key: `status-${v}`, label: statusLabel()[v], remove: () => toggle("status", status, v) })),
     ...genre.map((v) => ({ key: `genre-${v}`, label: v, remove: () => toggle("genre", genre, v) })),
   ];
 
@@ -182,9 +271,9 @@ export default function Screen() {
       actions={
         isAll ? undefined : (
           <DropdownMenu>
-            <Tooltip content="その他の操作">
+            <Tooltip content={t("moreActions")}>
               <span className="inline-flex">
-                <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label="その他の操作" />}>
+                <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")} />}>
                   <MoreHorizontal size={16} />
                 </DropdownTrigger>
               </span>
@@ -203,7 +292,7 @@ export default function Screen() {
   if (!isAll && one.data === null) {
     return (
       <Page>
-        <EmptyState title="ライブラリが見つかりません" body="ライブラリの一覧からもう一度選んでください" />
+        <EmptyState title={t("libraryNotFound")} body={t("libraryNotFoundBody")} />
       </Page>
     );
   }
@@ -233,23 +322,23 @@ export default function Screen() {
       {header}
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
-        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{seriesList.total} シリーズ</p>
+        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
         <div className="flex items-center gap-2">
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
-            <SelectTrigger aria-label="並び順" />
+            <SelectTrigger aria-label={t("sortLabel")} />
             <SelectContent>
               {SORTS.map((s, i) => (
                 <SelectItem key={s.value} index={i} value={s.value}>
-                  {s.label}
+                  {t(s.label)}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <Tooltip content={desc ? "降順" : "昇順"}>
+          <Tooltip content={desc ? t("sortDesc") : t("sortAsc")}>
             <Button
               variant="ghost"
               size="icon"
-              aria-label="並び順を逆にする"
+              aria-label={t("sortReverse")}
               onClick={() => update({ desc: desc ? null : "1" })}
             >
               <ArrowUpDown size={16} />
@@ -261,31 +350,31 @@ export default function Screen() {
             onClick={() => setPanelOpen((o) => !o)}
             leadingIcon={SlidersHorizontal as IconComponent}
           >
-            {filterCount > 0 ? `絞り込み ${filterCount}` : "絞り込み"}
+            {filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}
           </Button>
         </div>
       </div>
 
       {panelOpen && (
         <div className="mb-4 grid gap-4 rounded-[12px] bg-card p-4 md:grid-cols-3">
-          <FilterGroup title="既読状態">
+          <FilterGroup title={t("readState")}>
             {READ_STATES.map((o) => (
-              <CheckRow key={o.value} label={o.label} checked={read.includes(o.value)} onChange={() => toggle("read", read, o.value)} />
+              <CheckRow key={o.value} label={t(o.label)} checked={read.includes(o.value)} onChange={() => toggle("read", read, o.value)} />
             ))}
           </FilterGroup>
-          <FilterGroup title="ステータス">
+          <FilterGroup title={t("status")}>
             {STATUSES.map((v) => (
-              <CheckRow key={v} label={statusLabel[v]} checked={status.includes(v)} onChange={() => toggle("status", status, v)} />
+              <CheckRow key={v} label={statusLabel()[v]} checked={status.includes(v)} onChange={() => toggle("status", status, v)} />
             ))}
           </FilterGroup>
-          <FilterGroup title="ジャンル">
+          <FilterGroup title={t("genres")}>
             {genres.map((g) => (
               <CheckRow key={g} label={g} checked={genre.includes(g)} onChange={() => toggle("genre", genre, g)} />
             ))}
           </FilterGroup>
           <div className="flex justify-end md:col-span-3">
             <Button variant="ghost" onClick={clearAll}>
-              クリア
+              {t("clear")}
             </Button>
           </div>
         </div>
@@ -298,7 +387,7 @@ export default function Screen() {
               key={c.key}
               type="button"
               onClick={c.remove}
-              aria-label={`${c.label}を外す`}
+              aria-label={t("removeChip", { label: c.label })}
               className={cn(
                 typeClass("body"),
                 "inline-flex h-9 items-center gap-1 rounded-full bg-muted px-3 text-foreground outline-none focus-visible:ring-2 ring-[var(--focus-ring)]",
@@ -314,15 +403,15 @@ export default function Screen() {
       {series.length === 0 ? (
         filterCount > 0 ? (
           <EmptyState
-            title="条件に合うシリーズがありません"
+            title={t("noMatch")}
             action={
               <Button variant="secondary" onClick={clearAll}>
-                絞り込みをクリア
+                {t("clearFilters")}
               </Button>
             }
           />
         ) : (
-          <EmptyState title="シリーズがありません" body="ライブラリをスキャンすると、ここに表示されます" />
+          <EmptyState title={t("noSeries")} body={t("noSeriesBody")} />
         )
       ) : (
         <>

@@ -21,8 +21,15 @@ import (
 	"github.com/tabunugoku/cominavi/server/internal/task"
 )
 
-func notFound(msg string) NotFoundJSONResponse     { return NotFoundJSONResponse{Message: msg} }
-func badRequest(msg string) BadRequestJSONResponse { return BadRequestJSONResponse{Message: msg} }
+// notFound and badRequest build the error bodies of the generated responses:
+// a catalog code, and its text in the request's language.
+func notFound(ctx context.Context, code string, args ...any) NotFoundJSONResponse {
+	return NotFoundJSONResponse{Code: code, Message: msg(ctx, code, args...)}
+}
+
+func badRequest(ctx context.Context, code string, args ...any) BadRequestJSONResponse {
+	return BadRequestJSONResponse{Code: code, Message: msg(ctx, code, args...)}
+}
 
 func strs(s string) []string {
 	var out []string
@@ -81,7 +88,9 @@ func (s *server) libraryView(ctx context.Context, l Library) Library {
 	// Root, exclusions and watcher state are administrators' business.
 	watchErr := ""
 	if currentUser(ctx).IsAdmin() {
-		watchErr = s.Library.WatchError(l.Id)
+		if code := s.Library.WatchError(l.Id); code != "" {
+			watchErr = msg(ctx, code)
+		}
 	} else {
 		l.Root, l.Exclude = "", []string{}
 	}
@@ -110,7 +119,7 @@ func (s *server) ListLibraries(ctx context.Context, _ ListLibrariesRequestObject
 func (s *server) GetLibrary(ctx context.Context, req GetLibraryRequestObject) (GetLibraryResponseObject, error) {
 	l, err := s.getLibrary(ctx, req.LibraryId)
 	if errors.Is(err, sql.ErrNoRows) {
-		return GetLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return GetLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -134,31 +143,32 @@ func validInterval(i ScanInterval) bool {
 	return false
 }
 
-func validExclude(pats []string) error {
+// badPattern returns the first exclusion pattern path.Match rejects, or "".
+func badPattern(pats []string) string {
 	for _, p := range pats {
 		if _, err := path.Match(p, ""); err != nil {
-			return fmt.Errorf("除外パターンが正しくありません: %q", p)
+			return p
 		}
 	}
-	return nil
+	return ""
 }
 
 func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObject) (CreateLibraryResponseObject, error) {
 	b := req.Body
 	if b == nil {
-		return CreateLibrary400JSONResponse{badRequest("本文がありません")}, nil
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	name := strings.TrimSpace(b.Name)
 	if name == "" {
-		return CreateLibrary400JSONResponse{badRequest("名前を入力してください")}, nil
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 	}
 	if !validKind(b.Kind) {
-		return CreateLibrary400JSONResponse{badRequest("種類が正しくありません")}, nil
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.kind")}, nil
 	}
 	interval := ScanIntervalDaily
 	if b.ScanInterval != nil {
 		if !validInterval(*b.ScanInterval) {
-			return CreateLibrary400JSONResponse{badRequest("スキャン間隔が正しくありません")}, nil
+			return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.scan_interval")}, nil
 		}
 		interval = *b.ScanInterval
 	}
@@ -166,15 +176,15 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 	if b.Exclude != nil {
 		exclude = *b.Exclude
 	}
-	if err := validExclude(exclude); err != nil {
-		return CreateLibrary400JSONResponse{badRequest(err.Error())}, nil
+	if bad := badPattern(exclude); bad != "" {
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.exclude_pattern", bad)}, nil
 	}
 	if !filepath.IsAbs(b.Root) {
-		return CreateLibrary400JSONResponse{badRequest("フォルダは絶対パスで指定してください")}, nil
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.root_not_absolute")}, nil
 	}
 	root := filepath.Clean(b.Root)
 	if st, err := os.Stat(root); err != nil || !st.IsDir() {
-		return CreateLibrary400JSONResponse{badRequest("フォルダが見つかりません")}, nil
+		return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.root_missing")}, nil
 	}
 	importCI := true
 	if b.ImportComicInfo != nil {
@@ -191,7 +201,7 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 		id, name, root, string(b.Kind), string(interval), watch, importCI, jsonText(exclude), time.Now().UTC().Format(time.RFC3339Nano))
 	if err != nil {
 		if strings.Contains(err.Error(), "UNIQUE") {
-			return CreateLibrary400JSONResponse{badRequest("このフォルダは別のライブラリに登録済みです")}, nil
+			return CreateLibrary400JSONResponse{badRequest(ctx, "bad_request.root_taken")}, nil
 		}
 		return nil, err
 	}
@@ -207,31 +217,31 @@ func (s *server) CreateLibrary(ctx context.Context, req CreateLibraryRequestObje
 
 func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObject) (UpdateLibraryResponseObject, error) {
 	if _, err := s.getLibrary(ctx, req.LibraryId); errors.Is(err, sql.ErrNoRows) {
-		return UpdateLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return UpdateLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	} else if err != nil {
 		return nil, err
 	}
 	b := req.Body
 	if b == nil {
-		return UpdateLibrary400JSONResponse{badRequest("本文がありません")}, nil
+		return UpdateLibrary400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	set, args := []string{}, []any{}
 	if b.Name != nil {
 		n := strings.TrimSpace(*b.Name)
 		if n == "" {
-			return UpdateLibrary400JSONResponse{badRequest("名前を入力してください")}, nil
+			return UpdateLibrary400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 		}
 		set, args = append(set, "name = ?"), append(args, n)
 	}
 	if b.Kind != nil {
 		if !validKind(*b.Kind) {
-			return UpdateLibrary400JSONResponse{badRequest("種類が正しくありません")}, nil
+			return UpdateLibrary400JSONResponse{badRequest(ctx, "bad_request.kind")}, nil
 		}
 		set, args = append(set, "kind = ?"), append(args, string(*b.Kind))
 	}
 	if b.ScanInterval != nil {
 		if !validInterval(*b.ScanInterval) {
-			return UpdateLibrary400JSONResponse{badRequest("スキャン間隔が正しくありません")}, nil
+			return UpdateLibrary400JSONResponse{badRequest(ctx, "bad_request.scan_interval")}, nil
 		}
 		set, args = append(set, "scan_interval = ?"), append(args, string(*b.ScanInterval))
 	}
@@ -242,8 +252,8 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 		set, args = append(set, "import_comicinfo = ?"), append(args, *b.ImportComicInfo)
 	}
 	if b.Exclude != nil {
-		if err := validExclude(*b.Exclude); err != nil {
-			return UpdateLibrary400JSONResponse{badRequest(err.Error())}, nil
+		if bad := badPattern(*b.Exclude); bad != "" {
+			return UpdateLibrary400JSONResponse{badRequest(ctx, "bad_request.exclude_pattern", bad)}, nil
 		}
 		set, args = append(set, "exclude = ?"), append(args, jsonText(*b.Exclude))
 	}
@@ -266,7 +276,7 @@ func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObje
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return DeleteLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return DeleteLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM search_rows WHERE library_id = ?`, req.LibraryId); err != nil {
 		return nil, err
@@ -281,12 +291,12 @@ func (s *server) ScanLibrary(ctx context.Context, req ScanLibraryRequestObject) 
 	}
 	t, err := queue(ctx, req.LibraryId)
 	if errors.Is(err, library.ErrNotFound) {
-		return ScanLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return ScanLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return ScanLibrary202JSONResponse(toTask(t)), nil
+	return ScanLibrary202JSONResponse(toTask(ctx, t)), nil
 }
 
 // ─── Series and books ────────────────────────────────────────────────────────
@@ -299,7 +309,7 @@ func (s *server) GetSeries(ctx context.Context, req GetSeriesRequestObject) (Get
 		return nil, err
 	}
 	if !ok {
-		return GetSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return GetSeries404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	return GetSeries200JSONResponse(x), nil
 }
@@ -308,7 +318,7 @@ func (s *server) ListSeriesBooks(ctx context.Context, req ListSeriesBooksRequest
 	if ok, err := s.visible(ctx, "series", req.SeriesId); err != nil {
 		return nil, err
 	} else if !ok {
-		return ListSeriesBooks404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return ListSeriesBooks404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	out, err := s.listBooks(ctx, ` AND b.series_id = ?`, `ORDER BY b.number_sort, b.path`, req.SeriesId)
 	if err != nil {
@@ -323,7 +333,7 @@ func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBook
 		return nil, err
 	}
 	if !ok {
-		return GetBook404JSONResponse{notFound("本が見つかりません")}, nil
+		return GetBook404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	return GetBook200JSONResponse(x), nil
 }
@@ -334,7 +344,7 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 	cond, args := libScope(ctx, "b.library_id")
 	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime, media_status FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
 		append([]any{req.BookId}, args...)...).Scan(&size, &mtime, &status); errors.Is(err, sql.ErrNoRows) {
-		return ListBookPages404JSONResponse{notFound("本が見つかりません")}, nil
+		return ListBookPages404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	} else if err != nil {
 		return nil, err
 	}
@@ -362,17 +372,17 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 
 // The image operations are served by servePage / serveThumbnail (see New);
 // the strict handlers exist only to satisfy the generated interface.
-func (s *server) GetBookPage(context.Context, GetBookPageRequestObject) (GetBookPageResponseObject, error) {
-	return GetBookPage404JSONResponse{notFound("not routed")}, nil
+func (s *server) GetBookPage(ctx context.Context, _ GetBookPageRequestObject) (GetBookPageResponseObject, error) {
+	return GetBookPage404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
-func (s *server) GetBookPageThumbnail(context.Context, GetBookPageThumbnailRequestObject) (GetBookPageThumbnailResponseObject, error) {
-	return GetBookPageThumbnail404JSONResponse{notFound("not routed")}, nil
+func (s *server) GetBookPageThumbnail(ctx context.Context, _ GetBookPageThumbnailRequestObject) (GetBookPageThumbnailResponseObject, error) {
+	return GetBookPageThumbnail404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
-func (s *server) GetBookThumbnail(context.Context, GetBookThumbnailRequestObject) (GetBookThumbnailResponseObject, error) {
-	return GetBookThumbnail404JSONResponse{notFound("not routed")}, nil
+func (s *server) GetBookThumbnail(ctx context.Context, _ GetBookThumbnailRequestObject) (GetBookThumbnailResponseObject, error) {
+	return GetBookThumbnail404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
-func (s *server) GetSeriesThumbnail(context.Context, GetSeriesThumbnailRequestObject) (GetSeriesThumbnailResponseObject, error) {
-	return GetSeriesThumbnail404JSONResponse{notFound("not routed")}, nil
+func (s *server) GetSeriesThumbnail(ctx context.Context, _ GetSeriesThumbnailRequestObject) (GetSeriesThumbnailResponseObject, error) {
+	return GetSeriesThumbnail404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
 
 // pageAllowed checks the page number, that the caller may see the book and
@@ -381,18 +391,18 @@ func (s *server) GetSeriesThumbnail(context.Context, GetSeriesThumbnailRequestOb
 func (s *server) pageAllowed(w http.ResponseWriter, r *http.Request) (int, bool) {
 	n, err := strconv.Atoi(r.PathValue("page"))
 	if err != nil || n < 1 {
-		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.page")
 		return 0, false
 	}
 	if ok, err := s.visible(r.Context(), "books", r.PathValue("bookId")); err != nil {
-		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.page_unreadable")
 		return 0, false
 	} else if !ok {
-		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.page")
 		return 0, false
 	}
 	if !canStream(r.Context()) {
-		writeError(w, http.StatusForbidden, "このアカウントでは本を読めません")
+		writeError(r.Context(), w, http.StatusForbidden, "forbidden.read")
 		return 0, false
 	}
 	return n, true
@@ -406,14 +416,14 @@ func (s *server) servePageThumbnail(w http.ResponseWriter, r *http.Request) {
 	}
 	t, err := s.Library.PageThumbnail(r.Context(), r.PathValue("bookId"), n)
 	if errors.Is(err, library.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.page")
 		return
 	}
 	if err != nil {
 		if r.Context().Err() == nil {
 			slog.Warn("page thumbnail", "book", r.PathValue("bookId"), "page", n, "err", err)
 		}
-		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
 	f := t.File
@@ -437,11 +447,11 @@ func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
 	}
 	p, err := s.Library.OpenPage(r.Context(), r.PathValue("bookId"), n)
 	if errors.Is(err, library.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "ページが見つかりません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.page")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "ページを読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
 	defer p.Close()
@@ -480,10 +490,10 @@ func (s *server) serveThumbnail(kind string) http.HandlerFunc {
 			table = "series"
 		}
 		if ok, err := s.visible(r.Context(), table, id); err != nil {
-			writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+			writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 			return
 		} else if !ok {
-			writeError(w, http.StatusNotFound, "表紙がありません")
+			writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
 			return
 		}
 		s.sendThumbnail(w, r, kind, id)
@@ -495,22 +505,22 @@ func (s *server) serveThumbnail(kind string) http.HandlerFunc {
 func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id string) {
 	p, err := s.Library.ThumbnailPath(r.Context(), kind, id)
 	if errors.Is(err, library.ErrNotFound) {
-		writeError(w, http.StatusNotFound, "表紙がありません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
 		return
 	}
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 		return
 	}
 	f, err := os.Open(p)
 	if err != nil {
-		writeError(w, http.StatusNotFound, "表紙がありません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
 		return
 	}
 	defer f.Close()
 	st, err := f.Stat()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 		return
 	}
 	h := w.Header()
@@ -524,8 +534,21 @@ func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id 
 
 // ─── Tasks and media issues ──────────────────────────────────────────────────
 
-func toTask(t task.Task) Task {
-	out := Task{Id: t.ID, Kind: TaskKind(t.Kind), Label: t.Label, State: TaskState(t.State), Progress: t.Progress, Error: t.Error}
+// toTask renders a task for the request's language: a coded label or error
+// comes from the catalog, anything else is the stored text.
+func toTask(ctx context.Context, t task.Task) Task {
+	label, errText := t.Label, t.Error
+	if t.LabelCode != "" {
+		label = msg(ctx, t.LabelCode, t.LabelArg)
+	}
+	if t.ErrorCode != "" {
+		var args []any
+		if t.ErrorArg != "" {
+			args = append(args, t.ErrorArg)
+		}
+		errText = msg(ctx, t.ErrorCode, args...)
+	}
+	out := Task{Id: t.ID, Kind: TaskKind(t.Kind), Label: label, State: TaskState(t.State), Progress: t.Progress, Error: errText}
 	if t.LibraryID != "" {
 		v := t.LibraryID
 		out.LibraryId = &v
@@ -544,7 +567,7 @@ func (s *server) ListTasks(ctx context.Context, _ ListTasksRequestObject) (ListT
 	}
 	out := ListTasks200JSONResponse{}
 	for _, t := range ts {
-		out = append(out, toTask(t))
+		out = append(out, toTask(ctx, t))
 	}
 	return out, nil
 }
@@ -552,7 +575,7 @@ func (s *server) ListTasks(ctx context.Context, _ ListTasksRequestObject) (ListT
 func (s *server) CancelTask(ctx context.Context, req CancelTaskRequestObject) (CancelTaskResponseObject, error) {
 	err := s.Tasks.Cancel(ctx, req.TaskId)
 	if errors.Is(err, task.ErrNotFound) {
-		return CancelTask404JSONResponse{notFound("タスクが見つかりません")}, nil
+		return CancelTask404JSONResponse{notFound(ctx, "not_found.task")}, nil
 	}
 	if err != nil {
 		return nil, err
