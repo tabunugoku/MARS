@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/tabunugoku/cominavi/server/internal/events"
 )
@@ -192,8 +193,11 @@ func (s *server) komgaTachiSeriesPut(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback()
-	if err := setReadState(ctx, tx, true, "b.series_id = ? AND b.number_sort <= ? AND b.media_status = 'ready'",
-		[]any{id, *body.LastBookNumberSortRead}); err != nil {
+	// The books are the ones the browse and GET endpoints count (the same
+	// builder), up to and including the number written.
+	where, args, _, _ := komgaSeriesBookQuery(id, nil)
+	cond := strings.TrimPrefix(where, " AND ") + " AND b.number_sort <= ?"
+	if err := setReadState(ctx, tx, true, cond, append(args, *body.LastBookNumberSortRead)); err != nil {
 		komgaTachiFail(ctx, w, err)
 		return
 	}

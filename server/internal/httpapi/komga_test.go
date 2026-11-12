@@ -679,18 +679,23 @@ func pngHeaderOnly(w, h uint32) []byte {
 
 func TestKomgaConvertGuards(t *testing.T) {
 	small := pngBytes(t, 3, 2, color.RGBA{1, 2, 3, 255})
-	out, err := komgaConvertPNG(small)
+	img, err := komgaDecodePage(small)
 	if err != nil {
 		t.Fatalf("small page: %v", err)
 	}
-	if cfg, err := png.DecodeConfig(bytes.NewReader(out)); err != nil || cfg.Width != 3 || cfg.Height != 2 {
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		t.Fatalf("small page encode: %v", err)
+	}
+	if cfg, err := png.DecodeConfig(bytes.NewReader(out.Bytes())); err != nil || cfg.Width != 3 || cfg.Height != 2 {
 		t.Fatalf("small page output: %+v %v", cfg, err)
 	}
-	// 20000 x 20000 is 4e8 pixels, over media.MaxPixels: refused from the header.
-	if _, err := komgaConvertPNG(pngHeaderOnly(20000, 20000)); !errors.Is(err, errPageTooLarge) {
+	// 6000 x 6000 is 36e6 pixels: over komgaConvertMaxPixels (32e6) though
+	// under media.MaxPixels, so it is refused from the header.
+	if _, err := komgaDecodePage(pngHeaderOnly(6000, 6000)); !errors.Is(err, errPageTooLarge) {
 		t.Fatalf("huge header: %v, want errPageTooLarge", err)
 	}
-	if _, err := komgaConvertPNG([]byte("not an image")); !errors.Is(err, errPageFormat) {
+	if _, err := komgaDecodePage([]byte("not an image")); !errors.Is(err, errPageFormat) {
 		t.Fatalf("garbage: %v, want errPageFormat", err)
 	}
 }

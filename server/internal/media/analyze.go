@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
-	"image"
 	_ "image/gif"  // decoder registration for DecodeConfig
 	_ "image/jpeg" // decoder registration for DecodeConfig
 	_ "image/png"  // decoder registration for DecodeConfig
@@ -180,12 +180,12 @@ func readPageConfig(e archive.Entry, r io.Reader, cover *bytes.Buffer) (int, int
 		src = io.TeeReader(lr, cover)
 	}
 	br := bufio.NewReader(src)
-	cfg, _, err := image.DecodeConfig(br)
+	cfg, err := CheckPixels(br, MaxPixels)
+	if errors.Is(err, ErrTooManyPixels) {
+		return 0, 0, ErrTooLarge
+	}
 	if err != nil {
 		return 0, 0, err
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > MaxPixels {
-		return 0, 0, ErrTooLarge
 	}
 	if _, err := io.Copy(io.Discard, br); err != nil {
 		return 0, 0, err

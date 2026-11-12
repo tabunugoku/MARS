@@ -349,8 +349,10 @@ func (s *server) komgaBooks(ctx context.Context, where string, whereArgs []any, 
 	q, base := bookQuery(ctx)
 	base = append(base, whereArgs...)
 	var total int
-	if err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM (`+q+where+`)`, base...).Scan(&total); err != nil {
-		return nil, 0, err
+	if !pg.unpaged {
+		if err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM (`+q+where+`)`, base...).Scan(&total); err != nil {
+			return nil, 0, err
+		}
 	}
 	text := q + where + ` ` + tail
 	args := append(append([]any{}, base...), tailArgs...)
@@ -370,6 +372,9 @@ func (s *server) komgaBooks(ctx context.Context, where string, whereArgs []any, 
 			return nil, 0, err
 		}
 		out = append(out, x)
+	}
+	if pg.unpaged {
+		total = len(out)
 	}
 	return out, total, rows.Err()
 }
@@ -519,6 +524,11 @@ func (s *server) komgaPages(w http.ResponseWriter, r *http.Request) {
 // server-wide. A conversion holds a page in memory while it decodes.
 const komgaConvertSlots = 2
 
+// komgaConvertMaxPixels is the largest page (width*height) that convert=png
+// decodes. It covers 8000x4000 scans; conversion is only for formats Mihon
+// cannot decode, so large pages are rare.
+const komgaConvertMaxPixels = 32_000_000
+
 var convertSlots = make(chan struct{}, komgaConvertSlots)
 
 var (
@@ -526,35 +536,31 @@ var (
 	errPageFormat   = errors.New("komga: page format not readable")
 )
 
-// komgaConvertPNG re-encodes a page as PNG. The header is read before any
-// pixel is decoded, so a page over media.MaxPixels is refused cheaply.
-func komgaConvertPNG(data []byte) ([]byte, error) {
+// komgaDecodePage checks the header of a page and decodes it for conversion.
+// The header is read first, so a page over komgaConvertMaxPixels is refused
+// before any pixel is decoded. The caller encodes the image.
+func komgaDecodePage(data []byte) (image.Image, error) {
 	if len(data) > media.MaxEntryBytes {
 		return nil, errPageTooLarge
 	}
-	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
+	if _, err := media.CheckPixels(bytes.NewReader(data), komgaConvertMaxPixels); err != nil {
+		if errors.Is(err, media.ErrTooManyPixels) {
+			return nil, errPageTooLarge
+		}
 		return nil, errPageFormat
-	}
-	if int64(cfg.Width)*int64(cfg.Height) > media.MaxPixels {
-		return nil, errPageTooLarge
 	}
 	img, _, err := image.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, errPageFormat
 	}
-	var buf bytes.Buffer
-	if err := png.Encode(&buf, img); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+	return img, nil
 }
 
 // komgaPage serves page {page} (1-based) of a book. Without convert=png it is
-// the main API's page, unchanged. With it the page is decoded and re-encoded
-// as PNG: a page no decoder reads answers 415, one over the pixel limit 413.
-// At most komgaConvertSlots conversions run at once; a client that leaves
-// while waiting gets no answer.
+// the main API's page, unchanged. With it the page is decoded and streamed
+// back as PNG: a page no decoder reads answers 415, one over
+// komgaConvertMaxPixels 422. At most komgaConvertSlots conversions run at
+// once; a client that leaves while waiting gets no answer.
 func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Query().Get("convert") != "png" {
 		s.servePage(w, r)
@@ -587,24 +593,23 @@ func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
-	out, err := komgaConvertPNG(data)
+	img, err := komgaDecodePage(data)
 	switch {
 	case errors.Is(err, errPageTooLarge):
-		writeError(ctx, w, http.StatusRequestEntityTooLarge, "too_large.page_convert")
-		return
-	case errors.Is(err, errPageFormat):
-		writeError(ctx, w, http.StatusUnsupportedMediaType, "unsupported.page_convert")
+		writeError(ctx, w, http.StatusUnprocessableEntity, "too_large.page_convert")
 		return
 	case err != nil:
-		writeError(ctx, w, http.StatusInternalServerError, "server.page_unreadable")
+		writeError(ctx, w, http.StatusUnsupportedMediaType, "unsupported.page_convert")
 		return
 	}
 	h := w.Header()
 	h.Set("Content-Type", "image/png")
-	h.Set("Content-Length", strconv.Itoa(len(out)))
 	h.Set("Cache-Control", "private, no-cache")
 	h.Set("X-Content-Type-Options", "nosniff")
-	_, _ = w.Write(out)
+	if err := png.Encode(w, img); err != nil {
+		// The headers are sent already, so the status cannot change.
+		slog.Error("komga page convert", "err", err)
+	}
 }
 
 // ─── Read lists ──────────────────────────────────────────────────────────────

@@ -162,7 +162,7 @@ func TestCompatAPIKeyCookie(t *testing.T) {
 		for _, ck := range rec.Result().Cookies() {
 			if ck.Name == compatKeyCookie {
 				got = ck.Value
-				if !ck.HttpOnly || ck.Path != "/" {
+				if !ck.HttpOnly || ck.Path != "/komga/" {
 					t.Fatalf("%s: cookie attributes %+v", name, ck)
 				}
 			}
@@ -183,8 +183,22 @@ func TestCompatAPIKeyCookie(t *testing.T) {
 	if rec := compatGet(e.h, "/api/v1/me", keyCookie); rec.Code != 401 {
 		t.Fatalf("key cookie on /api/v1/me: %d", rec.Code)
 	}
+	// OPDS readers rarely keep cookies: /opds/ does not echo the key.
+	rec := compatGet(h, compatPaths[0], header("X-API-Key", created.Key))
+	for _, ck := range rec.Result().Cookies() {
+		if ck.Name == compatKeyCookie {
+			t.Fatal("/opds/ set the key cookie")
+		}
+	}
+	// Credentials the request names win over a cookie that still works.
+	if rec := compatGet(h, p, keyCookie, header("X-API-Key", "cn_forged")); rec.Code != 401 {
+		t.Fatalf("forged key beside a working key cookie: %d", rec.Code)
+	}
+	if rec := compatGet(h, p, keyCookie, basicAuth("読者", "wrong password")); rec.Code != 401 {
+		t.Fatalf("wrong password beside a working key cookie: %d", rec.Code)
+	}
 	// A session token in the key cookie is not a key.
-	rec := compatGet(h, compatPaths[0], basicAuth("読者", "reader pass"))
+	rec = compatGet(h, compatPaths[0], basicAuth("読者", "reader pass"))
 	token := compatCookieFrom(rec)
 	if rec := compatGet(h, p, func(r *http.Request) {
 		r.AddCookie(&http.Cookie{Name: compatKeyCookie, Value: token})

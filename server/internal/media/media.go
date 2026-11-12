@@ -5,6 +5,8 @@ package media
 
 import (
 	"errors"
+	"image"
+	"io"
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
@@ -42,7 +44,22 @@ type Analysis struct {
 }
 
 var (
-	ErrNoPages     = errors.New("media: no images in archive")
-	ErrTooLarge    = errors.New("media: image or entry over the size limit")
-	ErrCacheTooBig = errors.New("media: book exceeds the extraction limit")
+	ErrNoPages       = errors.New("media: no images in archive")
+	ErrTooLarge      = errors.New("media: image or entry over the size limit")
+	ErrCacheTooBig   = errors.New("media: book exceeds the extraction limit")
+	ErrTooManyPixels = errors.New("media: image has more pixels than the limit")
 )
+
+// CheckPixels reads an image's header from r and returns its config. When
+// width*height is over limit it returns ErrTooManyPixels, before any pixel is
+// decoded. A header that does not decode returns the image package's error.
+func CheckPixels(r io.Reader, limit int64) (image.Config, error) {
+	cfg, _, err := image.DecodeConfig(r)
+	if err != nil {
+		return image.Config{}, err
+	}
+	if int64(cfg.Width)*int64(cfg.Height) > limit {
+		return cfg, ErrTooManyPixels
+	}
+	return cfg, nil
+}

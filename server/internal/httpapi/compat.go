@@ -35,10 +35,15 @@ import (
 // password check per request. The compat cookie is not the web app's
 // session cookie, so it cannot drive /api/v1.
 //
-// A client that signed in with an API key gets the key back in its own
-// cookie (cn_compat_key), checked as a key on every use, so the tracker works
-// for key users too and deleting the key ends it. Key-shaped and session
-// tokens live in separate cookies so neither is ever checked as the other.
+// A client that signed in to /komga/ with an API key gets the key back in its
+// own cookie (cn_compat_key, Path /komga/), checked as a key on every use, so
+// the tracker works for key users too and deleting the key ends it. Key-shaped
+// and session tokens live in separate cookies so neither is ever checked as
+// the other. OPDS readers rarely keep cookies, so /opds/ never echoes a key.
+//
+// Credentials the request sends (X-API-Key, Bearer, Basic) win over either
+// cookie: a client that switched to another key or account is served as the
+// one it names now, not as the one a leftover cookie remembers.
 
 const (
 	compatCookie    = "cn_compat"
@@ -107,6 +112,39 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 		}
 		return u, false, false
 	}
+	// byKey checks an API key and, on success, hands it back as a cookie.
+	byKey := func(k string) (auth.User, bool, bool) {
+		u, ok, done := try(s.Auth.UserByAPIKey(ctx, k))
+		if ok && strings.HasPrefix(r.URL.Path, "/komga/") {
+			setCompatCookie(w, r, compatKeyCookie, "/komga/", k)
+		}
+		return u, ok, done
+	}
+	// answer settles a request that named its credentials: they work, the
+	// check already answered, or it gets the challenge.
+	answer := func(u auth.User, ok, done bool) (auth.User, bool) {
+		if ok || done {
+			return u, ok
+		}
+		return s.compatChallenge(w, r)
+	}
+	if k := r.Header.Get("X-API-Key"); k != "" {
+		return answer(byKey(k))
+	}
+	h := r.Header.Get("Authorization")
+	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
+		return answer(byKey(h[7:]))
+	}
+	if name, pass, found := r.BasicAuth(); found {
+		// An API key as the password; anything else (including a real
+		// password that happens to look like a key) is checked as a password.
+		if strings.HasPrefix(pass, "cn_") {
+			if u, ok, done := byKey(pass); ok || done {
+				return u, ok
+			}
+		}
+		return answer(s.compatBasic(w, r, cache, strings.TrimSpace(name), pass))
+	}
 	if c, err := r.Cookie(compatCookie); err == nil && c.Value != "" {
 		if u, ok, done := try(s.Auth.UserBySession(ctx, c.Value)); ok || done {
 			return u, ok
@@ -117,39 +155,13 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 			return u, ok
 		}
 	}
-	// byKey checks an API key and, on success, hands it back as a cookie.
-	byKey := func(k string) (auth.User, bool, bool) {
-		u, ok, done := try(s.Auth.UserByAPIKey(ctx, k))
-		if ok {
-			s.setCompatKeyCookie(w, r, k)
-		}
-		return u, ok, done
-	}
-	if k := r.Header.Get("X-API-Key"); k != "" {
-		if u, ok, done := byKey(k); ok || done {
-			return u, ok
-		}
-	}
-	h := r.Header.Get("Authorization")
-	if len(h) > 7 && strings.EqualFold(h[:7], "Bearer ") {
-		if u, ok, done := byKey(h[7:]); ok || done {
-			return u, ok
-		}
-	}
-	if name, pass, found := r.BasicAuth(); found {
-		// An API key as the password; anything else (including a real
-		// password that happens to look like a key) is checked as a password.
-		if strings.HasPrefix(pass, "cn_") {
-			if u, ok, done := byKey(pass); ok || done {
-				return u, ok
-			}
-		}
-		if u, ok, done := s.compatBasic(w, r, cache, strings.TrimSpace(name), pass); ok || done {
-			return u, ok
-		}
-	}
+	return s.compatChallenge(w, r)
+}
+
+// compatChallenge answers 401 with the Basic challenge.
+func (s *server) compatChallenge(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
 	w.Header().Set("WWW-Authenticate", `Basic realm="ComiNavi", charset="UTF-8"`)
-	writeError(ctx, w, http.StatusUnauthorized, "unauthorized.sign_in")
+	writeError(r.Context(), w, http.StatusUnauthorized, "unauthorized.sign_in")
 	return auth.User{}, false
 }
 
@@ -167,7 +179,7 @@ func (s *server) compatBasic(w http.ResponseWriter, r *http.Request, cache *basi
 	if token, ok := cache.get(key, time.Now()); ok {
 		u, err := s.Auth.UserBySession(ctx, token)
 		if err == nil {
-			s.setCompatCookie(w, r, token)
+			setCompatCookie(w, r, compatCookie, "/", token)
 			return u, true, false
 		}
 		cache.drop(key) // signed out, password changed, or expired
@@ -224,31 +236,19 @@ func (s *server) compatBasic(w http.ResponseWriter, r *http.Request, cache *basi
 		return answered(http.StatusInternalServerError, "server.error")
 	}
 	cache.put(key, token, time.Now())
-	s.setCompatCookie(w, r, token)
+	setCompatCookie(w, r, compatCookie, "/", token)
 	return u, true, false
 }
 
-// setCompatCookie hands the session to clients that keep cookies, unless the
-// request already carries it.
-func (s *server) setCompatCookie(w http.ResponseWriter, r *http.Request, token string) {
-	if c, err := r.Cookie(compatCookie); err == nil && c.Value == token {
+// setCompatCookie hands a credential to clients that keep cookies, unless the
+// request already carries it. Both values are checked again on every use
+// (session or API key), so signing out or deleting the key ends the cookie.
+func setCompatCookie(w http.ResponseWriter, r *http.Request, name, path, value string) {
+	if c, err := r.Cookie(name); err == nil && c.Value == value {
 		return
 	}
 	http.SetCookie(w, &http.Cookie{
-		Name: compatCookie, Value: token, Path: "/", MaxAge: int(compatSession / time.Second),
-		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
-	})
-}
-
-// setCompatKeyCookie hands an API key that just worked back to the client,
-// unless the request already carries it. The key is checked again on every
-// use, so deleting it ends the cookie too.
-func (s *server) setCompatKeyCookie(w http.ResponseWriter, r *http.Request, key string) {
-	if c, err := r.Cookie(compatKeyCookie); err == nil && c.Value == key {
-		return
-	}
-	http.SetCookie(w, &http.Cookie{
-		Name: compatKeyCookie, Value: key, Path: "/", MaxAge: int(compatSession / time.Second),
+		Name: name, Value: value, Path: path, MaxAge: int(compatSession / time.Second),
 		HttpOnly: true, SameSite: http.SameSiteLaxMode, Secure: secureRequest(r),
 	})
 }

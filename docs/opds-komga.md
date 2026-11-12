@@ -21,9 +21,11 @@ answers 404.
   the `cn_compat` cookie. No credentials → 401 with
   `WWW-Authenticate: Basic`. The first Basic sign-in starts a 30-day session
   and sets `cn_compat`; Mihon's tracker sends no credentials and relies on it.
-  A sign-in with an API key (any of the three ways) sets `cn_compat_key` to
-  that key instead, checked as a key on every use, so deleting the key ends
-  it. Neither cookie works on `/api/v1`.
+  A sign-in to `/komga/` with an API key (any of the three ways) sets
+  `cn_compat_key` (Path `/komga/`) to that key instead, checked as a key on
+  every use, so deleting the key ends it; `/opds/` never echoes a key.
+  Credentials the request sends win over either cookie. Neither cookie works
+  on `/api/v1`.
 - Handlers read the caller with `currentUser(ctx)` and must read series and
   books only through `seriesQuery`/`bookQuery`/`listSeries`/`listBooks`
   (`query.go`) or `libScope`/`visible` (`access.go`). Anything the caller
@@ -96,7 +98,10 @@ into the task brief). The rules:
 - Paged lists use Komga's page wrapper (`content`, `pageable`, `totalElements`,
   `totalPages`, `last`, `first`, `number`, `size`, `numberOfElements`,
   `empty`, `sort`), `page` 0-based, default size 20, `unpaged=true` for all.
-- Pages are 1-based. `?convert=png` re-encodes the page as PNG.
+- Pages are 1-based. `?convert=png` re-encodes the page as PNG. The header is
+  checked first: a page over 32 MP answers 422 (`too_large.page_convert`), a
+  page no decoder reads answers 415 (`unsupported.page_convert`). At most two
+  conversions run at once, and the PNG is streamed, not buffered.
 - Enum values map: series status `ONGOING`/`ENDED`/`HIATUS`/`ABANDONED`,
   read status `UNREAD`/`IN_PROGRESS`/`READ`, media status `READY`/… .
 - Unknown filters and sorts are ignored rather than rejected.
