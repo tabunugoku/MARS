@@ -1,12 +1,41 @@
+import { createHash } from 'node:crypto'
+import fs from 'node:fs'
 import path from 'node:path'
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 
 const API_TARGET = 'http://localhost:25600'
 
+/** Stamps dist/sw.js with this build: a version derived from index.html (so
+ *  every deploy changes the worker's bytes, the browser installs it and old
+ *  caches are pruned) and the entry files index.html loads (precached with
+ *  the shell, so the offline fallback never points at files it lacks). */
+function stampServiceWorker(): Plugin {
+  let outDir = 'dist'
+  return {
+    name: 'cominavi-sw-stamp',
+    apply: 'build',
+    configResolved(c) {
+      outDir = path.resolve(c.root, c.build.outDir)
+    },
+    closeBundle() {
+      const sw = path.join(outDir, 'sw.js')
+      const html = fs.readFileSync(path.join(outDir, 'index.html'), 'utf8')
+      const version = createHash('sha256').update(html).digest('hex').slice(0, 12)
+      const entry = [...new Set([...html.matchAll(/(?:src|href)="(\/assets\/[^"]+)"/g)].map((m) => m[1]))]
+      const src = fs.readFileSync(sw, 'utf8')
+      const out = src
+        .replace('const VERSION = "dev";', `const VERSION = ${JSON.stringify(version)};`)
+        .replace('const ENTRY = [];', `const ENTRY = ${JSON.stringify(entry)};`)
+      if (out === src || !out.includes(version)) throw new Error('sw.js: VERSION/ENTRY placeholders not found')
+      fs.writeFileSync(sw, out)
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), stampServiceWorker()],
   resolve: {
     alias: {
       '@': path.resolve(import.meta.dirname, './src'),

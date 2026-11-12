@@ -91,6 +91,7 @@ function SignInForm() {
         <Field data-invalid={errors.user || undefined}>
           <FieldLabel htmlFor="login-user">ユーザー名またはメールアドレス</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="login-user"
             name="username"
             autoComplete="username"
@@ -104,6 +105,7 @@ function SignInForm() {
         <Field data-invalid={errors.pass || undefined}>
           <FieldLabel htmlFor="login-pass">パスワード</FieldLabel>
           <Input
+            className="pointer-coarse:h-11"
             id="login-pass"
             name="password"
             type="password"
@@ -117,7 +119,8 @@ function SignInForm() {
 
         <Field orientation="horizontal">
           <Checkbox id="login-keep" checked={keep} onCheckedChange={setKeep} />
-          <FieldLabel htmlFor="login-keep">ログイン状態を保持する</FieldLabel>
+          {/* The label is the touch target: a full 44px row beside the 16px box. */}
+          <FieldLabel htmlFor="login-keep" className="pointer-coarse:-my-3.5 pointer-coarse:py-3.5">ログイン状態を保持する</FieldLabel>
         </Field>
       </div>
 

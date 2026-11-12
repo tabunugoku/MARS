@@ -172,7 +172,7 @@ function BookPage({ id }: { id: string }) {
       <div className="mb-4 flex items-center justify-between gap-2">
         <Link
           to={`/series/${book.seriesId}`}
-          className={cn(typeClass("caption"), "inline-flex min-w-0 items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3 pointer-coarse:py-3")}
+          className={cn(typeClass("caption"), "inline-flex min-w-0 items-center gap-1 text-muted-foreground hover:text-foreground pointer-coarse:-my-3.5 pointer-coarse:py-3.5")}
         >
           <ChevronLeft size={14} className="shrink-0" />
           <span className="truncate">{series?.title ?? "シリーズ"}</span>

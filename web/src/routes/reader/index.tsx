@@ -411,7 +411,7 @@ function ReaderBody({
         initial={false}
         animate={{ y: chrome ? 0 : "-100%", opacity: chrome ? 1 : 0 }}
         transition={{ type: "spring", duration: 0.24, bounce: 0 }}
-        className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 border-b border-white/8 bg-reader/90 px-2 pb-2 pt-[max(env(safe-area-inset-top),8px)] text-white"
+        className="absolute inset-x-0 top-0 z-20 flex items-center gap-2 border-b border-white/8 bg-reader/90 pb-2 pl-[max(env(safe-area-inset-left),8px)] pr-[max(env(safe-area-inset-right),8px)] pt-[max(env(safe-area-inset-top),8px)] text-white"
         style={{ pointerEvents: chrome ? "auto" : "none" }}
         inert={!chrome}
       >
@@ -446,7 +446,7 @@ function ReaderBody({
           initial={false}
           animate={{ y: chrome ? 0 : "100%", opacity: chrome ? 1 : 0 }}
           transition={{ type: "spring", duration: 0.24, bounce: 0 }}
-          className="absolute inset-x-0 bottom-0 z-20 border-t border-white/8 bg-reader/90 px-4 pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white"
+          className="absolute inset-x-0 bottom-0 z-20 border-t border-white/8 bg-reader/90 pb-[max(env(safe-area-inset-bottom),12px)] pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),16px)] pt-3 text-white"
           style={{ pointerEvents: chrome ? "auto" : "none" }}
           inert={!chrome}
         >
@@ -485,7 +485,7 @@ function IconBtn({ label, onClick, children, pressed }: { label: string; onClick
       aria-pressed={pressed}
       onClick={onClick}
       className={cn(
-        "flex size-10 items-center justify-center rounded-full transition-colors duration-80 hover:bg-white/10 active:bg-white/20",
+        "flex size-11 items-center justify-center rounded-full transition-colors duration-80 hover:bg-white/10 active:bg-white/20",
         "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]",
         pressed && "bg-white/15",
       )}
@@ -571,9 +571,9 @@ function PageStrip({ pages, current, rtl, onPick, onClose }: { pages: Page[]; cu
   }, [current]);
   return (
     <div className="absolute inset-x-0 bottom-0 z-30 border-t border-white/8 bg-reader pb-[max(env(safe-area-inset-bottom),12px)] pt-3 text-white" role="dialog" aria-label="ページ一覧">
-      <div className="mb-2 flex items-center justify-between px-4">
+      <div className="mb-2 flex items-center justify-between pl-[max(env(safe-area-inset-left),16px)] pr-[max(env(safe-area-inset-right),4px)]">
         <p className={typeClass("subtitle")}>ページ一覧</p>
-        <button type="button" onClick={onClose} className={cn(typeClass("caption"), "inline-flex h-7 items-center rounded px-2 text-white/70 hover:text-white")}>
+        <button type="button" onClick={onClose} className={cn(typeClass("caption"), "-my-2 inline-flex h-11 items-center rounded px-3 text-white/70 hover:text-white")}>
           <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
         </button>
       </div>

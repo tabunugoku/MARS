@@ -81,14 +81,14 @@ export function ReaderSettings({
           animate={{ x: 0 }}
           exit={{ x: "100%", transition: spring.slow.exit }}
           transition={spring.slow}
-          className="absolute inset-y-0 right-0 z-30 flex w-full max-w-xs flex-col gap-5 overflow-y-auto border-l border-white/8 bg-reader p-5 pt-[max(env(safe-area-inset-top),20px)] text-white"
+          className="absolute inset-y-0 right-0 z-30 flex w-full max-w-xs flex-col gap-5 overflow-y-auto border-l border-white/8 bg-reader p-5 pb-[max(env(safe-area-inset-bottom),20px)] pr-[max(env(safe-area-inset-right),20px)] pt-[max(env(safe-area-inset-top),20px)] text-white"
           onPointerDown={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between">
             <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
               表示設定
             </p>
-            <button type="button" onClick={onClose} className={cn(typeClass("caption"), "inline-flex h-7 items-center rounded px-2 text-white/70 hover:text-white")}>
+            <button type="button" onClick={onClose} className={cn(typeClass("caption"), "-mr-3 -my-2 inline-flex h-11 items-center rounded px-3 text-white/70 hover:text-white")}>
               <span className="[text-box:trim-both_cap_alphabetic]">閉じる</span>
             </button>
           </div>
@@ -106,7 +106,7 @@ export function ReaderSettings({
             />
             <p className={cn(typeClass("caption"), "text-white/60")}>
               {SCOPE_NOTE[scope]}
-              <Link to="/settings/reader" className="ml-1 text-white/80 underline underline-offset-2 hover:text-white">
+              <Link to="/settings/reader" className="relative ml-1 text-white/80 underline underline-offset-2 touch-hit hover:text-white">
                 全体設定を開く
               </Link>
             </p>
@@ -120,7 +120,7 @@ export function ReaderSettings({
           <Segmented label="背景" value={prefs.bg} onChange={set("bg")} options={opts(BG_LABEL)} disabled={!custom} />
 
           <div className={cn(typeClass("caption"), "mt-auto space-y-1 text-white/60")}>
-            <p>キー操作: ← → ページ送り / Space 次へ / M メニュー / Esc 閉じる</p>
+            <p className="pointer-coarse:hidden">キー操作: ← → ページ送り / Space 次へ / M メニュー / Esc 閉じる</p>
             <p>画面の左右をタップでページ送り、中央でメニュー。</p>
           </div>
         </motion.aside>

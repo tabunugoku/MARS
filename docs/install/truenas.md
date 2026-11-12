@@ -196,6 +196,23 @@ address pool (**Apps > Configuration > Settings**, *Address Pools*), so the
 server trusts its `X-Forwarded-For` header. Add it as an environment variable
 in either method.
 
+### Installing the app on phones and tablets
+
+Phones and tablets can install ComiNavi to the home screen, but only over
+HTTPS: at `http://<truenas-ip>:25600` it works in the browser without the
+install option. If the TrueNAS **Tailscale** app is installed, enable
+*MagicDNS* and *HTTPS Certificates* in the Tailscale admin console, open a
+shell in the Tailscale app and run
+
+```sh
+tailscale serve --bg http://<truenas-ip>:25600
+```
+
+then open `https://<truenas-hostname>.<tailnet>.ts.net` on the device and
+choose *Add to Home Screen* (iOS) or *Install app* (Android). See
+[Installing on a phone or tablet](../../README.md#installing-on-a-phone-or-tablet-pwa)
+for reverse-proxy settings.
+
 ## 9. Troubleshooting
 
 | Symptom | Likely cause |
