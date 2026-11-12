@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/cominavi/server/internal/db"
 	"github.com/tabunugoku/cominavi/server/internal/media"
 	"github.com/tabunugoku/cominavi/server/internal/scan"
 	"github.com/tabunugoku/cominavi/server/internal/task"
@@ -173,23 +174,32 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 		if len(todo) == 0 {
 			return nil
 		}
-		tx, err := s.DB.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer tx.Rollback()
 		// Series fields come from the first book, chosen only now that every
-		// book's number (possibly from its own ComicInfo) is final.
+		// book's number (possibly from its own ComicInfo) is final. One
+		// series is one unit; the batch commits every few dozen so progress
+		// writes never wait behind the whole library.
+		b := &db.Batch{DB: s.DB}
+		defer b.Close()
 		ts := time.Now().UTC().Format(time.RFC3339Nano)
 		for seriesID, byBook := range infos {
+			tx, err := b.Tx(ctx)
+			if err != nil {
+				return err
+			}
 			if err := applySeriesInfo(ctx, tx, seriesID, byBook, ts); err != nil {
 				return err
 			}
+			if err := b.Step(ctx); err != nil {
+				return err
+			}
 		}
-		if err := scan.RebuildSearch(ctx, tx, l.id); err != nil {
+		if err := b.Flush(); err != nil {
 			return err
 		}
-		return tx.Commit()
+		if err := scan.SyncSearch(ctx, s.DB, b, l.id); err != nil {
+			return err
+		}
+		return b.Flush()
 	})
 }
 
@@ -262,15 +272,21 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
 		return "", nil, err
 	}
+	ins, err := tx.PrepareContext(ctx, `INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`)
+	if err != nil {
+		return "", nil, err
+	}
+	defer ins.Close()
 	for _, p := range a.Pages {
-		if _, err := tx.ExecContext(ctx,
-			`INSERT INTO pages (book_id, number, entry, media_type, width, height) VALUES (?, ?, ?, ?, ?, ?)`,
-			bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
+		if _, err := ins.ExecContext(ctx, bookID, p.Number, p.Entry, p.MediaType, p.Width, p.Height); err != nil {
 			return "", nil, err
 		}
 	}
 	if ci != nil {
 		if err := applyBookInfo(ctx, tx, bookID, lockedJSON, *ci, ts); err != nil {
+			return "", nil, err
+		}
+		if err := scan.IndexBook(ctx, tx, bookID); err != nil {
 			return "", nil, err
 		}
 	}

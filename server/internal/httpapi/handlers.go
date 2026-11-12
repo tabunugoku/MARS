@@ -255,7 +255,7 @@ func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObje
 	if n, _ := res.RowsAffected(); n == 0 {
 		return DeleteLibrary404JSONResponse{notFound("ライブラリが見つかりません")}, nil
 	}
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM search_index WHERE library_id = ?`, req.LibraryId); err != nil {
+	if _, err := s.DB.ExecContext(ctx, `DELETE FROM search_rows WHERE library_id = ?`, req.LibraryId); err != nil {
 		return nil, err
 	}
 	return DeleteLibrary204Response{}, nil

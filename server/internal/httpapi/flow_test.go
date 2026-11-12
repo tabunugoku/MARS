@@ -135,9 +135,14 @@ type env struct {
 // env.admin is a signed-in administrator.
 func newEnv(t *testing.T) *env {
 	t.Helper()
+	return newEnvAt(t, t.TempDir())
+}
+
+// newEnvAt is newEnv with the data folder (database, thumbnails) in data.
+func newEnvAt(t *testing.T, data string) *env {
+	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
-	data := t.TempDir()
 	d, err := db.Open(ctx, filepath.Join(data, "t.db"))
 	if err != nil {
 		t.Fatal(err)
