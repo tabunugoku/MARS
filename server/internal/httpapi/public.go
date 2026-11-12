@@ -70,7 +70,7 @@ func (s *server) GetLoginScreen(ctx context.Context, _ GetLoginScreenRequestObje
 func (s *server) servePublicCover(w http.ResponseWriter, r *http.Request) {
 	covers, err := s.coverWall(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "表紙を読めませんでした")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 		return
 	}
 	want := "/api/v1/public/covers/" + r.PathValue("seriesId")
@@ -80,5 +80,5 @@ func (s *server) servePublicCover(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	writeError(w, http.StatusNotFound, "表紙がありません")
+	writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
 }

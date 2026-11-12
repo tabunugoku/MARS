@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { api, errorMessage, useApi, type Task, type TaskKind } from "@/api";
 import { useLiveConnected, useLiveEvents, useLiveReload } from "@/api/live";
+import { defineMessages, useT } from "@/i18n";
 import { LoadError } from "@/components/shell/load-error";
 import { EmptyState, Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { CountUp } from "@/components/media/count-up";
@@ -16,17 +17,90 @@ import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { ConfirmDialog, TableSkeleton, relTime } from "./_parts";
 
-const KIND_LABEL: Record<TaskKind, string> = {
-  scan: "スキャン",
-  analyze: "解析",
-  thumbnail: "サムネイル",
-  hash: "ハッシュ",
-  trash: "ゴミ箱",
-};
-const HISTORY_HEADS = ["種別", "ラベル", "状態", "開始時刻"];
+const m = defineMessages({
+  ja: {
+    title: "タスク",
+    activeTitle: "実行中・待機中",
+    historyTitle: "履歴",
+    kindScan: "スキャン",
+    kindAnalyze: "解析",
+    kindThumbnail: "サムネイル",
+    kindHash: "ハッシュ",
+    kindTrash: "ゴミ箱",
+    colKind: "種別",
+    colLabel: "ラベル",
+    colState: "状態",
+    colStarted: "開始時刻",
+    emptyActiveTitle: "実行中のタスクはありません",
+    emptyActiveBody: "スキャンや解析は、ライブラリ設定から始められます",
+    goLibraries: "ライブラリ設定へ",
+    historyEmpty: "履歴はまだありません",
+    allLibraries: "全ライブラリ",
+    stop: "中止",
+    stopAll: "すべて中止",
+    stopped: "中止",
+    done: "完了",
+    failed: "失敗",
+    taskStopped: "タスクを中止しました",
+    allStopped: "すべてのタスクを中止しました",
+    stopFailed: ({ n, error }) => `${n} 件を中止できませんでした：${error}`,
+    emptyTrash: "ゴミ箱を空にする",
+    emptied: ({ series, books }) => `ゴミ箱を空にしました（シリーズ ${series} 件、本 ${books} 件）`,
+    stopAllTitle: "すべてのタスクを中止しますか",
+    stopAllBody: "実行中と待機中のタスクをすべて止めます。",
+    emptyTrashTitle: "ゴミ箱を空にしますか",
+    emptyTrashBody: "ゴミ箱のファイルを完全に削除します。元に戻せません。",
+    empty: "空にする",
+  },
+  en: {
+    title: "Tasks",
+    activeTitle: "Running and queued",
+    historyTitle: "History",
+    kindScan: "Scan",
+    kindAnalyze: "Analyze",
+    kindThumbnail: "Thumbnail",
+    kindHash: "Hash",
+    kindTrash: "Trash",
+    colKind: "Kind",
+    colLabel: "Label",
+    colState: "Status",
+    colStarted: "Started",
+    emptyActiveTitle: "No tasks running",
+    emptyActiveBody: "Start a scan or analysis from library settings",
+    goLibraries: "Go to library settings",
+    historyEmpty: "No history yet",
+    allLibraries: "All libraries",
+    stop: "Stop",
+    stopAll: "Stop all",
+    stopped: "Stopped",
+    done: "Done",
+    failed: "Failed",
+    taskStopped: "Task stopped",
+    allStopped: "All tasks stopped",
+    stopFailed: ({ n, error }) => `Could not stop ${n} ${n === 1 ? "task" : "tasks"}: ${error}`,
+    emptyTrash: "Empty trash",
+    emptied: ({ series, books }) =>
+      `Emptied the trash: ${series} series, ${books} ${books === 1 ? "book" : "books"}`,
+    stopAllTitle: "Stop all tasks?",
+    stopAllBody: "Stops all running and queued tasks.",
+    emptyTrashTitle: "Empty trash?",
+    emptyTrashBody: "Permanently deletes the files in the trash. This cannot be undone.",
+    empty: "Empty",
+  },
+});
+
 const POLL_MS = 3000;
 
 export default function Screen() {
+  const t = useT(m);
+  const kindLabel: Record<TaskKind, string> = {
+    scan: t("kindScan"),
+    analyze: t("kindAnalyze"),
+    thumbnail: t("kindThumbnail"),
+    hash: t("kindHash"),
+    trash: t("kindTrash"),
+  };
+  const historyHeads = [t("colKind"), t("colLabel"), t("colState"), t("colStarted")];
   const { data, error, reload } = useApi(() => Promise.all([api.tasks(), api.libraries()]), []);
   const [confirm, setConfirm] = useState<"abort" | "trash" | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
@@ -79,7 +153,7 @@ export default function Screen() {
     setBusyIds((s) => new Set(s).add(id));
     try {
       await api.cancelTask(id);
-      toast.success("タスクを中止しました");
+      toast.success(t("taskStopped"));
       reload();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -99,9 +173,9 @@ export default function Screen() {
       const results = await Promise.allSettled(targets.map((id) => api.cancelTask(id)));
       const failed = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
       if (failed.length === 0) {
-        toast.success("すべてのタスクを中止しました");
+        toast.success(t("allStopped"));
       } else {
-        toast.error(`${failed.length} 件を中止できませんでした：${errorMessage(failed[0].reason)}`);
+        toast.error(t("stopFailed", { n: failed.length, error: errorMessage(failed[0].reason) }));
       }
       reload();
     } finally {
@@ -113,7 +187,7 @@ export default function Screen() {
     setEmptying(true);
     try {
       const r = await api.emptyTrash();
-      toast.success(`ゴミ箱を空にしました（シリーズ ${r.series} 件、本 ${r.books} 件）`);
+      toast.success(t("emptied", { series: r.series, books: r.books }));
       reload();
     } catch (err) {
       toast.error(errorMessage(err));
@@ -125,15 +199,15 @@ export default function Screen() {
   return (
     <Page>
       <PageHeader
-        title="タスク"
+        title={t("title")}
         actions={
           tasks && (
             <>
               <Button variant="tertiary" disabled={!hasActive || aborting} onClick={() => setConfirm("abort")}>
-                すべて中止
+                {t("stopAll")}
               </Button>
               <Button variant="secondary" disabled={emptying} onClick={() => setConfirm("trash")}>
-                ゴミ箱を空にする
+                {t("emptyTrash")}
               </Button>
             </>
           )
@@ -145,7 +219,7 @@ export default function Screen() {
       {!error && (
         <>
           <section className="mb-10">
-            <SectionTitle>実行中・待機中</SectionTitle>
+            <SectionTitle>{t("activeTitle")}</SectionTitle>
             {!tasks && (
               <div className="flex flex-col gap-2" aria-hidden>
                 {[0, 1].map((i) => (
@@ -155,34 +229,34 @@ export default function Screen() {
             )}
             {tasks && !hasActive && (
               <EmptyState
-                title="実行中のタスクはありません"
-                body="スキャンや解析は、ライブラリ設定から始められます"
+                title={t("emptyActiveTitle")}
+                body={t("emptyActiveBody")}
                 action={
                   <Button variant="secondary" asChild>
-                    <Link to="/admin/libraries">ライブラリ設定へ</Link>
+                    <Link to="/admin/libraries">{t("goLibraries")}</Link>
                   </Button>
                 }
               />
             )}
             {hasActive && (
               <ul className="flex flex-col gap-2">
-                {active.map((t) => {
-                  const pct = Math.round(t.progress * 100);
-                  const running = t.state === "running";
+                {active.map((task) => {
+                  const pct = Math.round(task.progress * 100);
+                  const running = task.state === "running";
                   return (
-                    <li key={t.id} className="flex items-center gap-4 rounded-xl bg-card p-4">
+                    <li key={task.id} className="flex items-center gap-4 rounded-xl bg-card p-4">
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <p className={cn(typeClass("subtitle"), "truncate text-foreground")} style={{ fontVariationSettings: fontWeights.semibold }}>
-                          {t.label}
+                          {task.label}
                         </p>
                         <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                          {t.libraryId ? libNames.get(t.libraryId) : "全ライブラリ"}
+                          {task.libraryId ? libNames.get(task.libraryId) : t("allLibraries")}
                         </p>
                         <div className="flex items-center gap-3">
                           <DotTrack
                             total={24}
                             value={running ? Math.round((pct / 100) * 24) : 0}
-                            label={t.label}
+                            label={task.label}
                             size="sm"
                             className="flex-1"
                           />
@@ -191,8 +265,8 @@ export default function Screen() {
                           </span>
                         </div>
                       </div>
-                      <Button variant="ghost" disabled={busyIds.has(t.id)} onClick={() => cancel(t.id)}>
-                        中止
+                      <Button variant="ghost" disabled={busyIds.has(task.id)} onClick={() => cancel(task.id)}>
+                        {t("stop")}
                       </Button>
                     </li>
                   );
@@ -202,50 +276,50 @@ export default function Screen() {
           </section>
 
           <section>
-            <SectionTitle>履歴</SectionTitle>
-            {!tasks && <TableSkeleton heads={HISTORY_HEADS} rows={3} />}
+            <SectionTitle>{t("historyTitle")}</SectionTitle>
+            {!tasks && <TableSkeleton heads={historyHeads} rows={3} />}
             {tasks && (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      {HISTORY_HEADS.map((h) => (
+                      {historyHeads.map((h) => (
                         <TableHead key={h}>{h}</TableHead>
                       ))}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {history.map((t, i) => (
-                      <TableRow key={t.id} index={i}>
-                        <TableCell className="whitespace-nowrap">{KIND_LABEL[t.kind]}</TableCell>
+                    {history.map((task, i) => (
+                      <TableRow key={task.id} index={i}>
+                        <TableCell className="whitespace-nowrap">{kindLabel[task.kind]}</TableCell>
                         <TableCell className="text-foreground">
-                          <span>{t.label}</span>
-                          {t.state === "failed" && t.error && (
-                            <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t.error}</p>
+                          <span>{task.label}</span>
+                          {task.state === "failed" && task.error && (
+                            <p className={cn(typeClass("caption"), "text-muted-foreground")}>{task.error}</p>
                           )}
                         </TableCell>
                         <TableCell>
-                          {t.state === "done" && (
+                          {task.state === "done" && (
                             <Badge variant="ghost" color="gray">
-                              完了
+                              {t("done")}
                             </Badge>
                           )}
-                          {t.state === "failed" && (
+                          {task.state === "failed" && (
                             <Badge variant="ghost" color="red">
-                              失敗
+                              {t("failed")}
                             </Badge>
                           )}
-                          {t.state === "cancelled" && (
+                          {task.state === "cancelled" && (
                             <Badge variant="ghost" color="gray">
-                              中止
+                              {t("stopped")}
                             </Badge>
                           )}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">{relTime(t.startedAt)}</TableCell>
+                        <TableCell className="whitespace-nowrap">{relTime(task.startedAt)}</TableCell>
                       </TableRow>
                     ))}
                     {history.length === 0 && (
-                      <TableEmpty columns={HISTORY_HEADS.length} title="履歴はまだありません" rows={2} />
+                      <TableEmpty columns={historyHeads.length} title={t("historyEmpty")} rows={2} />
                     )}
                   </TableBody>
                 </Table>
@@ -258,17 +332,17 @@ export default function Screen() {
       <ConfirmDialog
         open={confirm === "abort"}
         onOpenChange={(open) => !open && setConfirm(null)}
-        title="すべてのタスクを中止しますか"
-        body="実行中と待機中のタスクをすべて止めます。"
-        confirmLabel="すべて中止"
+        title={t("stopAllTitle")}
+        body={t("stopAllBody")}
+        confirmLabel={t("stopAll")}
         onConfirm={() => void cancelAll()}
       />
       <ConfirmDialog
         open={confirm === "trash"}
         onOpenChange={(open) => !open && setConfirm(null)}
-        title="ゴミ箱を空にしますか"
-        body="ゴミ箱のファイルを完全に削除します。元に戻せません。"
-        confirmLabel="空にする"
+        title={t("emptyTrashTitle")}
+        body={t("emptyTrashBody")}
+        confirmLabel={t("empty")}
         onConfirm={() => void emptyTrash()}
       />
     </Page>

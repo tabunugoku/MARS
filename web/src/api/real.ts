@@ -26,7 +26,9 @@ export const realApi = {
 
   // The caller
   me: () => get<User>("/me"),
-  updateMe: (name: string) => request<User>("PATCH", "/me", { name }),
+  /** locale "" follows the browser; omitted, the server keeps the stored choice. */
+  updateMe: (name: string, locale?: "" | "ja" | "en") =>
+    request<User>("PATCH", "/me", locale === undefined ? { name } : { name, locale }),
   changePassword: (currentPassword: string, newPassword: string) =>
     request<void>("PUT", "/me/password", { currentPassword, newPassword }),
   apiKeys: () => get<ApiKey[]>("/me/api-keys"),

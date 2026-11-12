@@ -15,6 +15,18 @@ import { cn } from "@/lib/utils";
 import { useSize } from "@/lib/size-context";
 import { useIcons } from "@/lib/icon-context";
 import { SIDEBAR_MENU_POPUP } from "@/lib/sidebar-menu-grid";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    user: "ユーザー",
+    openMenu: "ユーザーメニューを開く",
+  },
+  en: {
+    user: "User",
+    openMenu: "Open user menu",
+  },
+});
 
 // ---------------------------------------------------------------------------
 // Footer user row: identity anchors the sidebar's outer edge. The 20px
@@ -46,14 +58,15 @@ export function SidebarUserFooter({
 }: SidebarUserFooterProps) {
   const iconSize = useSize().icon;
   const icons = useIcons();
+  const t = useT(m);
   const ChevronsUpDown = icons["chevrons-up-down"];
   return (
-    <SidebarMenu aria-label="ユーザー" className={cn(className)}>
+    <SidebarMenu aria-label={t("user")} className={cn(className)}>
       <SidebarMenuItem>
         <DropdownMenu>
           <DropdownTrigger
             render={
-              <SidebarMenuButton aria-label="ユーザーメニューを開く">
+              <SidebarMenuButton aria-label={t("openMenu")}>
                 <span className="-ml-0.5 -mr-0.5 flex size-5 shrink-0 items-center justify-center">
                   {avatar}
                 </span>

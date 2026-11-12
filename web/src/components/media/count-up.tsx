@@ -1,10 +1,11 @@
 import { useEffect, useRef } from "react";
 import { animate, useReducedMotion } from "motion/react";
+import { intlLocale } from "@/i18n";
 
 // A number that counts up to its value when it first appears or changes
 // (Aimran "count-up number"). Writes text directly, no re-render per frame.
 // Tabular figures so the width doesn't jitter while counting.
-export function CountUp({ value, format = (n) => n.toLocaleString("ja-JP"), className }: { value: number; format?: (n: number) => string; className?: string }) {
+export function CountUp({ value, format = (n) => n.toLocaleString(intlLocale()), className }: { value: number; format?: (n: number) => string; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const from = useRef(0);
   const reduce = useReducedMotion() ?? false;

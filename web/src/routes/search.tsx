@@ -11,6 +11,58 @@ import { Tabs, TabsItem, TabsPanel } from "@/components/ui/tabs";
 import { Tooltip } from "@/components/ui/tooltip";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, intlLocale, useLocale, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    placeholder: "タイトル・著者名・ISBN",
+    searchLabel: "検索",
+    clearSearch: "検索語を消す",
+    clear: "クリア",
+    removeTip: "削除",
+    removeRecent: "{v} を削除",
+    clearAllRecent: "すべて消去",
+    recentSearches: "最近の検索",
+    genres: "ジャンル",
+    noResults: "「{term}」に一致するものはありません",
+    noResultsBody: "タイトル・著者名・ISBN で探せます",
+    tabAll: "すべて",
+    tabSeries: ({ n }) => `シリーズ（${n}）`,
+    tabBooks: ({ n }) => `巻（${n}）`,
+    tabCollections: ({ n }) => `コレクション（${n}）`,
+    tabReadLists: ({ n }) => `リーディングリスト（${n}）`,
+    collectionCount: ({ n }) => `${n}件`,
+    readListCount: ({ n }) => `${n}件`,
+    seriesShelf: "シリーズ",
+    booksShelf: "巻",
+    collections: "コレクション",
+    readLists: "リーディングリスト",
+  },
+  en: {
+    placeholder: "Title, author or ISBN",
+    searchLabel: "Search",
+    clearSearch: "Clear search",
+    clear: "Clear",
+    removeTip: "Remove",
+    removeRecent: "Remove {v}",
+    clearAllRecent: "Clear all",
+    recentSearches: "Recent searches",
+    genres: "Genres",
+    noResults: 'No results for "{term}"',
+    noResultsBody: "Search by title, author or ISBN",
+    tabAll: "All",
+    tabSeries: ({ n }) => `Series (${n})`,
+    tabBooks: ({ n }) => `Books (${n})`,
+    tabCollections: ({ n }) => `Collections (${n})`,
+    tabReadLists: ({ n }) => `Read lists (${n})`,
+    collectionCount: ({ n }) => (n === 1 ? "1 series" : `${n} series`),
+    readListCount: ({ n }) => (n === 1 ? "1 book" : `${n} books`),
+    seriesShelf: "Series",
+    booksShelf: "Books",
+    collections: "Collections",
+    readLists: "Read lists",
+  },
+});
 
 const RECENT_KEY = "cn-recent-searches";
 const RECENT_MAX = 8;
@@ -61,6 +113,8 @@ function ListRows({ rows }: { rows: ListRow[] }) {
 }
 
 export default function Screen() {
+  const t = useT(m);
+  const lang = useLocale();
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const term = q.trim();
@@ -77,8 +131,8 @@ export default function Screen() {
   const results = useApi(() => api.search(term), [term]);
 
   const genres = useMemo(
-    () => [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, "ja")),
-    [genreList.data],
+    () => [...(genreList.data ?? [])].sort((a, b) => a.localeCompare(b, intlLocale(lang))),
+    [genreList.data, lang],
   );
 
   // External ?q= change (sidebar search, back/forward): adopt it and drop any
@@ -155,7 +209,7 @@ export default function Screen() {
       <>
         {recent.length > 0 && (
           <section className="mb-10">
-            <SectionTitle action={<Button variant="ghost" size="compact" onClick={clearAll}>すべて消去</Button>}>最近の検索</SectionTitle>
+            <SectionTitle action={<Button variant="ghost" size="compact" onClick={clearAll}>{t("clearAllRecent")}</Button>}>{t("recentSearches")}</SectionTitle>
             <ul className="flex flex-col">
               {recent.map((v) => (
                 <li key={v} className="flex items-center gap-1">
@@ -167,8 +221,8 @@ export default function Screen() {
                     <Clock size={16} aria-hidden className="shrink-0 text-muted-foreground" />
                     <span className={cn(typeClass("body"), "truncate")}>{v}</span>
                   </button>
-                  <Tooltip content="削除">
-                    <Button variant="ghost" size="icon" aria-label={`${v} を削除`} onClick={() => forget(v)}>
+                  <Tooltip content={t("removeTip")}>
+                    <Button variant="ghost" size="icon" aria-label={t("removeRecent", { v })} onClick={() => forget(v)}>
                       <X />
                     </Button>
                   </Tooltip>
@@ -179,7 +233,7 @@ export default function Screen() {
         )}
         {genres.length > 0 && (
           <section className="mb-10">
-            <SectionTitle>ジャンル</SectionTitle>
+            <SectionTitle>{t("genres")}</SectionTitle>
             <div className="flex flex-wrap gap-2">
               {genres.map((g) => (
                 <Link
@@ -211,14 +265,14 @@ export default function Screen() {
     };
     const total = counts.series + counts.books + counts.collections + counts.readLists;
     if (total === 0) {
-      body = <EmptyState title={`「${term}」に一致するものはありません`} body="タイトル・著者名・ISBN で探せます" />;
+      body = <EmptyState title={t("noResults", { term })} body={t("noResultsBody")} />;
     } else {
       const tabs: { key: TabKey; label: string }[] = [
-        { key: "all", label: "すべて" },
-        ...(counts.series ? [{ key: "series" as const, label: `シリーズ（${counts.series}）` }] : []),
-        ...(counts.books ? [{ key: "books" as const, label: `巻（${counts.books}）` }] : []),
-        ...(counts.collections ? [{ key: "collections" as const, label: `コレクション（${counts.collections}）` }] : []),
-        ...(counts.readLists ? [{ key: "readLists" as const, label: `リーディングリスト（${counts.readLists}）` }] : []),
+        { key: "all", label: t("tabAll") },
+        ...(counts.series ? [{ key: "series" as const, label: t("tabSeries", { n: counts.series }) }] : []),
+        ...(counts.books ? [{ key: "books" as const, label: t("tabBooks", { n: counts.books }) }] : []),
+        ...(counts.collections ? [{ key: "collections" as const, label: t("tabCollections", { n: counts.collections }) }] : []),
+        ...(counts.readLists ? [{ key: "readLists" as const, label: t("tabReadLists", { n: counts.readLists }) }] : []),
       ];
       const active = tabs.some((t) => t.key === tab) ? tab : "all";
       const sel = Math.max(0, tabs.findIndex((t) => t.key === active));
@@ -226,13 +280,13 @@ export default function Screen() {
       const collectionRows: ListRow[] = r.collections.map((c) => ({
         id: c.id,
         name: c.name,
-        count: `${c.seriesIds.length}件`,
+        count: t("collectionCount", { n: c.seriesIds.length }),
         to: `/collections/${c.id}`,
       }));
       const readListRows: ListRow[] = r.readLists.map((l) => ({
         id: l.id,
         name: l.name,
-        count: `${l.bookIds.length}件`,
+        count: t("readListCount", { n: l.bookIds.length }),
         to: `/readlists/${l.id}`,
       }));
 
@@ -260,7 +314,7 @@ export default function Screen() {
         panel = (
           <>
             {r.series.length > 0 && (
-              <Shelf title="シリーズ">
+              <Shelf title={t("seriesShelf")}>
                 {r.series.map((s) => (
                   <ShelfItem key={s.id}>
                     <SeriesCard series={s} />
@@ -269,7 +323,7 @@ export default function Screen() {
               </Shelf>
             )}
             {r.books.length > 0 && (
-              <Shelf title="巻">
+              <Shelf title={t("booksShelf")}>
                 {r.books.map((b) => (
                   <ShelfItem key={b.id}>
                     <BookCard book={b} seriesTitle={b.seriesTitle} />
@@ -279,13 +333,13 @@ export default function Screen() {
             )}
             {collectionRows.length > 0 && (
               <section className="mb-10">
-                <SectionTitle>コレクション</SectionTitle>
+                <SectionTitle>{t("collections")}</SectionTitle>
                 <ListRows rows={collectionRows} />
               </section>
             )}
             {readListRows.length > 0 && (
               <section className="mb-10">
-                <SectionTitle>リーディングリスト</SectionTitle>
+                <SectionTitle>{t("readLists")}</SectionTitle>
                 <ListRows rows={readListRows} />
               </section>
             )}
@@ -314,25 +368,25 @@ export default function Screen() {
 
   return (
     <Page>
-      <h1 className="sr-only">検索</h1>
+      <h1 className="sr-only">{t("searchLabel")}</h1>
 
       <form role="search" onSubmit={submit} className="relative mb-6">
         <Search size={16} aria-hidden className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="text"
           autoFocus
-          aria-label="検索"
-          placeholder="タイトル・著者名・ISBN"
+          aria-label={t("searchLabel")}
+          placeholder={t("placeholder")}
           value={text}
           onChange={(e) => setText(e.target.value)}
           className={cn(typeClass("title"), "h-11 pl-10 pr-10")}
         />
         {text && (
-          <Tooltip content="クリア">
+          <Tooltip content={t("clear")}>
             <Button
               variant="ghost"
               size="icon"
-              aria-label="検索語を消す"
+              aria-label={t("clearSearch")}
               className="absolute right-1 top-1/2 -translate-y-1/2"
               onClick={() => setText("")}
             >

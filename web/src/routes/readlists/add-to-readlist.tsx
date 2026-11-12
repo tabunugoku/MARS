@@ -10,6 +10,28 @@ import { Input } from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import type { IconComponent } from "@/lib/icon-context";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    created: "リーディングリストを作成しました",
+    title: "リーディングリストに追加",
+    loading: "読み込んでいます",
+    empty: "リーディングリストがありません。下から作成できます。",
+    newName: "新しいリーディングリスト",
+    create: "作成",
+    close: "閉じる",
+  },
+  en: {
+    created: "Read list created",
+    title: "Add to read list",
+    loading: "Loading",
+    empty: "No read lists yet. Create one below.",
+    newName: "New read list",
+    create: "Create",
+    close: "Close",
+  },
+});
 
 /** Adds one book to read lists. Admin only (the server refuses other users'
  *  list writes). Mounted fresh on each open (parent uses a key), so the lists
@@ -24,6 +46,7 @@ export function AddToReadListDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT(m);
   const [lists, setLists] = useState<ReadList[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
@@ -75,7 +98,7 @@ export function AddToReadListDialog({
     api
       .createReadList({ name: n, bookIds: [bookId] })
       .then((created) => {
-        toast.success("リーディングリストを作成しました");
+        toast.success(t("created"));
         setName("");
         createdRef.current = [...createdRef.current.filter((l) => l.id !== created.id), created];
         setLists((ls) => {
@@ -94,15 +117,15 @@ export function AddToReadListDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>リーディングリストに追加</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
 
         {error ? (
           <p className={cn(typeClass("body"), "text-muted-foreground")}>{error}</p>
         ) : !lists ? (
-          <p className={cn(typeClass("body"), "text-muted-foreground")}>読み込んでいます</p>
+          <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("loading")}</p>
         ) : lists.length === 0 ? (
-          <p className={cn(typeClass("body"), "text-muted-foreground")}>リーディングリストがありません。下から作成できます。</p>
+          <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("empty")}</p>
         ) : (
           <ul className="max-h-[50dvh] divide-y divide-border overflow-y-auto">
             {lists.map((l) => {
@@ -126,7 +149,7 @@ export function AddToReadListDialog({
 
         <div className="space-y-2 border-t border-border pt-4">
           <Field>
-            <FieldLabel htmlFor="new-readlist-name">新しいリーディングリスト</FieldLabel>
+            <FieldLabel htmlFor="new-readlist-name">{t("newName")}</FieldLabel>
             <div className="flex items-center gap-2">
               <Input
                 id="new-readlist-name"
@@ -144,14 +167,14 @@ export function AddToReadListDialog({
                 disabled={!name.trim() || !lists || creating}
                 onClick={create}
               >
-                作成
+                {t("create")}
               </Button>
             </div>
           </Field>
         </div>
 
         <DialogFooter>
-          <DialogClose render={<Button variant="ghost">閉じる</Button>} />
+          <DialogClose render={<Button variant="ghost">{t("close")}</Button>} />
         </DialogFooter>
       </DialogContent>
     </Dialog>

@@ -2,6 +2,7 @@
 // with VITE_API=mock), its types, reader settings and small formatters.
 // Keep screens free of direct "@/mock" imports.
 import { useCallback, useEffect, useRef, useState, type DependencyList } from "react";
+import { defineMessages, intlLocale, translate } from "@/i18n";
 import { ApiError } from "./http";
 import type { Series } from "./types";
 
@@ -31,9 +32,26 @@ export function startDownload(url: string) {
   a.remove();
 }
 
+const m = defineMessages({
+  ja: {
+    offline: "サーバーに接続できませんでした",
+    ongoing: "連載中",
+    ended: "完結",
+    hiatus: "休載中",
+    abandoned: "打ち切り",
+  },
+  en: {
+    offline: "Could not reach the server",
+    ongoing: "Ongoing",
+    ended: "Ended",
+    hiatus: "On hiatus",
+    abandoned: "Abandoned",
+  },
+});
+
 /** The message to show for a failed call. */
 export function errorMessage(err: unknown): string {
-  return err instanceof ApiError ? err.message : "サーバーに接続できませんでした";
+  return err instanceof ApiError ? err.message : translate(m, "offline");
 }
 
 /** Loads data for a screen. A new deps list starts over (never shows the
@@ -194,10 +212,11 @@ export const formatBytes = (n: number) => {
   return `${n.toFixed(i > 1 ? 1 : 0)} ${u[i]}`;
 };
 export const formatDate = (iso: string) =>
-  new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "short", day: "numeric" }).format(new Date(iso));
-export const statusLabel: Record<Series["status"], string> = {
-  ongoing: "連載中",
-  ended: "完結",
-  hiatus: "休載中",
-  abandoned: "打ち切り",
-};
+  new Intl.DateTimeFormat(intlLocale(), { year: "numeric", month: "short", day: "numeric" }).format(new Date(iso));
+/** Series status labels in the current language. */
+export const statusLabel = (): Record<Series["status"], string> => ({
+  ongoing: translate(m, "ongoing"),
+  ended: translate(m, "ended"),
+  hiatus: translate(m, "hiatus"),
+  abandoned: translate(m, "abandoned"),
+});

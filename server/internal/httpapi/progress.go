@@ -30,14 +30,14 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 		return nil, err
 	}
 	if !ok {
-		return SetBookProgress404JSONResponse{notFound("本が見つかりません")}, nil
+		return SetBookProgress404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	b := req.Body
 	if b == nil {
-		return SetBookProgress400JSONResponse{badRequest("本文がありません")}, nil
+		return SetBookProgress400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	if b.Page < 1 || b.Page > book.PageCount {
-		return SetBookProgress400JSONResponse{badRequest("ページ番号が正しくありません")}, nil
+		return SetBookProgress400JSONResponse{badRequest(ctx, "bad_request.page_number")}, nil
 	}
 	now := time.Now().UTC()
 	p := ReadProgress{Page: b.Page, Completed: b.Page == book.PageCount, ReadAt: now.Format(time.RFC3339)}
@@ -53,7 +53,7 @@ func (s *server) SetBookProgress(ctx context.Context, req SetBookProgressRequest
 		seq = *b.Seq
 	}
 	if len(writer) > 64 || seq < 0 {
-		return SetBookProgress400JSONResponse{badRequest("writer か seq が正しくありません")}, nil
+		return SetBookProgress400JSONResponse{badRequest(ctx, "bad_request.writer_seq")}, nil
 	}
 	uid := currentUser(ctx).ID
 	// A write without a writer (mark read) is not ordered: it always applies.
@@ -111,7 +111,7 @@ func (s *server) ClearBookProgress(ctx context.Context, req ClearBookProgressReq
 		return nil, err
 	}
 	if !ok {
-		return ClearBookProgress404JSONResponse{notFound("本が見つかりません")}, nil
+		return ClearBookProgress404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM read_progress WHERE user_id = ? AND book_id = ?`,
 		currentUser(ctx).ID, req.BookId); err != nil {
@@ -127,7 +127,7 @@ func (s *server) MarkSeriesRead(ctx context.Context, req MarkSeriesReadRequestOb
 		return nil, err
 	}
 	if !ok {
-		return MarkSeriesRead404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return MarkSeriesRead404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	if err := s.markRead(ctx, "series_id", req.SeriesId, req.Body != nil && req.Body.Completed); err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func (s *server) MarkLibraryRead(ctx context.Context, req MarkLibraryReadRequest
 	var one int
 	err := s.DB.QueryRowContext(ctx, `SELECT 1 FROM libraries l WHERE l.id = ? AND `+cond, append([]any{req.LibraryId}, args...)...).Scan(&one)
 	if errors.Is(err, sql.ErrNoRows) {
-		return MarkLibraryRead404JSONResponse{notFound("ライブラリが見つかりません")}, nil
+		return MarkLibraryRead404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -244,10 +244,10 @@ func (s *server) GetReaderPrefs(ctx context.Context, req GetReaderPrefsRequestOb
 func (s *server) SetGlobalReaderPrefs(ctx context.Context, req SetGlobalReaderPrefsRequestObject) (SetGlobalReaderPrefsResponseObject, error) {
 	b := req.Body
 	if b == nil {
-		return SetGlobalReaderPrefs400JSONResponse{badRequest("本文がありません")}, nil
+		return SetGlobalReaderPrefs400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	if !b.Direction.Valid() || !b.Spread.Valid() || !b.Fit.Valid() || !b.Bg.Valid() {
-		return SetGlobalReaderPrefs400JSONResponse{badRequest("読書設定の値が正しくありません")}, nil
+		return SetGlobalReaderPrefs400JSONResponse{badRequest(ctx, "bad_request.reader_prefs")}, nil
 	}
 	target := ""
 	if p := req.Params.Profile; p != nil {
@@ -256,7 +256,7 @@ func (s *server) SetGlobalReaderPrefs(ctx context.Context, req SetGlobalReaderPr
 			target = "mobile"
 		case Desktop:
 		default:
-			return SetGlobalReaderPrefs400JSONResponse{badRequest("profile は desktop か mobile です")}, nil
+			return SetGlobalReaderPrefs400JSONResponse{badRequest(ctx, "bad_request.profile")}, nil
 		}
 	}
 	if err := s.putPrefs(ctx, "global", target, jsonText(b)); err != nil {
@@ -284,10 +284,10 @@ func (s *server) SetSeriesReaderPrefs(ctx context.Context, req SetSeriesReaderPr
 		return nil, err
 	}
 	if !ok {
-		return SetSeriesReaderPrefs404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return SetSeriesReaderPrefs404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	if !checkPrefs(req.Body) {
-		return SetSeriesReaderPrefs400JSONResponse{badRequest("読書設定の値が正しくありません")}, nil
+		return SetSeriesReaderPrefs400JSONResponse{badRequest(ctx, "bad_request.reader_prefs")}, nil
 	}
 	if err := s.putPrefs(ctx, "series", req.SeriesId, jsonText(req.Body)); err != nil {
 		return nil, err
@@ -301,7 +301,7 @@ func (s *server) DeleteSeriesReaderPrefs(ctx context.Context, req DeleteSeriesRe
 		return nil, err
 	}
 	if !ok {
-		return DeleteSeriesReaderPrefs404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return DeleteSeriesReaderPrefs404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM reader_prefs WHERE user_id = ? AND scope = 'series' AND target = ?`,
 		currentUser(ctx).ID, req.SeriesId); err != nil {
@@ -316,10 +316,10 @@ func (s *server) SetBookReaderPrefs(ctx context.Context, req SetBookReaderPrefsR
 		return nil, err
 	}
 	if !ok {
-		return SetBookReaderPrefs404JSONResponse{notFound("本が見つかりません")}, nil
+		return SetBookReaderPrefs404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	if !checkPrefs(req.Body) {
-		return SetBookReaderPrefs400JSONResponse{badRequest("読書設定の値が正しくありません")}, nil
+		return SetBookReaderPrefs400JSONResponse{badRequest(ctx, "bad_request.reader_prefs")}, nil
 	}
 	if err := s.putPrefs(ctx, "book", req.BookId, jsonText(req.Body)); err != nil {
 		return nil, err
@@ -333,7 +333,7 @@ func (s *server) DeleteBookReaderPrefs(ctx context.Context, req DeleteBookReader
 		return nil, err
 	}
 	if !ok {
-		return DeleteBookReaderPrefs404JSONResponse{notFound("本が見つかりません")}, nil
+		return DeleteBookReaderPrefs404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	if _, err := s.DB.ExecContext(ctx, `DELETE FROM reader_prefs WHERE user_id = ? AND scope = 'book' AND target = ?`,
 		currentUser(ctx).ID, req.BookId); err != nil {

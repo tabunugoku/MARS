@@ -26,7 +26,7 @@ const writeWait = 30 * time.Second
 // StreamEvents is served by serveEvents (see New); the strict handler exists
 // only to satisfy the generated interface.
 func (s *server) StreamEvents(context.Context, StreamEventsRequestObject) (StreamEventsResponseObject, error) {
-	return nil, errors.New("not routed")
+	return nil, errors.New("not_found.route")
 }
 
 // serveEvents is GET /events: a text/event-stream of the changes the caller
@@ -35,7 +35,7 @@ func (s *server) StreamEvents(context.Context, StreamEventsRequestObject) (Strea
 // takes effect on an open stream within one heartbeat.
 func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	if s.Events == nil {
-		writeError(w, http.StatusNotFound, "イベントは使えません")
+		writeError(r.Context(), w, http.StatusNotFound, "not_found.events")
 		return
 	}
 	ctx := r.Context()
@@ -48,7 +48,7 @@ func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 	sub, err := s.Events.Subscribe(u.ID)
 	if err != nil {
 		w.Header().Set("Retry-After", "30")
-		writeError(w, http.StatusTooManyRequests, "開いている更新の接続が多すぎます")
+		writeError(r.Context(), w, http.StatusTooManyRequests, "too_many_requests.events")
 		return
 	}
 	defer s.Events.Unsubscribe(sub)
@@ -92,7 +92,7 @@ func (s *server) serveEvents(w http.ResponseWriter, r *http.Request) {
 			}
 			data := ev.Data
 			if t, ok := data.(task.Task); ok {
-				data = toTask(t)
+				data = toTask(ctx, t)
 			}
 			b, err := json.Marshal(data)
 			if err != nil {

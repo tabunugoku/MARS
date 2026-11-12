@@ -10,13 +10,47 @@ import { Tabs, TabsItem, TabsPanel } from "@/components/ui/tabs";
 import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
 import { IconAction, TableSkeleton } from "./_parts";
 
-const HEADS = ["表紙", "シリーズ", "パス", "詳細", "操作"];
+const m = defineMessages({
+  ja: {
+    title: "メディア管理",
+    colCover: "表紙",
+    colSeries: "シリーズ",
+    colPath: "パス",
+    colDetails: "詳細",
+    colActions: "操作",
+    reanalyzeStarted: "再解析を開始しました",
+    tabErrors: "エラー",
+    tabMissing: "見つからない",
+    tabCount: "{label}（{n}）",
+    noProblems: "問題のあるファイルはありません",
+    bookTitle: "{series} {number}巻",
+    reanalyze: "再解析",
+  },
+  en: {
+    title: "Media management",
+    colCover: "Cover",
+    colSeries: "Series",
+    colPath: "Path",
+    colDetails: "Details",
+    colActions: "Actions",
+    reanalyzeStarted: "Re-analysis started",
+    tabErrors: "Errors",
+    tabMissing: "Missing",
+    tabCount: "{label} ({n})",
+    noProblems: "No problem files",
+    bookTitle: "{series} vol. {number}",
+    reanalyze: "Re-analyze",
+  },
+});
 
 type Row = { issue: MediaIssue; book: Book; series: string };
 
 export default function Screen() {
+  const t = useT(m);
+  const heads = [t("colCover"), t("colSeries"), t("colPath"), t("colDetails"), t("colActions")];
   const { data, error, reload } = useApi(async () => {
     const issues = await api.mediaIssues();
     const books = await api.booksByIds(issues.map((i) => i.bookId));
@@ -30,7 +64,7 @@ export default function Screen() {
     setBusyIds((s) => new Set(s).add(bookId));
     try {
       await api.analyzeBook(bookId);
-      toast.success("再解析を開始しました");
+      toast.success(t("reanalyzeStarted"));
     } catch (err) {
       toast.error(errorMessage(err));
     } finally {
@@ -54,41 +88,41 @@ export default function Screen() {
     return out;
   };
   const tabs = [
-    { label: "エラー", rows: rowsFor(["error", "unsupported"]) },
-    { label: "見つからない", rows: rowsFor(["missing"]) },
+    { label: t("tabErrors"), rows: rowsFor(["error", "unsupported"]) },
+    { label: t("tabMissing"), rows: rowsFor(["missing"]) },
   ];
 
   return (
     <Page>
-      <PageHeader title="メディア管理" />
+      <PageHeader title={t("title")} />
 
       {error && !data && <LoadError message={error} onRetry={reload} />}
 
-      {!error && !data && <TableSkeleton heads={HEADS} rows={3} />}
+      {!error && !data && <TableSkeleton heads={heads} rows={3} />}
 
       {data && (
         <>
           <Tabs selectedIndex={tab} onSelect={setTab} idPrefix="media" className="mb-4">
-            {tabs.map((t, i) => (
-              <TabsItem key={t.label} index={i} label={`${t.label}（${t.rows.length}）`} />
+            {tabs.map((entry, i) => (
+              <TabsItem key={entry.label} index={i} label={t("tabCount", { label: entry.label, n: entry.rows.length })} />
             ))}
           </Tabs>
-          {tabs.map((t, i) => (
-            <TabsPanel key={t.label} index={i} selectedIndex={tab} idPrefix="media">
-              {t.rows.length === 0 ? (
-                <EmptyState title="問題のあるファイルはありません" />
+          {tabs.map((entry, i) => (
+            <TabsPanel key={entry.label} index={i} selectedIndex={tab} idPrefix="media">
+              {entry.rows.length === 0 ? (
+                <EmptyState title={t("noProblems")} />
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        {HEADS.map((h) => (
+                        {heads.map((h) => (
                           <TableHead key={h}>{h}</TableHead>
                         ))}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {t.rows.map(({ issue, book, series }, r) => (
+                      {entry.rows.map(({ issue, book, series }, r) => (
                         <TableRow key={`${issue.kind}-${book.id}`} index={r}>
                           <TableCell>
                             <div className="w-8">
@@ -100,7 +134,7 @@ export default function Screen() {
                               to={`/books/${book.id}`}
                               className="whitespace-nowrap text-foreground underline-offset-2 hover:underline"
                             >
-                              {series} {book.number}巻
+                              {t("bookTitle", { series, number: book.number })}
                             </Link>
                           </TableCell>
                           <TableCell className={cn(typeClass("caption"), "max-w-[280px] truncate font-mono")}>{book.path}</TableCell>
@@ -108,7 +142,7 @@ export default function Screen() {
                           <TableCell>
                             <div className="flex gap-1">
                               <IconAction
-                                label="再解析"
+                                label={t("reanalyze")}
                                 icon={RefreshCw}
                                 onClick={() => !busyIds.has(book.id) && reanalyze(book.id)}
                               />

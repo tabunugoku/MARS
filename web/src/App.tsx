@@ -6,6 +6,18 @@ import { keylineSlots } from "@/lib/icons";
 import { ThemeProvider, useTheme } from "@/components/shell/theme";
 import { AppShell } from "@/components/shell/app-shell";
 import { RouteError } from "@/components/shell/route-error";
+import { defineMessages, useLocale, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    notifications: "通知",
+    dismiss: "通知を閉じる",
+  },
+  en: {
+    notifications: "Notifications",
+    dismiss: "Dismiss notification",
+  },
+});
 
 // Every screen is its own chunk; only the shell ships in the first load.
 const Login = lazy(() => import("@/routes/login"));
@@ -57,14 +69,18 @@ const router = createBrowserRouter([
 
 function ThemedToaster() {
   const { theme } = useTheme();
-  return <Toaster position="bottom-center" theme={theme} labels={{ region: "通知", dismiss: "通知を閉じる" }} />;
+  const t = useT(m);
+  return <Toaster position="bottom-center" theme={theme} labels={{ region: t("notifications"), dismiss: t("dismiss") }} />;
 }
 
 export default function App() {
+  // A language change remounts the screens, so text that components keep in
+  // state or memo (Fluid's labels among them) is drawn again in the new one.
+  const locale = useLocale();
   return (
     <ThemeProvider>
       <FluidProvider icons={keylineSlots}>
-        <RouterProvider router={router} />
+        <RouterProvider key={locale} router={router} />
         <ThemedToaster />
       </FluidProvider>
     </ThemeProvider>

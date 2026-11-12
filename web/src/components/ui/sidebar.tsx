@@ -127,7 +127,7 @@ function SidebarSheet({ side, open, onClose, children }: SidebarSheetProps) {
             >
               {/* Radix's TitleWarning checks for a rendered DialogTitle, so
                   ship a visually hidden one as the accessible name. */}
-              <DialogPrimitive.Title className="sr-only">サイドバー</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="sr-only">{uiText("sidebar")}</DialogPrimitive.Title>
               <SurfaceProvider value={level}>{children}</SurfaceProvider>
             </motion.div>
           </DialogPrimitive.Content>
@@ -329,3 +329,4 @@ export type {
   SidebarMenuSubItemProps,
   SidebarMenuSubButtonProps,
 } from "@/components/ui/sidebar-menu";
+import { uiText } from "@/i18n/ui";

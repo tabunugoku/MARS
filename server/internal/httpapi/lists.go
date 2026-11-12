@@ -151,11 +151,11 @@ func (s *server) ListCollections(ctx context.Context, req ListCollectionsRequest
 func (s *server) CreateCollection(ctx context.Context, req CreateCollectionRequestObject) (CreateCollectionResponseObject, error) {
 	b := req.Body
 	if b == nil {
-		return CreateCollection400JSONResponse{badRequest("本文がありません")}, nil
+		return CreateCollection400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	name := strings.TrimSpace(b.Name)
 	if name == "" {
-		return CreateCollection400JSONResponse{badRequest("名前を入力してください")}, nil
+		return CreateCollection400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 	}
 	var in []string
 	if b.SeriesIds != nil {
@@ -175,7 +175,7 @@ func (s *server) CreateCollection(ctx context.Context, req CreateCollectionReque
 		return nil, err
 	}
 	if !ok {
-		return CreateCollection400JSONResponse{badRequest("存在しないシリーズが含まれています")}, nil
+		return CreateCollection400JSONResponse{badRequest(ctx, "bad_request.unknown_series")}, nil
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO collections (id, name, ordered, created_at) VALUES (?, ?, ?, ?)`,
 		id, name, ordered, time.Now().UTC().Format(time.RFC3339)); err != nil {
@@ -200,7 +200,7 @@ func (s *server) GetCollection(ctx context.Context, req GetCollectionRequestObje
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return GetCollection404JSONResponse{notFound("コレクションが見つかりません")}, nil
+		return GetCollection404JSONResponse{notFound(ctx, "not_found.collection")}, nil
 	}
 	return GetCollection200JSONResponse(cs[0]), nil
 }
@@ -214,7 +214,7 @@ func (s *server) UpdateCollection(ctx context.Context, req UpdateCollectionReque
 	if b.Name != nil {
 		t := strings.TrimSpace(*b.Name)
 		if t == "" {
-			return UpdateCollection400JSONResponse{badRequest("名前を入力してください")}, nil
+			return UpdateCollection400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 		}
 		name = &t
 	}
@@ -232,7 +232,7 @@ func (s *server) UpdateCollection(ctx context.Context, req UpdateCollectionReque
 	var ordered bool
 	err = tx.QueryRowContext(ctx, `SELECT name, ordered FROM collections WHERE id = ?`, req.CollectionId).Scan(&cur, &ordered)
 	if errors.Is(err, sql.ErrNoRows) {
-		return UpdateCollection404JSONResponse{notFound("コレクションが見つかりません")}, nil
+		return UpdateCollection404JSONResponse{notFound(ctx, "not_found.collection")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -253,7 +253,7 @@ func (s *server) UpdateCollection(ctx context.Context, req UpdateCollectionReque
 			return nil, err
 		}
 		if !ok {
-			return UpdateCollection400JSONResponse{badRequest("存在しないシリーズが含まれています")}, nil
+			return UpdateCollection400JSONResponse{badRequest(ctx, "bad_request.unknown_series")}, nil
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM collection_series WHERE collection_id = ?`, req.CollectionId); err != nil {
 			return nil, err
@@ -273,7 +273,7 @@ func (s *server) UpdateCollection(ctx context.Context, req UpdateCollectionReque
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return UpdateCollection404JSONResponse{notFound("コレクションが見つかりません")}, nil
+		return UpdateCollection404JSONResponse{notFound(ctx, "not_found.collection")}, nil
 	}
 	return UpdateCollection200JSONResponse(cs[0]), nil
 }
@@ -284,7 +284,7 @@ func (s *server) DeleteCollection(ctx context.Context, req DeleteCollectionReque
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return DeleteCollection404JSONResponse{notFound("コレクションが見つかりません")}, nil
+		return DeleteCollection404JSONResponse{notFound(ctx, "not_found.collection")}, nil
 	}
 	return DeleteCollection204Response{}, nil
 }
@@ -295,7 +295,7 @@ func (s *server) ListCollectionSeries(ctx context.Context, req ListCollectionSer
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return ListCollectionSeries404JSONResponse{notFound("コレクションが見つかりません")}, nil
+		return ListCollectionSeries404JSONResponse{notFound(ctx, "not_found.collection")}, nil
 	}
 	args := []any{req.CollectionId}
 	tail := `ORDER BY s.title_sort, s.id`
@@ -321,11 +321,11 @@ func (s *server) ListReadLists(ctx context.Context, req ListReadListsRequestObje
 func (s *server) CreateReadList(ctx context.Context, req CreateReadListRequestObject) (CreateReadListResponseObject, error) {
 	b := req.Body
 	if b == nil {
-		return CreateReadList400JSONResponse{badRequest("本文がありません")}, nil
+		return CreateReadList400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	name := strings.TrimSpace(b.Name)
 	if name == "" {
-		return CreateReadList400JSONResponse{badRequest("名前を入力してください")}, nil
+		return CreateReadList400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 	}
 	var in []string
 	if b.BookIds != nil {
@@ -348,7 +348,7 @@ func (s *server) CreateReadList(ctx context.Context, req CreateReadListRequestOb
 		return nil, err
 	}
 	if !ok {
-		return CreateReadList400JSONResponse{badRequest("存在しない巻が含まれています")}, nil
+		return CreateReadList400JSONResponse{badRequest(ctx, "bad_request.unknown_book")}, nil
 	}
 	if _, err := tx.ExecContext(ctx, `INSERT INTO read_lists (id, name, summary, created_at) VALUES (?, ?, ?, ?)`,
 		id, name, summary, time.Now().UTC().Format(time.RFC3339)); err != nil {
@@ -373,7 +373,7 @@ func (s *server) GetReadList(ctx context.Context, req GetReadListRequestObject) 
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return GetReadList404JSONResponse{notFound("読書リストが見つかりません")}, nil
+		return GetReadList404JSONResponse{notFound(ctx, "not_found.read_list")}, nil
 	}
 	return GetReadList200JSONResponse(ls[0]), nil
 }
@@ -387,7 +387,7 @@ func (s *server) UpdateReadList(ctx context.Context, req UpdateReadListRequestOb
 	if b.Name != nil {
 		t := strings.TrimSpace(*b.Name)
 		if t == "" {
-			return UpdateReadList400JSONResponse{badRequest("名前を入力してください")}, nil
+			return UpdateReadList400JSONResponse{badRequest(ctx, "bad_request.name_required")}, nil
 		}
 		name = &t
 	}
@@ -404,7 +404,7 @@ func (s *server) UpdateReadList(ctx context.Context, req UpdateReadListRequestOb
 	var curName, curSummary string
 	err = tx.QueryRowContext(ctx, `SELECT name, summary FROM read_lists WHERE id = ?`, req.ReadListId).Scan(&curName, &curSummary)
 	if errors.Is(err, sql.ErrNoRows) {
-		return UpdateReadList404JSONResponse{notFound("読書リストが見つかりません")}, nil
+		return UpdateReadList404JSONResponse{notFound(ctx, "not_found.read_list")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -425,7 +425,7 @@ func (s *server) UpdateReadList(ctx context.Context, req UpdateReadListRequestOb
 			return nil, err
 		}
 		if !ok {
-			return UpdateReadList400JSONResponse{badRequest("存在しない巻が含まれています")}, nil
+			return UpdateReadList400JSONResponse{badRequest(ctx, "bad_request.unknown_book")}, nil
 		}
 		if _, err := tx.ExecContext(ctx, `DELETE FROM read_list_books WHERE read_list_id = ?`, req.ReadListId); err != nil {
 			return nil, err
@@ -445,7 +445,7 @@ func (s *server) UpdateReadList(ctx context.Context, req UpdateReadListRequestOb
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return UpdateReadList404JSONResponse{notFound("読書リストが見つかりません")}, nil
+		return UpdateReadList404JSONResponse{notFound(ctx, "not_found.read_list")}, nil
 	}
 	return UpdateReadList200JSONResponse(ls[0]), nil
 }
@@ -456,7 +456,7 @@ func (s *server) DeleteReadList(ctx context.Context, req DeleteReadListRequestOb
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return DeleteReadList404JSONResponse{notFound("読書リストが見つかりません")}, nil
+		return DeleteReadList404JSONResponse{notFound(ctx, "not_found.read_list")}, nil
 	}
 	return DeleteReadList204Response{}, nil
 }
@@ -467,7 +467,7 @@ func (s *server) ListReadListBooks(ctx context.Context, req ListReadListBooksReq
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return ListReadListBooks404JSONResponse{notFound("読書リストが見つかりません")}, nil
+		return ListReadListBooks404JSONResponse{notFound(ctx, "not_found.read_list")}, nil
 	}
 	out, err := s.listBooks(ctx,
 		` AND b.id IN (SELECT book_id FROM read_list_books WHERE read_list_id = ?)`,
@@ -496,17 +496,17 @@ type listLink struct {
 var collectionLink = listLink{
 	list: "collections", link: "collection_series", listCol: "collection_id",
 	member: "series", memberCol: "series_id", alias: "s",
-	notFound: "コレクションが見つかりません",
-	noMember: "シリーズが見つかりません",
-	conflict: "コレクションの中身が変わりました。読み込み直してください",
+	notFound: "not_found.collection",
+	noMember: "not_found.series",
+	conflict: "conflict.collection_changed",
 }
 
 var readListLink = listLink{
 	list: "read_lists", link: "read_list_books", listCol: "read_list_id",
 	member: "books", memberCol: "book_id", alias: "b",
-	notFound: "読書リストが見つかりません",
-	noMember: "巻が見つかりません",
-	conflict: "読書リストの中身が変わりました。読み込み直してください",
+	notFound: "not_found.read_list",
+	noMember: "not_found.member_book",
+	conflict: "conflict.read_list_changed",
 }
 
 // memberSlot is one row of a list in position order.
@@ -636,14 +636,14 @@ func (s *server) AddCollectionSeries(ctx context.Context, req AddCollectionSerie
 		return nil, err
 	}
 	if !ok {
-		return AddCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+		return AddCollectionSeries404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	ok, err = l.memberVisible(ctx, tx, req.SeriesId)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return AddCollectionSeries404JSONResponse{notFound(l.noMember)}, nil
+		return AddCollectionSeries404JSONResponse{notFound(ctx, l.noMember)}, nil
 	}
 	if err := l.add(ctx, tx, req.CollectionId, req.SeriesId); err != nil {
 		return nil, err
@@ -656,7 +656,7 @@ func (s *server) AddCollectionSeries(ctx context.Context, req AddCollectionSerie
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return AddCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+		return AddCollectionSeries404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return AddCollectionSeries200JSONResponse(cs[0]), nil
 }
@@ -673,7 +673,7 @@ func (s *server) RemoveCollectionSeries(ctx context.Context, req RemoveCollectio
 		return nil, err
 	}
 	if !ok {
-		return RemoveCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+		return RemoveCollectionSeries404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	if err := l.remove(ctx, tx, req.CollectionId, req.SeriesId); err != nil {
 		return nil, err
@@ -686,7 +686,7 @@ func (s *server) RemoveCollectionSeries(ctx context.Context, req RemoveCollectio
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return RemoveCollectionSeries404JSONResponse{notFound(l.notFound)}, nil
+		return RemoveCollectionSeries404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return RemoveCollectionSeries200JSONResponse(cs[0]), nil
 }
@@ -707,14 +707,14 @@ func (s *server) ReorderCollection(ctx context.Context, req ReorderCollectionReq
 		return nil, err
 	}
 	if !ok {
-		return ReorderCollection404JSONResponse{notFound(l.notFound)}, nil
+		return ReorderCollection404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	ok, err = l.reorder(ctx, tx, req.CollectionId, in)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return ReorderCollection409JSONResponse{ConflictJSONResponse{Message: l.conflict}}, nil
+		return ReorderCollection409JSONResponse{ConflictJSONResponse{Code: l.conflict, Message: msg(ctx, l.conflict)}}, nil
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -724,7 +724,7 @@ func (s *server) ReorderCollection(ctx context.Context, req ReorderCollectionReq
 		return nil, err
 	}
 	if len(cs) == 0 {
-		return ReorderCollection404JSONResponse{notFound(l.notFound)}, nil
+		return ReorderCollection404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return ReorderCollection200JSONResponse(cs[0]), nil
 }
@@ -741,14 +741,14 @@ func (s *server) AddReadListBook(ctx context.Context, req AddReadListBookRequest
 		return nil, err
 	}
 	if !ok {
-		return AddReadListBook404JSONResponse{notFound(l.notFound)}, nil
+		return AddReadListBook404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	ok, err = l.memberVisible(ctx, tx, req.BookId)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return AddReadListBook404JSONResponse{notFound(l.noMember)}, nil
+		return AddReadListBook404JSONResponse{notFound(ctx, l.noMember)}, nil
 	}
 	if err := l.add(ctx, tx, req.ReadListId, req.BookId); err != nil {
 		return nil, err
@@ -761,7 +761,7 @@ func (s *server) AddReadListBook(ctx context.Context, req AddReadListBookRequest
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return AddReadListBook404JSONResponse{notFound(l.notFound)}, nil
+		return AddReadListBook404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return AddReadListBook200JSONResponse(ls[0]), nil
 }
@@ -778,7 +778,7 @@ func (s *server) RemoveReadListBook(ctx context.Context, req RemoveReadListBookR
 		return nil, err
 	}
 	if !ok {
-		return RemoveReadListBook404JSONResponse{notFound(l.notFound)}, nil
+		return RemoveReadListBook404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	if err := l.remove(ctx, tx, req.ReadListId, req.BookId); err != nil {
 		return nil, err
@@ -791,7 +791,7 @@ func (s *server) RemoveReadListBook(ctx context.Context, req RemoveReadListBookR
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return RemoveReadListBook404JSONResponse{notFound(l.notFound)}, nil
+		return RemoveReadListBook404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return RemoveReadListBook200JSONResponse(ls[0]), nil
 }
@@ -812,14 +812,14 @@ func (s *server) ReorderReadList(ctx context.Context, req ReorderReadListRequest
 		return nil, err
 	}
 	if !ok {
-		return ReorderReadList404JSONResponse{notFound(l.notFound)}, nil
+		return ReorderReadList404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	ok, err = l.reorder(ctx, tx, req.ReadListId, in)
 	if err != nil {
 		return nil, err
 	}
 	if !ok {
-		return ReorderReadList409JSONResponse{ConflictJSONResponse{Message: l.conflict}}, nil
+		return ReorderReadList409JSONResponse{ConflictJSONResponse{Code: l.conflict, Message: msg(ctx, l.conflict)}}, nil
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
@@ -829,7 +829,7 @@ func (s *server) ReorderReadList(ctx context.Context, req ReorderReadListRequest
 		return nil, err
 	}
 	if len(ls) == 0 {
-		return ReorderReadList404JSONResponse{notFound(l.notFound)}, nil
+		return ReorderReadList404JSONResponse{notFound(ctx, l.notFound)}, nil
 	}
 	return ReorderReadList200JSONResponse(ls[0]), nil
 }

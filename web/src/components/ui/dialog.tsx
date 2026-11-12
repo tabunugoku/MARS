@@ -21,6 +21,7 @@ import { useSize, useSizeVariant, typeClass } from "@/lib/size-context";
 import { SurfaceProvider, useSurface } from "@/lib/surface-context";
 import { surfaceClasses } from "@/lib/surface-classes";
 import { Button } from "@/components/ui/button";
+import { uiText } from "@/i18n/ui";
 
 const DIALOG_OFFSET = 4;
 
@@ -197,7 +198,7 @@ const DialogContent = forwardRef<HTMLDivElement, DialogContentProps>(
                     className="absolute right-3 top-3"
                   >
                     <XIcon />
-                    <span className="sr-only">閉じる</span>
+                    <span className="sr-only">{uiText("close")}</span>
                   </Button>
                 </DialogPrimitive.Close>
               )}

@@ -1,6 +1,16 @@
 import { memo, useEffect, useState } from "react";
 import { coverRevision, onCoverRetry, onCoverRevision } from "@/lib/cover-retry";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    read: "既読",
+  },
+  en: {
+    read: "Read",
+  },
+});
 
 export interface CoverProps {
   /** The thumbnail URL from the API (thumbnailUrl). */
@@ -23,6 +33,7 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
   // A book without a thumbnail yet (not analysed, or no image) answers 404.
   // A thumbnail made again in this tab's lifetime (see live events) is
   // fetched anew under ?r=; a failed one is tried again then too.
+  const t = useT(m);
   const [rev, setRev] = useState(() => coverRevision(src));
   useEffect(() => {
     if (!src) return;
@@ -62,7 +73,7 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
       )}
       {read && (
         <span className="absolute bottom-2 right-1.5 rounded-full bg-black/70 px-1.5 text-[11px] leading-5 text-white">
-          既読
+          {t("read")}
         </span>
       )}
       {progress !== undefined && progress > 0 && progress < 1 && (

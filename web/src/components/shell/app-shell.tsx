@@ -12,6 +12,30 @@ import { useTheme } from "./theme";
 import { PageSkeleton } from "@/components/media/skeletons";
 import { CompassBackdrop } from "@/components/brand/compass-backdrop";
 import { motion } from "motion/react";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    themeToDark: "ダークテーマ（クリックでライト）",
+    themeToLight: "ライトテーマ（クリックでダーク）",
+    toggleTheme: "テーマを切り替え",
+    mainNav: "メインナビゲーション",
+    home: "ホーム",
+    library: "ライブラリ",
+    search: "検索",
+    collections: "コレクション",
+  },
+  en: {
+    themeToDark: "Dark theme (click for light)",
+    themeToLight: "Light theme (click for dark)",
+    toggleTheme: "Switch theme",
+    mainNav: "Main navigation",
+    home: "Home",
+    library: "Library",
+    search: "Search",
+    collections: "Collections",
+  },
+});
 
 /** Desktop: inset sidebar + content card. Mobile (<768px): bottom tabs, and
  *  the sidebar becomes a drawer opened from the "ライブラリ" tab. */
@@ -37,11 +61,12 @@ export function AppShell() {
 
 function Topbar() {
   const { theme, toggle } = useTheme();
+  const t = useT(m);
   return (
     <SidebarInsetTopbar className="relative pr-2">
       <div className="flex-1" />
-      <Tooltip content={theme === "dark" ? "ダークテーマ（クリックでライト）" : "ライトテーマ（クリックでダーク）"} side="bottom">
-        <Button variant="ghost" size="icon" aria-label="テーマを切り替え" onClick={(e) => toggle(e.currentTarget)}>
+      <Tooltip content={theme === "dark" ? t("themeToLight") : t("themeToDark")} side="bottom">
+        <Button variant="ghost" size="icon" aria-label={t("toggleTheme")} onClick={(e) => toggle(e.currentTarget)}>
           <ThemeGlyph dark={theme === "dark"} />
         </Button>
       </Tooltip>
@@ -93,15 +118,16 @@ function Tab({ to, label, icon, active, onClick }: { to?: string; label: string;
 function BottomTabs() {
   const { pathname } = useLocation();
   const { setOpenMobile } = useSidebar();
+  const t = useT(m);
   return (
     <nav
-      aria-label="メインナビゲーション"
+      aria-label={t("mainNav")}
       className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
     >
-      <Tab to="/" label="ホーム" icon={<House size={18} />} active={pathname === "/"} />
-      <Tab label="ライブラリ" icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} onClick={() => setOpenMobile(true)} />
-      <Tab to="/search" label="検索" icon={<Search size={18} />} active={pathname.startsWith("/search")} />
-      <Tab to="/collections" label="コレクション" icon={<Grid2x2 size={18} />} active={pathname.startsWith("/collections") || pathname.startsWith("/readlists")} />
+      <Tab to="/" label={t("home")} icon={<House size={18} />} active={pathname === "/"} />
+      <Tab label={t("library")} icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} onClick={() => setOpenMobile(true)} />
+      <Tab to="/search" label={t("search")} icon={<Search size={18} />} active={pathname.startsWith("/search")} />
+      <Tab to="/collections" label={t("collections")} icon={<Grid2x2 size={18} />} active={pathname.startsWith("/collections") || pathname.startsWith("/readlists")} />
     </nav>
   );
 }

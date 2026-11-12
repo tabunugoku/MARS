@@ -46,9 +46,11 @@ func watchBackoff(failures int) time.Duration {
 	return d
 }
 
+// WatchErrLimit and WatchErrGeneric are the reasons WatchError returns, as
+// message codes; httpapi words them for the user.
 const (
-	watchMsgLimit   = "ファイルの監視を始められませんでした（監視できるフォルダ数の上限）。定期スキャンを使ってください"
-	watchMsgGeneric = "ファイルの監視を始められませんでした。定期スキャンを使ってください"
+	WatchErrLimit   = "watch.limit"
+	WatchErrGeneric = "watch.generic"
 )
 
 // watchState is one library's watcher. It is written only by the Watch loop
@@ -249,9 +251,9 @@ func (s *Service) queueWatchScan(ctx context.Context, libraryID string) {
 
 func watchErrMessage(err error) string {
 	if errors.Is(err, syscall.ENOSPC) || errors.Is(err, syscall.EMFILE) {
-		return watchMsgLimit
+		return WatchErrLimit
 	}
-	return watchMsgGeneric
+	return WatchErrGeneric
 }
 
 // watchTree watches root and every folder under it that scan would not skip,

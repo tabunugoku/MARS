@@ -124,8 +124,9 @@ export const mockApi: Api = {
   logout: () => delay(undefined),
 
   me: () => delay(me()),
-  updateMe: (name) => {
+  updateMe: (name, locale) => {
     db.currentUser.name = name.trim();
+    if (locale !== undefined) db.currentUser.locale = locale;
     return delay(me());
   },
   changePassword: (current) => (current ? delay(undefined) : fail(400, "現在のパスワードが違います")),
@@ -382,7 +383,7 @@ export const mockApi: Api = {
   createUser: (body) => {
     const u: User = {
       id: newId("u"), name: body.name, email: body.email, role: body.role, canDownload: body.canDownload ?? true,
-      canStream: body.canStream ?? true, allLibraries: body.allLibraries ?? true, libraryIds: body.libraryIds ?? [], lastActive: null,
+      canStream: body.canStream ?? true, allLibraries: body.allLibraries ?? true, libraryIds: body.libraryIds ?? [], lastActive: null, locale: "",
     };
     db.users.push(u);
     return delay(u);

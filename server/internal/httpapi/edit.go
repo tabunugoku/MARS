@@ -37,23 +37,30 @@ func lockJSON(cur string, edited []string, explicit *[]string) string {
 	return jsonText(out)
 }
 
-// badLock names the first lock that is not a known field, or "".
-func badLock(list *[]string, known []string) string {
+// invalid is a validation failure: a catalog code and its arguments. The
+// zero value means the input is valid.
+type invalid struct {
+	code string
+	args []any
+}
+
+// badLock names the first lock that is not a known field.
+func badLock(list *[]string, known []string) invalid {
 	if list == nil {
-		return ""
+		return invalid{}
 	}
 	for _, f := range *list {
 		if !slices.Contains(known, f) {
-			return "ロックできない項目があります: " + f
+			return invalid{"bad_request.locked_field", []any{f}}
 		}
 	}
-	return ""
+	return invalid{}
 }
 
 func badAuthors(list []Author) string {
 	for _, a := range list {
 		if strings.TrimSpace(a.Name) == "" || !a.Role.Valid() {
-			return "作者の名前と役割を入力してください"
+			return "bad_request.author"
 		}
 	}
 	return ""
@@ -98,17 +105,17 @@ func defaultSettings() ServerSettings {
 func settingsProblem(v ServerSettings) string {
 	switch {
 	case v.Port < 1 || v.Port > 65535:
-		return "ポート番号は1〜65535にしてください"
+		return "bad_request.port"
 	case v.TaskThreads < 1 || v.TaskThreads > 16:
-		return "同時に処理する数は1〜16にしてください"
+		return "bad_request.task_threads"
 	case v.RememberMeDays < 1 || v.RememberMeDays > 3650:
-		return "ログインを保つ日数は1〜3650日にしてください"
+		return "bad_request.remember_days"
 	case !v.LoginBackdrop.Valid():
-		return "ログイン画面の背景が正しくありません"
+		return "bad_request.login_backdrop"
 	case !v.ThumbnailSize.Valid():
-		return "表紙のサイズが正しくありません"
+		return "bad_request.thumbnail_size"
 	case v.ThumbnailFormat != ServerSettingsThumbnailFormatJpeg:
-		return "この形式にはまだ対応していません"
+		return "bad_request.thumbnail_format"
 	}
 	return ""
 }
@@ -155,34 +162,34 @@ func ThumbBounds(size string) (int, int) {
 	}
 }
 
-func checkSeriesUpdate(b *SeriesUpdate) string {
+func checkSeriesUpdate(b *SeriesUpdate) invalid {
 	switch {
 	case b.Title != nil && strings.TrimSpace(*b.Title) == "":
-		return "タイトルを入力してください"
+		return invalid{code: "bad_request.title_required"}
 	case b.TitleSort != nil && strings.TrimSpace(*b.TitleSort) == "":
-		return "並び順のタイトルを入力してください"
+		return invalid{code: "bad_request.title_sort_required"}
 	case b.Status != nil && !b.Status.Valid():
-		return "状態が正しくありません"
+		return invalid{code: "bad_request.status"}
 	case b.ReadingDirection != nil && !b.ReadingDirection.Valid():
-		return "読む方向が正しくありません"
+		return invalid{code: "bad_request.reading_direction"}
 	case b.AgeRating.Value != nil && (*b.AgeRating.Value < 0 || *b.AgeRating.Value > 99):
-		return "年齢制限は0〜99にしてください"
+		return invalid{code: "bad_request.age_rating"}
 	case b.TotalBookCount.Value != nil && *b.TotalBookCount.Value < 0:
-		return "巻数は0以上にしてください"
+		return invalid{code: "bad_request.total_books"}
 	case b.Authors != nil && badAuthors(*b.Authors) != "":
-		return badAuthors(*b.Authors)
+		return invalid{code: badAuthors(*b.Authors)}
 	}
 	return badLock(b.LockedFields, seriesLockNames)
 }
 
-func checkBookUpdate(b *BookUpdate) string {
+func checkBookUpdate(b *BookUpdate) invalid {
 	switch {
 	case b.Title != nil && strings.TrimSpace(*b.Title) == "":
-		return "タイトルを入力してください"
+		return invalid{code: "bad_request.title_required"}
 	case b.ReleaseDate.Value != nil && !validReleaseDate(strings.TrimSpace(*b.ReleaseDate.Value)):
-		return "発売日は YYYY-MM-DD、YYYY-MM、YYYY のいずれかで入力してください"
+		return invalid{code: "bad_request.release_date"}
 	case b.Authors != nil && badAuthors(*b.Authors) != "":
-		return badAuthors(*b.Authors)
+		return invalid{code: badAuthors(*b.Authors)}
 	}
 	return badLock(b.LockedFields, bookLockNames)
 }
@@ -193,14 +200,14 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	if ok, err := s.visible(ctx, "series", req.SeriesId); err != nil {
 		return nil, err
 	} else if !ok {
-		return UpdateSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return UpdateSeries404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	b := req.Body
 	if b == nil {
-		return UpdateSeries400JSONResponse{badRequest("本文がありません")}, nil
+		return UpdateSeries400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
-	if msg := checkSeriesUpdate(b); msg != "" {
-		return UpdateSeries400JSONResponse{badRequest(msg)}, nil
+	if inv := checkSeriesUpdate(b); inv.code != "" {
+		return UpdateSeries400JSONResponse{badRequest(ctx, inv.code, inv.args...)}, nil
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -211,7 +218,7 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM series WHERE id = ? AND deleted_at IS NULL`, req.SeriesId).
 		Scan(&libraryID, &locks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return UpdateSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return UpdateSeries404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -283,7 +290,7 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 		return nil, err
 	}
 	if !ok {
-		return UpdateSeries404JSONResponse{notFound("シリーズが見つかりません")}, nil
+		return UpdateSeries404JSONResponse{notFound(ctx, "not_found.series")}, nil
 	}
 	return UpdateSeries200JSONResponse(x), nil
 }
@@ -294,14 +301,14 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 	if ok, err := s.visible(ctx, "books", req.BookId); err != nil {
 		return nil, err
 	} else if !ok {
-		return UpdateBook404JSONResponse{notFound("本が見つかりません")}, nil
+		return UpdateBook404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	b := req.Body
 	if b == nil {
-		return UpdateBook400JSONResponse{badRequest("本文がありません")}, nil
+		return UpdateBook400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
-	if msg := checkBookUpdate(b); msg != "" {
-		return UpdateBook400JSONResponse{badRequest(msg)}, nil
+	if inv := checkBookUpdate(b); inv.code != "" {
+		return UpdateBook400JSONResponse{badRequest(ctx, inv.code, inv.args...)}, nil
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -312,7 +319,7 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM books WHERE id = ? AND deleted_at IS NULL`, req.BookId).
 		Scan(&libraryID, &locks)
 	if errors.Is(err, sql.ErrNoRows) {
-		return UpdateBook404JSONResponse{notFound("本が見つかりません")}, nil
+		return UpdateBook404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -372,7 +379,7 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 		return nil, err
 	}
 	if !ok {
-		return UpdateBook404JSONResponse{notFound("本が見つかりません")}, nil
+		return UpdateBook404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	return UpdateBook200JSONResponse(x), nil
 }
@@ -391,7 +398,7 @@ func (s *server) GetSettings(ctx context.Context, _ GetSettingsRequestObject) (G
 func (s *server) UpdateSettings(ctx context.Context, req UpdateSettingsRequestObject) (UpdateSettingsResponseObject, error) {
 	b := req.Body
 	if b == nil {
-		return UpdateSettings400JSONResponse{badRequest("本文がありません")}, nil
+		return UpdateSettings400JSONResponse{badRequest(ctx, "bad_request.body_missing")}, nil
 	}
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
@@ -430,7 +437,7 @@ func (s *server) UpdateSettings(ctx context.Context, req UpdateSettingsRequestOb
 		cur.ThumbnailSize = ServerSettingsThumbnailSize(*b.ThumbnailSize)
 	}
 	if msg := settingsProblem(cur); msg != "" {
-		return UpdateSettings400JSONResponse{badRequest(msg)}, nil
+		return UpdateSettings400JSONResponse{badRequest(ctx, msg)}, nil
 	}
 	raw, err := json.Marshal(cur)
 	if err != nil {
@@ -516,8 +523,8 @@ func execCount(ctx context.Context, tx *sql.Tx, q string) (int, error) {
 }
 
 // GetPublicCover is served by servePublicCover (public.go) on the outer mux.
-func (s *server) GetPublicCover(context.Context, GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error) {
-	return GetPublicCover404JSONResponse{notFound("not routed")}, nil
+func (s *server) GetPublicCover(ctx context.Context, _ GetPublicCoverRequestObject) (GetPublicCoverResponseObject, error) {
+	return GetPublicCover404JSONResponse{notFound(ctx, "not_found.route")}, nil
 }
 
 // AnalyzeBook marks the book outdated and queues its library's analysis,
@@ -527,7 +534,7 @@ func (s *server) AnalyzeBook(ctx context.Context, req AnalyzeBookRequestObject) 
 	err := s.DB.QueryRowContext(ctx, `UPDATE books SET media_status = 'outdated' WHERE id = ? AND deleted_at IS NULL RETURNING library_id`,
 		req.BookId).Scan(&lib)
 	if errors.Is(err, sql.ErrNoRows) {
-		return AnalyzeBook404JSONResponse{notFound("本が見つかりません")}, nil
+		return AnalyzeBook404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	}
 	if err != nil {
 		return nil, err
@@ -536,5 +543,5 @@ func (s *server) AnalyzeBook(ctx context.Context, req AnalyzeBookRequestObject) 
 	if err != nil {
 		return nil, err
 	}
-	return AnalyzeBook202JSONResponse(toTask(t)), nil
+	return AnalyzeBook202JSONResponse(toTask(ctx, t)), nil
 }

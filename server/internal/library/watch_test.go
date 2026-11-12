@@ -105,13 +105,13 @@ func TestWatchTreeMissingRoot(t *testing.T) {
 	if cancel != nil || done != nil {
 		t.Fatal("a failed start returned a handle")
 	}
-	if msg := watchErrMessage(err); msg != watchMsgGeneric {
+	if msg := watchErrMessage(err); msg != WatchErrGeneric {
 		t.Errorf("message = %q, want the generic one", msg)
 	}
 }
 
 func TestWatchErrMessageLimit(t *testing.T) {
-	if msg := watchErrMessage(syscall.ENOSPC); msg != watchMsgLimit {
+	if msg := watchErrMessage(syscall.ENOSPC); msg != WatchErrLimit {
 		t.Errorf("ENOSPC message = %q, want the limit message", msg)
 	}
 }
@@ -160,14 +160,14 @@ func TestWatchFailedStartBackoff(t *testing.T) {
 
 	s.reconcileWatches(ctx, ws)
 	check("first pass", 1)
-	if msg := s.WatchError("lib1"); msg != watchMsgGeneric {
+	if msg := s.WatchError("lib1"); msg != WatchErrGeneric {
 		t.Fatalf("WatchError = %q, want the generic message", msg)
 	}
 
 	// Within the back-off the start is not retried, and the message stays.
 	s.reconcileWatches(ctx, ws)
 	check("within back-off", 1)
-	if msg := s.WatchError("lib1"); msg != watchMsgGeneric {
+	if msg := s.WatchError("lib1"); msg != WatchErrGeneric {
 		t.Fatalf("WatchError during back-off = %q, want the generic message", msg)
 	}
 

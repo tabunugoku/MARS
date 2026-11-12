@@ -142,7 +142,7 @@ func (s *Service) QueueThumbnails(ctx context.Context, libraryID, seriesID strin
 	if err != nil {
 		return task.Task{}, err
 	}
-	key, label, where, arg := "thumbnail", l.name+" の表紙を作り直す", `library_id = ?`, l.id
+	key, label, where, arg := "thumbnail", task.Text{Code: "task.thumbnails", Arg: l.name, English: "Regenerate thumbnails for " + l.name}, `library_id = ?`, l.id
 	if seriesID != "" {
 		var title string
 		err := s.DB.QueryRowContext(ctx, `SELECT title FROM series WHERE id = ? AND library_id = ? AND deleted_at IS NULL`, seriesID, l.id).Scan(&title)
@@ -153,7 +153,7 @@ func (s *Service) QueueThumbnails(ctx context.Context, libraryID, seriesID strin
 			return task.Task{}, err
 		}
 		// Its own key: thumbnails of series B are not folded into series A's.
-		key, label, where, arg = "thumbnail:"+seriesID, title+" の表紙を作り直す", `series_id = ?`, seriesID
+		key, label, where, arg = "thumbnail:"+seriesID, task.Text{Code: "task.thumbnails", Arg: title, English: "Regenerate thumbnails for " + title}, `series_id = ?`, seriesID
 	}
 	return s.Queue.SubmitKey(ctx, "thumbnail", key, label, l.id, func(ctx context.Context, progress func(float64)) error {
 		rows, err := s.DB.QueryContext(ctx,
@@ -189,7 +189,7 @@ func (s *Service) QueueThumbnails(ctx context.Context, libraryID, seriesID strin
 			progress(float64(i+1) / float64(len(todo)))
 		}
 		if failed > 0 {
-			return fmt.Errorf("%d 冊の表紙を作れませんでした", failed)
+			return &task.CodedError{Code: "task.thumbnails_failed", Arg: fmt.Sprint(failed), Err: fmt.Errorf("could not make thumbnails for %d books", failed)}
 		}
 		return nil
 	})

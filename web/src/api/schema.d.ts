@@ -1077,7 +1077,10 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Error: {
+            /** @description Human-readable, in the request's language (Accept-Language: en gives English, anything else Japanese) */
             message: string;
+            /** @description Stable machine-readable reason, e.g. not_found.book; clients may key their own text on it */
+            code: string;
         };
         /** @enum {string} */
         LibraryKind: "manga" | "webtoon" | "comics" | "books";
@@ -1261,7 +1264,13 @@ export interface components {
             /** @description Libraries the user may see when allLibraries is false */
             libraryIds: string[];
             lastActive: string | null;
+            locale: components["schemas"]["Locale"];
         };
+        /**
+         * @description Interface language the user chose; empty follows the browser
+         * @enum {string}
+         */
+        Locale: "" | "ja" | "en";
         UserCreate: {
             name: string;
             email: string;
@@ -1520,6 +1529,7 @@ export interface components {
         };
         MeUpdate: {
             name: string;
+            locale?: components["schemas"]["Locale"];
         };
     };
     responses: {

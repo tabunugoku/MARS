@@ -13,9 +13,38 @@ import { api, errorMessage } from "@/api";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    collections: "コレクション",
+    readLists: "リーディングリスト",
+    created: "作成しました",
+    newButton: "新規作成",
+    createCollection: "コレクションを作成",
+    createReadList: "リーディングリストを作成",
+    name: "名前",
+    manualOrder: "手動で並べる",
+    cancel: "キャンセル",
+    create: "作成",
+  },
+  en: {
+    collections: "Collections",
+    readLists: "Read lists",
+    created: "Created",
+    newButton: "New",
+    createCollection: "Create collection",
+    createReadList: "Create read list",
+    name: "Name",
+    manualOrder: "Order manually",
+    cancel: "Cancel",
+    create: "Create",
+  },
+});
 
 /** Segment between collections and reading lists; each side is its own route. */
 export function ViewSwitch({ current }: { current: "collections" | "readlists" }) {
+  const t = useT(m);
   const navigate = useNavigate();
   return (
     <Tabs
@@ -24,14 +53,15 @@ export function ViewSwitch({ current }: { current: "collections" | "readlists" }
       selectedIndex={current === "collections" ? 0 : 1}
       onSelect={(i) => navigate(i === 0 ? "/collections" : "/readlists")}
     >
-      <TabsItem index={0} label="コレクション" />
-      <TabsItem index={1} label="リーディングリスト" />
+      <TabsItem index={0} label={t("collections")} />
+      <TabsItem index={1} label={t("readLists")} />
     </Tabs>
   );
 }
 
 /** Creates a collection or reading list, then opens it. Administrators only (the caller hides it). */
 export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
+  const t = useT(m);
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -46,7 +76,7 @@ export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
       : api.createReadList({ name: name.trim() });
     created
       .then((item) => {
-        toast.success("作成しました");
+        toast.success(t("created"));
         setName("");
         setManual(false);
         setOpen(false);
@@ -58,22 +88,22 @@ export function NewListDialog({ kind }: { kind: "collection" | "readlist" }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="secondary">新規作成</Button>} />
+      <DialogTrigger render={<Button variant="secondary">{t("newButton")}</Button>} />
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>{isCollection ? "コレクションを作成" : "リーディングリストを作成"}</DialogTitle>
+          <DialogTitle>{isCollection ? t("createCollection") : t("createReadList")}</DialogTitle>
         </DialogHeader>
         <div className="flex flex-col gap-4">
           <Field>
-            <FieldLabel htmlFor={`new-${kind}-name`}>名前</FieldLabel>
+            <FieldLabel htmlFor={`new-${kind}-name`}>{t("name")}</FieldLabel>
             <Input id={`new-${kind}-name`} value={name} onChange={(e) => setName(e.target.value)} />
           </Field>
-          {isCollection && <Switch label="手動で並べる" checked={manual} onToggle={() => setManual((m) => !m)} />}
+          {isCollection && <Switch label={t("manualOrder")} checked={manual} onToggle={() => setManual((m) => !m)} />}
         </div>
         <DialogFooter>
-          <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+          <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
           <Button variant="primary" disabled={!name.trim() || busy} onClick={submit}>
-            作成
+            {t("create")}
           </Button>
         </DialogFooter>
       </DialogContent>

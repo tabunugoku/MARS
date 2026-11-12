@@ -37,6 +37,7 @@ type ctxKey int
 const (
 	userKey ctxKey = iota
 	tokenKey
+	localeKey
 )
 
 func userFrom(ctx context.Context) (auth.User, bool) {
@@ -106,16 +107,16 @@ func (s *server) authenticate(next http.Handler) http.Handler {
 		}
 		if err != nil && !errors.Is(err, auth.ErrUnauthorized) {
 			slog.Error("authenticate", "err", err)
-			writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+			writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 			return
 		}
 		signedIn := err == nil
 		if !safeMethod(r.Method) && (viaCookie || isPublic(r)) && !sameOrigin(r) {
-			writeError(w, http.StatusForbidden, "別のサイトからの操作は受け付けません")
+			writeError(r.Context(), w, http.StatusForbidden, "forbidden.cross_site")
 			return
 		}
 		if !signedIn && !isPublic(r) {
-			writeError(w, http.StatusUnauthorized, "ログインしてください")
+			writeError(r.Context(), w, http.StatusUnauthorized, "unauthorized.sign_in")
 			return
 		}
 		if signedIn {
@@ -228,7 +229,7 @@ func (s *server) trusted(addr string) bool {
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
 	dec := json.NewDecoder(r.Body) // capped by authenticate
 	if err := dec.Decode(v); err != nil {
-		writeError(w, http.StatusBadRequest, "リクエストの形式が正しくありません")
+		writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
 		return false
 	}
 	return true
@@ -255,7 +256,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	key := "login:" + s.clientIP(r)
 	if ok, wait := s.Limiter.Begin(key, time.Now()); !ok {
 		w.Header().Set("Retry-After", retryAfter(wait))
-		writeError(w, http.StatusTooManyRequests, "失敗が続いたため、しばらくログインできません")
+		writeError(r.Context(), w, http.StatusTooManyRequests, "too_many_requests.sign_in")
 		return
 	}
 	failed := true
@@ -276,32 +277,32 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if errors.Is(err, auth.ErrBusy) || errors.Is(err, context.Canceled) {
 		failed = false // not a wrong guess
 		w.Header().Set("Retry-After", "5")
-		writeError(w, http.StatusServiceUnavailable, "混み合っています。少し待ってからもう一度お試しください")
+		writeError(r.Context(), w, http.StatusServiceUnavailable, "unavailable.busy")
 		return
 	}
 	if err != nil {
 		failed = false
 		slog.Error("login", "err", err)
-		writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		return
 	}
 	if !ok {
-		writeError(w, http.StatusUnauthorized, "ユーザー名またはパスワードが違います")
+		writeError(r.Context(), w, http.StatusUnauthorized, "unauthorized.bad_credentials")
 		return
 	}
 	failed = false
 	if err := s.startSession(ctx, w, r, id, hash, req.Remember != nil && *req.Remember); errors.Is(err, auth.ErrUnauthorized) {
 		// The password changed while we checked it.
-		writeError(w, http.StatusUnauthorized, "ユーザー名またはパスワードが違います")
+		writeError(r.Context(), w, http.StatusUnauthorized, "unauthorized.bad_credentials")
 		return
 	} else if err != nil {
 		slog.Error("login session", "err", err)
-		writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		return
 	}
 	u, err := s.userByID(ctx, id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		return
 	}
 	writeJSON(w, http.StatusOK, u)
@@ -344,7 +345,7 @@ func NewSetupGate(ctx context.Context, db *sql.DB, dataDir string) (*SetupGate, 
 	if err := os.WriteFile(g.path, []byte(token+"\n"), 0o600); err != nil {
 		return nil, err
 	}
-	slog.Warn("初回セットアップを待っています。ブラウザで開き、このトークンを入力してください", "token", token, "file", g.path)
+	slog.Warn("waiting for first-time setup: open the web app in a browser and enter this token", "token", token, "file", g.path)
 	return g, nil
 }
 
@@ -363,24 +364,24 @@ func (s *server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	if g.token == "" {
-		writeError(w, http.StatusForbidden, "セットアップは完了しています")
+		writeError(r.Context(), w, http.StatusForbidden, "forbidden.setup_done")
 		return
 	}
 	// No throttle: the token has 256 random bits, and a shared lockout
 	// would let anyone on the network keep the operator out.
 	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(req.Token)), []byte(g.token)) != 1 {
-		writeError(w, http.StatusForbidden, "セットアップのトークンが違います")
+		writeError(r.Context(), w, http.StatusForbidden, "forbidden.setup_token")
 		return
 	}
 	ctx := r.Context()
 	id, msg, err := s.insertUser(ctx, UserCreate{Name: req.Name, Email: req.Email, Password: req.Password, Role: RoleAdmin})
 	if err != nil {
 		slog.Error("setup", "err", err)
-		writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		return
 	}
 	if msg != "" {
-		writeError(w, http.StatusBadRequest, msg)
+		writeError(r.Context(), w, http.StatusBadRequest, msg)
 		return
 	}
 	g.token = ""
@@ -393,7 +394,7 @@ func (s *server) handleSetup(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.userByID(ctx, id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "サーバーでエラーが起きました")
+		writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		return
 	}
 	writeJSON(w, http.StatusCreated, u)

@@ -8,6 +8,7 @@
 // The global set comes in two profiles, desktop and mobile; each browser
 // reads with one of them (chosen on the settings page, detected by default).
 // Series and volume settings are shared by both.
+import { defineMessages, translate } from "@/i18n";
 import { api } from "./impl";
 import type { ReadingDirection } from "./types";
 
@@ -208,10 +209,79 @@ export function effectivePrefs(series: SeriesReaderPrefs, book: SeriesReaderPref
   return resolveGlobal(g, seriesDirection);
 }
 
-export const DIRECTION_LABEL: Record<ReadingDirection, string> = { rtl: "右→左", ltr: "左→右", vertical: "縦", webtoon: "縦スクロール" };
-export const SPREAD_LABEL: Record<ReaderPrefs["spread"], string> = { off: "単ページ", on: "見開き", cover: "表紙だけ単ページ" };
-export const FIT_LABEL: Record<ReaderPrefs["fit"], string> = { screen: "画面", width: "幅", height: "高さ", original: "原寸" };
-export const PROFILE_LABEL: Record<ReaderProfile, string> = { desktop: "PC", mobile: "モバイル" };
-/** "PC 用" / "モバイル用": a space only after Latin letters. */
-export const PROFILE_FOR_LABEL: Record<ReaderProfile, string> = { desktop: "PC 用", mobile: "モバイル用" };
-export const BG_LABEL: Record<ReaderPrefs["bg"], string> = { black: "黒", gray: "グレー", white: "白" };
+const L = defineMessages({
+  ja: {
+    rtl: "右→左",
+    ltr: "左→右",
+    vertical: "縦",
+    webtoon: "縦スクロール",
+    spreadOff: "単ページ",
+    spreadOn: "見開き",
+    spreadCover: "表紙だけ単ページ",
+    fitScreen: "画面",
+    fitWidth: "幅",
+    fitHeight: "高さ",
+    fitOriginal: "原寸",
+    profileDesktop: "PC",
+    profileMobile: "モバイル",
+    profileForDesktop: "PC 用",
+    profileForMobile: "モバイル用",
+    bgBlack: "黒",
+    bgGray: "グレー",
+    bgWhite: "白",
+  },
+  en: {
+    rtl: "Right to left",
+    ltr: "Left to right",
+    vertical: "Vertical",
+    webtoon: "Vertical scroll",
+    spreadOff: "Single page",
+    spreadOn: "Spread",
+    spreadCover: "Single cover page",
+    fitScreen: "Screen",
+    fitWidth: "Width",
+    fitHeight: "Height",
+    fitOriginal: "Original",
+    profileDesktop: "PC",
+    profileMobile: "Mobile",
+    profileForDesktop: "For PC",
+    profileForMobile: "For mobile",
+    bgBlack: "Black",
+    bgGray: "Gray",
+    bgWhite: "White",
+  },
+});
+
+// Label maps, in the current language. Read them at render time, not at
+// module load, so a language change shows through.
+export const directionLabel = (): Record<ReadingDirection, string> => ({
+  rtl: translate(L, "rtl"),
+  ltr: translate(L, "ltr"),
+  vertical: translate(L, "vertical"),
+  webtoon: translate(L, "webtoon"),
+});
+export const spreadLabel = (): Record<ReaderPrefs["spread"], string> => ({
+  off: translate(L, "spreadOff"),
+  on: translate(L, "spreadOn"),
+  cover: translate(L, "spreadCover"),
+});
+export const fitLabel = (): Record<ReaderPrefs["fit"], string> => ({
+  screen: translate(L, "fitScreen"),
+  width: translate(L, "fitWidth"),
+  height: translate(L, "fitHeight"),
+  original: translate(L, "fitOriginal"),
+});
+export const profileLabel = (): Record<ReaderProfile, string> => ({
+  desktop: translate(L, "profileDesktop"),
+  mobile: translate(L, "profileMobile"),
+});
+/** "For PC" / "For mobile" (ja: "PC 用" / "モバイル用": a space only after Latin letters). */
+export const profileForLabel = (): Record<ReaderProfile, string> => ({
+  desktop: translate(L, "profileForDesktop"),
+  mobile: translate(L, "profileForMobile"),
+});
+export const bgLabel = (): Record<ReaderPrefs["bg"], string> => ({
+  black: translate(L, "bgBlack"),
+  gray: translate(L, "bgGray"),
+  white: translate(L, "bgWhite"),
+});

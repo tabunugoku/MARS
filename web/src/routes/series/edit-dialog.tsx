@@ -21,38 +21,128 @@ import { Tabs, TabsItem, TabsPanel } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { defineMessages, translate, useT } from "@/i18n";
 
-export const directionLabel: Record<ReadingDirection, string> = {
-  rtl: "右から左",
-  ltr: "左から右",
-  vertical: "縦",
-  webtoon: "縦スクロール",
-};
+const m = defineMessages({
+  ja: {
+    dirRtl: "右から左",
+    dirLtr: "左から右",
+    dirVertical: "縦",
+    dirWebtoon: "縦スクロール",
+    roleWriter: "作",
+    rolePenciller: "画",
+    roleColorist: "色",
+    roleTranslator: "翻訳",
+    roleEditor: "編集",
+    roleCover: "表紙",
+    fieldTitle: "タイトル",
+    fieldTitleSort: "ソート用タイトル",
+    fieldSummary: "あらすじ",
+    fieldStatus: "ステータス",
+    fieldReadingDirection: "読み方向",
+    fieldPublisher: "出版社",
+    fieldLanguage: "言語",
+    fieldAgeRating: "年齢区分",
+    fieldTotalBooks: "総巻数",
+    ageNotInt: "年齢区分は整数で入力してください",
+    totalNotInt: "総巻数は整数で入力してください",
+    saved: "メタデータを保存しました",
+    title: "メタデータを編集",
+    tabBasic: "基本",
+    tabAuthors: "著者",
+    tabTagsGenres: "タグとジャンル",
+    authorName: "著者名",
+    role: "役割",
+    removeAuthor: "著者を削除",
+    addAuthor: "著者を追加",
+    genres: "ジャンル",
+    tags: "タグ",
+    separate: "カンマで区切って入力",
+    cancel: "キャンセル",
+    save: "保存",
+    keptOnScan: "スキャンで上書きされません",
+    overwrittenOnScan: "スキャンで上書きされます",
+    lockField: "{name}をロック",
+  },
+  en: {
+    dirRtl: "Right to left",
+    dirLtr: "Left to right",
+    dirVertical: "Vertical",
+    dirWebtoon: "Vertical scroll",
+    roleWriter: "Writer",
+    rolePenciller: "Penciller",
+    roleColorist: "Colorist",
+    roleTranslator: "Translator",
+    roleEditor: "Editor",
+    roleCover: "Cover",
+    fieldTitle: "Title",
+    fieldTitleSort: "Sort title",
+    fieldSummary: "Summary",
+    fieldStatus: "Status",
+    fieldReadingDirection: "Reading direction",
+    fieldPublisher: "Publisher",
+    fieldLanguage: "Language",
+    fieldAgeRating: "Age rating",
+    fieldTotalBooks: "Total books",
+    ageNotInt: "Age rating must be a whole number",
+    totalNotInt: "Total books must be a whole number",
+    saved: "Metadata saved",
+    title: "Edit metadata",
+    tabBasic: "Basic",
+    tabAuthors: "Authors",
+    tabTagsGenres: "Tags and genres",
+    authorName: "Author name",
+    role: "Role",
+    removeAuthor: "Remove author",
+    addAuthor: "Add author",
+    genres: "Genres",
+    tags: "Tags",
+    separate: "Separate with commas",
+    cancel: "Cancel",
+    save: "Save",
+    keptOnScan: "Scan won't overwrite this",
+    overwrittenOnScan: "Scan can overwrite this",
+    lockField: "Lock {name}",
+  },
+});
 
-export const roleLabel: Record<Author["role"], string> = {
-  writer: "作",
-  penciller: "画",
-  colorist: "色",
-  translator: "翻訳",
-  editor: "編集",
-  cover: "表紙",
-};
+export function directionLabel(): Record<ReadingDirection, string> {
+  return {
+    rtl: translate(m, "dirRtl"),
+    ltr: translate(m, "dirLtr"),
+    vertical: translate(m, "dirVertical"),
+    webtoon: translate(m, "dirWebtoon"),
+  };
+}
 
-export const fieldLabel: Record<string, string> = {
-  title: "タイトル",
-  titleSort: "ソート用タイトル",
-  summary: "あらすじ",
-  status: "ステータス",
-  readingDirection: "読み方向",
-  publisher: "出版社",
-  language: "言語",
-  ageRating: "年齢区分",
-  totalBookCount: "総巻数",
-};
+export function roleLabel(): Record<Author["role"], string> {
+  return {
+    writer: translate(m, "roleWriter"),
+    penciller: translate(m, "rolePenciller"),
+    colorist: translate(m, "roleColorist"),
+    translator: translate(m, "roleTranslator"),
+    editor: translate(m, "roleEditor"),
+    cover: translate(m, "roleCover"),
+  };
+}
 
-const statuses = Object.keys(statusLabel) as SeriesStatus[];
-const directions = Object.keys(directionLabel) as ReadingDirection[];
-const roles = Object.keys(roleLabel) as Author["role"][];
+export function fieldLabel(): Record<string, string> {
+  return {
+    title: translate(m, "fieldTitle"),
+    titleSort: translate(m, "fieldTitleSort"),
+    summary: translate(m, "fieldSummary"),
+    status: translate(m, "fieldStatus"),
+    readingDirection: translate(m, "fieldReadingDirection"),
+    publisher: translate(m, "fieldPublisher"),
+    language: translate(m, "fieldLanguage"),
+    ageRating: translate(m, "fieldAgeRating"),
+    totalBookCount: translate(m, "fieldTotalBooks"),
+  };
+}
+
+const statuses = Object.keys(statusLabel()) as SeriesStatus[];
+const directions = Object.keys(directionLabel()) as ReadingDirection[];
+const roles = Object.keys(roleLabel()) as Author["role"][];
 
 type Form = {
   title: string;
@@ -115,10 +205,10 @@ function changesOf(form: Form, s: Series, locked: string[]): SeriesUpdate {
   if (form.language !== s.language) c.language = form.language;
 
   const age = parseOptionalInt(form.ageRating);
-  if (age === undefined) throw new Error("年齢区分は整数で入力してください");
+  if (age === undefined) throw new Error(translate(m, "ageNotInt"));
   if (age !== s.ageRating) c.ageRating = age;
   const total = parseOptionalInt(form.totalBookCount);
-  if (total === undefined) throw new Error("総巻数は整数で入力してください");
+  if (total === undefined) throw new Error(translate(m, "totalNotInt"));
   if (total !== s.totalBookCount) c.totalBookCount = total;
 
   const authors = form.authors
@@ -138,7 +228,7 @@ function changesOf(form: Form, s: Series, locked: string[]): SeriesUpdate {
   // being saved stay locked (saving a field locks it on the server).
   const lockChanged = !sameList([...locked].sort(), [...s.lockedFields].sort());
   if (lockChanged) {
-    const shown = Object.keys(fieldLabel);
+    const shown = Object.keys(fieldLabel());
     const hidden = s.lockedFields.filter((f) => !shown.includes(f));
     c.lockedFields = [...new Set([...hidden, ...locked, ...Object.keys(c)])];
   }
@@ -159,10 +249,13 @@ export function EditDialog({
   onOpenChange: (open: boolean) => void;
   onSaved: (series: Series) => void;
 }) {
+  const t = useT(m);
   const [form, setForm] = useState<Form>(() => initialForm(series));
   const [locked, setLocked] = useState<string[]>(series.lockedFields);
   const [tab, setTab] = useState(0);
   const [saving, setSaving] = useState(false);
+  const directionNames = directionLabel();
+  const roleNames = roleLabel();
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => setForm((f) => ({ ...f, [key]: value }));
   const toggleLock = (field: string) =>
@@ -188,7 +281,7 @@ export function EditDialog({
     setSaving(true);
     try {
       const updated = await api.updateSeries(series.id, changes);
-      toast.success("メタデータを保存しました");
+      toast.success(t("saved"));
       onSaved(updated);
       onOpenChange(false);
     } catch (err) {
@@ -204,13 +297,13 @@ export function EditDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>メタデータを編集</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
 
         <Tabs selectedIndex={tab} onSelect={setTab} idPrefix="meta">
-          <TabsItem index={0} label="基本" />
-          <TabsItem index={1} label="著者" />
-          <TabsItem index={2} label="タグとジャンル" />
+          <TabsItem index={0} label={t("tabBasic")} />
+          <TabsItem index={1} label={t("tabAuthors")} />
+          <TabsItem index={2} label={t("tabTagsGenres")} />
         </Tabs>
 
         <div className="max-h-[60dvh] overflow-y-auto">
@@ -230,7 +323,7 @@ export function EditDialog({
                 <SelectContent>
                   {statuses.map((s, i) => (
                     <SelectItem key={s} index={i} value={s}>
-                      {statusLabel[s]}
+                      {statusLabel()[s]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -242,7 +335,7 @@ export function EditDialog({
                 <SelectContent>
                   {directions.map((d, i) => (
                     <SelectItem key={d} index={i} value={d}>
-                      {directionLabel[d]}
+                      {directionNames[d]}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -280,26 +373,26 @@ export function EditDialog({
             {form.authors.map((a, i) => (
               <div key={i} className="flex items-center gap-2">
                 <Input
-                  aria-label="著者名"
+                  aria-label={t("authorName")}
                   className="flex-1"
                   value={a.name}
                   onChange={(e) => setAuthor(i, { name: e.target.value })}
                 />
                 <Select value={a.role} onValueChange={(v) => setAuthor(i, { role: v as Author["role"] })}>
-                  <SelectTrigger aria-label="役割" className="w-28" />
+                  <SelectTrigger aria-label={t("role")} className="w-28" />
                   <SelectContent>
                     {roles.map((r, j) => (
                       <SelectItem key={r} index={j} value={r}>
-                        {roleLabel[r]}
+                        {roleNames[r]}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Tooltip content="著者を削除">
+                <Tooltip content={t("removeAuthor")}>
                   <Button
                     variant="ghost"
                     size="icon-compact"
-                    aria-label="著者を削除"
+                    aria-label={t("removeAuthor")}
                     onClick={() => set("authors", form.authors.filter((_, j) => j !== i))}
                   >
                     <X />
@@ -308,28 +401,28 @@ export function EditDialog({
               </div>
             ))}
             <Button variant="secondary" leadingIcon={Plus as IconComponent} onClick={() => set("authors", [...form.authors, { name: "", role: "writer" }])}>
-              著者を追加
+              {t("addAuthor")}
             </Button>
           </TabsPanel>
 
           <TabsPanel index={2} selectedIndex={tab} idPrefix="meta" className="grid gap-4">
             <Field>
-              <FieldLabel htmlFor="meta-genres">ジャンル</FieldLabel>
-              <Input id="meta-genres" placeholder="カンマで区切って入力" value={form.genres} onChange={(e) => set("genres", e.target.value)} />
+              <FieldLabel htmlFor="meta-genres">{t("genres")}</FieldLabel>
+              <Input id="meta-genres" placeholder={t("separate")} value={form.genres} onChange={(e) => set("genres", e.target.value)} />
             </Field>
             <Field>
-              <FieldLabel htmlFor="meta-tags">タグ</FieldLabel>
-              <Input id="meta-tags" placeholder="カンマで区切って入力" value={form.tags} onChange={(e) => set("tags", e.target.value)} />
+              <FieldLabel htmlFor="meta-tags">{t("tags")}</FieldLabel>
+              <Input id="meta-tags" placeholder={t("separate")} value={form.tags} onChange={(e) => set("tags", e.target.value)} />
             </Field>
           </TabsPanel>
         </div>
 
         <DialogFooter>
           <Button variant="secondary" disabled={saving} onClick={() => onOpenChange(false)}>
-            キャンセル
+            {t("cancel")}
           </Button>
           <Button disabled={saving} onClick={save}>
-            保存
+            {t("save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -353,16 +446,18 @@ function LockedField({
   className?: string;
   children: ReactNode;
 }) {
+  const t = useT(m);
   const isLocked = locked.includes(field);
+  const name = fieldLabel()[field];
   return (
     <Field className={className}>
       <div className="flex items-center justify-between gap-2">
-        <FieldLabel htmlFor={id}>{fieldLabel[field]}</FieldLabel>
-        <Tooltip content={isLocked ? "スキャンで上書きされません" : "スキャンで上書きされます"}>
+        <FieldLabel htmlFor={id}>{name}</FieldLabel>
+        <Tooltip content={isLocked ? t("keptOnScan") : t("overwrittenOnScan")}>
           <Button
             variant="ghost"
             size="icon-compact"
-            aria-label={`${fieldLabel[field]}をロック`}
+            aria-label={t("lockField", { name })}
             aria-pressed={isLocked}
             className={cn(isLocked && "text-foreground")}
             onClick={() => onToggle(field)}

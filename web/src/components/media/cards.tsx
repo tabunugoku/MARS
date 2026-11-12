@@ -2,6 +2,20 @@ import { Link } from "react-router";
 import type { Book, Series } from "@/api";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    volumes: ({ n }) => `${n}冊`,
+    pages: ({ n }) => `${n}ページ`,
+    progress: ({ page, total }) => ` · ${page}/${total}`,
+  },
+  en: {
+    volumes: ({ n }) => (n === 1 ? "1 volume" : `${n} volumes`),
+    pages: ({ n }) => (n === 1 ? "1 page" : `${n} pages`),
+    progress: ({ page, total }) => ` · ${page}/${total}`,
+  },
+});
 import { Cover } from "./cover";
 
 /** Spotlight (Aimran "spotlight card"): violet screentone pressed onto the
@@ -27,6 +41,7 @@ const metaCls = cn(typeClass("caption"), "truncate text-muted-foreground");
 
 /** Grid/shelf tile for a series. Whole tile is one link; hover lifts the cover only. */
 export function SeriesCard({ series, priority, className }: { series: Series; priority?: boolean; className?: string }) {
+  const t = useT(m);
   const unread = series.bookCount - series.booksRead;
   return (
     <Link
@@ -48,7 +63,7 @@ export function SeriesCard({ series, priority, className }: { series: Series; pr
       </div>
       <div className="mt-2 space-y-0.5 px-0.5">
         <p className={titleCls}>{series.title}</p>
-        <p className={metaCls}>{series.bookCount}冊</p>
+        <p className={metaCls}>{t("volumes", { n: series.bookCount })}</p>
       </div>
     </Link>
   );
@@ -56,6 +71,7 @@ export function SeriesCard({ series, priority, className }: { series: Series; pr
 
 /** Grid/shelf tile for a book. `showSeries` prints the series title as meta (dashboard shelves). */
 export function BookCard({ book, seriesTitle, priority, className, to }: { book: Book; seriesTitle?: string; priority?: boolean; className?: string; to?: string }) {
+  const t = useT(m);
   const p = book.progress;
   const progress = p ? (p.completed ? 1 : p.page / book.pageCount) : undefined;
   return (
@@ -73,8 +89,8 @@ export function BookCard({ book, seriesTitle, priority, className, to }: { book:
       <div className="mt-2 space-y-0.5 px-0.5">
         <p className={titleCls}>{seriesTitle ?? book.title}</p>
         <p className={metaCls}>
-          {seriesTitle ? book.title : `${book.pageCount}ページ`}
-          {p && !p.completed && ` · ${p.page}/${book.pageCount}`}
+          {seriesTitle ? book.title : t("pages", { n: book.pageCount })}
+          {p && !p.completed && t("progress", { page: p.page, total: book.pageCount })}
         </p>
       </div>
     </Link>

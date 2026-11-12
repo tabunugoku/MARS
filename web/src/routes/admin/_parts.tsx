@@ -1,5 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { Block } from "@/components/media/skeletons";
+import { defineMessages, intlLocale, useT } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,7 +14,15 @@ import {
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tooltip } from "@/components/ui/tooltip";
 
-const rtf = new Intl.RelativeTimeFormat("ja", { numeric: "auto" });
+const m = defineMessages({
+  ja: {
+    cancel: "キャンセル",
+  },
+  en: {
+    cancel: "Cancel",
+  },
+});
+
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["day", 86400],
   ["hour", 3600],
@@ -23,6 +32,7 @@ const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
 /** 「3時間前」style relative time. `null` (never happened) shows a dash. */
 export function relTime(iso: string | null): string {
   if (!iso) return "—";
+  const rtf = new Intl.RelativeTimeFormat(intlLocale(), { numeric: "auto" });
   const diff = (Date.parse(iso) - Date.now()) / 1000;
   for (const [unit, sec] of UNITS) {
     if (Math.abs(diff) >= sec) return rtf.format(Math.round(diff / sec), unit);
@@ -65,6 +75,7 @@ export function ConfirmDialog({
   confirmLabel: string;
   onConfirm: () => void;
 }) {
+  const t = useT(m);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
@@ -73,7 +84,7 @@ export function ConfirmDialog({
           <DialogDescription>{body}</DialogDescription>
         </DialogHeader>
         <DialogFooter>
-          <DialogClose render={<Button variant="ghost">キャンセル</Button>} />
+          <DialogClose render={<Button variant="ghost">{t("cancel")}</Button>} />
           <Button
             variant="destructive"
             onClick={() => {

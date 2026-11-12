@@ -10,6 +10,26 @@ import { Field, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    title: "コレクションに追加",
+    empty: "コレクションはまだありません。",
+    newCollection: "新しいコレクション",
+    name: "名前",
+    create: "作成",
+    created: "コレクションを作成しました",
+  },
+  en: {
+    title: "Add to collection",
+    empty: "No collections yet.",
+    newCollection: "New collection",
+    name: "Name",
+    create: "Create",
+    created: "Collection created",
+  },
+});
 
 /** Adds this series to collections or takes it out. Each checkbox saves at once.
  *  Administrators only: the caller shows the menu item to them alone. */
@@ -22,11 +42,12 @@ export function AddToCollectionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
+  const t = useT(m);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="sm">
         <DialogHeader>
-          <DialogTitle>コレクションに追加</DialogTitle>
+          <DialogTitle>{t("title")}</DialogTitle>
         </DialogHeader>
         <CollectionChecks seriesId={seriesId} open={open} />
       </DialogContent>
@@ -40,6 +61,7 @@ function mergeById<T extends { id: string }>(xs: T[], x: T): T[] {
 }
 
 function CollectionChecks({ seriesId, open }: { seriesId: string; open: boolean }) {
+  const t = useT(m);
   const [lists, setLists] = useState<Collection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -101,7 +123,7 @@ function CollectionChecks({ seriesId, open }: { seriesId: string; open: boolean 
         createdRef.current = mergeById(createdRef.current, created);
         setLists((ls) => mergeById(ls ?? [], created));
         setName("");
-        toast.success("コレクションを作成しました");
+        toast.success(t("created"));
       })
       .catch((err: unknown) => toast.error(errorMessage(err)))
       .finally(() => {
@@ -118,7 +140,7 @@ function CollectionChecks({ seriesId, open }: { seriesId: string; open: boolean 
   return (
     <div className="flex flex-col gap-4">
       {lists.length === 0 ? (
-        <p className={cn(typeClass("body"), "text-muted-foreground")}>コレクションはまだありません。</p>
+        <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("empty")}</p>
       ) : (
         <ul className="flex flex-col">
           {lists.map((c) => (
@@ -143,13 +165,13 @@ function CollectionChecks({ seriesId, open }: { seriesId: string; open: boolean 
       )}
 
       <Field>
-        <FieldLabel htmlFor="add-to-collection-new">新しいコレクション</FieldLabel>
+        <FieldLabel htmlFor="add-to-collection-new">{t("newCollection")}</FieldLabel>
         <div className="flex items-center gap-2">
           <Input
             id="add-to-collection-new"
             className="min-w-0 flex-1"
             value={name}
-            placeholder="名前"
+            placeholder={t("name")}
             disabled={creating}
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => {
@@ -157,7 +179,7 @@ function CollectionChecks({ seriesId, open }: { seriesId: string; open: boolean 
             }}
           />
           <Button variant="secondary" disabled={!name.trim() || busy} onClick={create}>
-            作成
+            {t("create")}
           </Button>
         </div>
       </Field>

@@ -5,6 +5,20 @@ import { Button } from "@/components/ui/button";
 import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
+import { defineMessages, useT } from "@/i18n";
+
+const m = defineMessages({
+  ja: {
+    showAll: "すべて表示",
+    previous: "前へ",
+    next: "次へ",
+  },
+  en: {
+    showAll: "Show all",
+    previous: "Previous",
+    next: "Next",
+  },
+});
 
 /** Page frame: one max width and one gutter for every screen. */
 export function Page({ children, className }: { children: ReactNode; className?: string }) {
@@ -35,6 +49,7 @@ export function PageHeader({ title, meta, actions, back, icon }: { title: ReactN
 }
 
 export function SectionTitle({ children, to, action }: { children: ReactNode; to?: string; action?: ReactNode }) {
+  const t = useT(m);
   return (
     <div className="mb-3 flex items-baseline justify-between gap-2">
       <h2 className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
@@ -42,7 +57,7 @@ export function SectionTitle({ children, to, action }: { children: ReactNode; to
       </h2>
       {to ? (
         <Link to={to} className={cn(typeClass("caption"), "text-muted-foreground hover:text-foreground")}>
-          すべて表示
+          {t("showAll")}
         </Link>
       ) : (
         action
@@ -64,6 +79,7 @@ export function CoverGrid({ children, className }: { children: ReactNode; classN
 export function Shelf({ title, to, children }: { title: ReactNode; to?: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   const page = (dir: 1 | -1) => ref.current?.scrollBy({ left: dir * ref.current.clientWidth * 0.85, behavior: "smooth" });
+  const t = useT(m);
   return (
     <section className="mb-10">
       <SectionTitle
@@ -71,10 +87,10 @@ export function Shelf({ title, to, children }: { title: ReactNode; to?: string; 
         action={
           // Paging arrows are for a mouse; on touch the shelf scrolls under the finger.
           <div className="hidden gap-1 md:pointer-fine:flex">
-            <Button variant="ghost" size="icon-compact" aria-label="前へ" onClick={() => page(-1)}>
+            <Button variant="ghost" size="icon-compact" aria-label={t("previous")} onClick={() => page(-1)}>
               <ChevronLeft />
             </Button>
-            <Button variant="ghost" size="icon-compact" aria-label="次へ" onClick={() => page(1)}>
+            <Button variant="ghost" size="icon-compact" aria-label={t("next")} onClick={() => page(1)}>
               <ChevronRight />
             </Button>
           </div>
