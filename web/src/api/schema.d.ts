@@ -291,7 +291,7 @@ export interface paths {
         };
         /**
          * Live changes as server-sent events (text/event-stream)
-         * @description One long-lived stream per app. Each message has an event name and a JSON data line: `task` (TaskEvent, administrators only), `library` (LibraryEvent), `book` (BookEvent) and `progress` (ProgressEvent, the caller's own reading progress). Library, book and progress events are sent only for libraries the caller may see. A comment line is sent about every 25 seconds as a heartbeat. When the client falls behind the stream is closed; on reconnecting, refetch what is shown.
+         * @description One long-lived stream per app. Each message has an event name and a JSON data line: `task` (TaskEvent, administrators only), `library` (LibraryEvent), `book` (BookEvent) and `progress` (ProgressEvent, the caller's own reading progress). Library, book and progress events are sent only for libraries the caller may see. A comment line is sent about every 25 seconds as a heartbeat. When the client falls behind the stream is closed; on reconnecting, refetch what is shown. A user may hold 16 streams and the server 512; past that the request is answered 429 with Retry-After.
          */
         get: operations["streamEvents"];
         put?: never;
