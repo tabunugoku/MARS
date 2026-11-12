@@ -199,8 +199,8 @@ export default function Screen() {
               <FieldLabel id="acc-locale">{t("displayLanguage")}</FieldLabel>
               <RadioGroup aria-labelledby="acc-locale" value={shownLocale} onValueChange={(v) => setLocale(v as "" | Locale)}>
                 <RadioItem index={0} value="" label={t("followBrowser")} />
-                <RadioItem index={1} value="ja" label={t("nameJa")} />
-                <RadioItem index={2} value="en" label={t("nameEn")} />
+                <RadioItem index={1} value="en" label={t("nameEn")} />
+                <RadioItem index={2} value="ja" label={t("nameJa")} />
               </RadioGroup>
             </Field>
             <div>
