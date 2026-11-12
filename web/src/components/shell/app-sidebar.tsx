@@ -15,7 +15,7 @@ import { MenuItem } from "@/components/ui/menu-item";
 import { SidebarUserFooter } from "@/components/sidebar-app/user-footer";
 import { SidebarSearchField } from "@/components/sidebar-app/search-field";
 import type { IconComponent } from "@/lib/icon-context";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useRef } from "react";
 import { api, useApi } from "@/api";
 import { defineMessages, useT } from "@/i18n";
 import { fontWeights } from "@/lib/font-weight";
@@ -159,8 +159,35 @@ function useShellLive(reloadLibs: () => void, reloadTasks: () => void, tasks: { 
   }, []);
 }
 
+// "/" puts the cursor in the search field, as on GitHub or YouTube, unless the
+// key is being typed somewhere (a field, an open dialog) or comes with a
+// modifier. Where the sidebar is hidden (phones), it opens the search screen.
+function useSlashToSearch(form: RefObject<HTMLFormElement | null>) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      e.preventDefault();
+      const input = form.current?.querySelector<HTMLInputElement>('input[name="q"]');
+      if (input && input.offsetParent !== null) {
+        input.focus();
+        input.select();
+      } else {
+        navigate("/search");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [form, navigate]);
+}
+
 export function AppSidebar() {
   const navigate = useNavigate();
+  const searchForm = useRef<HTMLFormElement>(null);
+  useSlashToSearch(searchForm);
   const { theme, toggle } = useTheme();
   const { data: libs, reload: reloadLibs } = useApi(() => api.libraries(), []);
   const { data: me } = useApi(() => api.me(), []);
@@ -183,6 +210,7 @@ export function AppSidebar() {
           </span>
         </Link>
         <form
+          ref={searchForm}
           onSubmit={(e) => {
             e.preventDefault();
             const q = new FormData(e.currentTarget).get("q");
