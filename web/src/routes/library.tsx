@@ -514,7 +514,7 @@ export default function Screen() {
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
         <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {!sel.active && series.length > 0 && (
             <Button
               variant="secondary"

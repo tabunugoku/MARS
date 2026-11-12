@@ -317,7 +317,7 @@ export default function Screen() {
             <TableHeader>
               <TableRow>
                 {heads.map((h) => (
-                  <TableHead key={h.label} className={h.right ? "text-right" : undefined}>
+                  <TableHead key={h.label} className={cn("whitespace-nowrap", h.right && "text-right")}>
                     {h.label}
                   </TableHead>
                 ))}
@@ -336,7 +336,7 @@ export default function Screen() {
                         </span>
                       </div>
                       {l.watchError && (
-                        <p className={cn(typeClass("caption"), "mt-1 max-w-[260px] text-muted-foreground")}>
+                        <p className={cn(typeClass("caption"), "mt-1 min-w-[200px] max-w-[260px] text-muted-foreground")}>
                           {t("watchFailed", { error: l.watchError })}
                         </p>
                       )}
