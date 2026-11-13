@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ChevronLeft, ChevronRight, CircleCheck, MoreHorizontal, Play, RotateCcw } from "@keyline-icons/react";
+import { ChevronLeft, ChevronRight, CircleCheck, MoreHorizontal, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, bookFileUrl, bookInlineUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -426,9 +426,10 @@ function BookPage({ id }: { id: string }) {
             ) : null}
           </div>
 
-          {/* One row on a phone: there the secondary actions show their icon
-              only (the label stays for screen readers) and the main action
-              takes the rest of the row. */}
+          {/* One row on a phone: there Mark as read and More show their icon
+              only (the label stays for screen readers), Read from start keeps
+              its text with 12 px padding, and the main action takes the rest
+              of the row (about 320 of 327 px at 375 px, in ja and en). */}
           <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
             {pdfInBrowser ? (
               canStream && (
@@ -443,11 +444,8 @@ function BookPage({ id }: { id: string }) {
                 <BrandAction to={`/read/${book.id}`} icon={Play} className="max-sm:flex-1">
                   {book.progress && !completed ? t("continueReading") : t("startReading")}
                 </BrandAction>
-                <Button variant="secondary" asChild className={phoneIcon}>
-                  <Link to={`/read/${book.id}?page=1`}>
-                    <RotateCcw size={16} className="sm:hidden" />
-                    <span className="max-sm:sr-only">{t("readFromStart")}</span>
-                  </Link>
+                <Button variant="secondary" asChild className="max-sm:shrink-0 max-sm:px-3">
+                  <Link to={`/read/${book.id}?page=1`}>{t("readFromStart")}</Link>
                 </Button>
               </>
             )}
