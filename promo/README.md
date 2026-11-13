@@ -88,5 +88,3 @@ npm run render
 `remotion.config.ts` then uses the installed Chrome and the x64 compositor,
 both running under emulation. Set `MARS_PROMO_BROWSER` or
 `MARS_PROMO_BINARIES` to use other paths. Other machines need no setup.
-
-`x-posts.md` holds the X (Twitter) posts for the v1.0.0 release.
