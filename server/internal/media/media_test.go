@@ -224,7 +224,7 @@ func TestAnalyzeComicInfoRules(t *testing.T) {
 
 func TestThumbnailScalesAndKeepsSmallImages(t *testing.T) {
 	big := jpegBytes(t, 400, 600)
-	out, err := Thumbnail(big, 200, 300)
+	out, err := Thumbnail(big, 200, 300, FormatJPEG)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestThumbnailScalesAndKeepsSmallImages(t *testing.T) {
 	}
 
 	small := pngBytes(t, 30, 40)
-	out, err = Thumbnail(small, 200, 300)
+	out, err = Thumbnail(small, 200, 300, FormatJPEG)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestThumbnailScalesAndKeepsSmallImages(t *testing.T) {
 
 func TestThumbnailTooLarge(t *testing.T) {
 	huge := patchPNGSize(t, pngBytes(t, 4, 4), 20000, 20000)
-	if _, err := Thumbnail(huge, 200, 300); !errors.Is(err, ErrTooLarge) {
+	if _, err := Thumbnail(huge, 200, 300, FormatJPEG); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
 }

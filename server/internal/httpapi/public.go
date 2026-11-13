@@ -96,7 +96,7 @@ func (s *server) servePublicCover(w http.ResponseWriter, r *http.Request) {
 			if s.loginBackdrop(r.Context()) == BookCovers {
 				kind = "book"
 			}
-			s.sendThumbnail(w, r, kind, r.PathValue("seriesId"))
+			s.sendThumbnail(w, r, kind, r.PathValue("seriesId"), false)
 			return
 		}
 	}

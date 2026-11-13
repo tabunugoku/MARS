@@ -38,21 +38,33 @@ func ThumbVersion(name string) string { return fmt.Sprintf("%x", hash(name)) }
 // made from. Other errors are server errors.
 var ErrImage = errors.New("library: image")
 
-// newThumbName is a file name under ThumbDir that no earlier thumbnail had.
-func newThumbName(prefix string) string {
+// newThumbName is a file name under ThumbDir that no earlier thumbnail had,
+// with the extension ext (".jpg", ".webp" or ".avif").
+func newThumbName(prefix string, ext string) string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		// Never expected; the clock still makes the name fresh.
-		return fmt.Sprintf("%s-%x.jpg", prefix, time.Now().UnixNano())
+		return fmt.Sprintf("%s-%x%s", prefix, time.Now().UnixNano(), ext)
 	}
-	return prefix + "-" + hex.EncodeToString(b[:]) + ".jpg"
+	return prefix + "-" + hex.EncodeToString(b[:]) + ext
 }
 
-// removeThumb deletes a thumbnail file that no row refers to any more. An
-// error is ignored: a file left behind is harmless.
+// JPEGCopyDir is the folder under a thumbnail folder that keeps JPEG copies
+// of WebP and AVIF thumbnails, for clients that only read JPEG (OPDS, the
+// Komga API). A copy is named after its thumbnail, so removeThumb removes both.
+const JPEGCopyDir = "jpeg"
+
+// removeThumb deletes a thumbnail file that no row refers to any more, and
+// its JPEG copy if one was made. An error is ignored: a file left behind is
+// harmless.
 func (s *Service) removeThumb(name string) {
-	if name != "" {
-		_ = os.Remove(filepath.Join(s.ThumbDir, filepath.Base(name)))
+	if name == "" {
+		return
+	}
+	base := filepath.Base(name)
+	_ = os.Remove(filepath.Join(s.ThumbDir, base))
+	if ext := filepath.Ext(base); ext != ".jpg" && ext != ".jpeg" {
+		_ = os.Remove(filepath.Join(s.ThumbDir, JPEGCopyDir, strings.TrimSuffix(base, ext)+".jpg"))
 	}
 }
 
@@ -104,11 +116,12 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 		return err
 	}
 	w, h := s.thumbBounds(ctx)
-	jpg, err := media.Thumbnail(img, w, h)
+	f := s.thumbFormat(ctx)
+	jpg, err := media.Thumbnail(img, w, h, f)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrImage, err)
 	}
-	name, err := s.writeThumb("series-"+seriesID, jpg)
+	name, err := s.writeThumb("series-"+seriesID, jpg, f)
 	if err != nil {
 		return err
 	}
@@ -181,11 +194,12 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 		return err
 	}
 	w, h := s.thumbBounds(ctx)
-	jpg, err := media.Thumbnail(img, w, h)
+	f := s.thumbFormat(ctx)
+	jpg, err := media.Thumbnail(img, w, h, f)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrImage, err)
 	}
-	name, err := s.writeThumb(bookID, jpg)
+	name, err := s.writeThumb(bookID, jpg, f)
 	if err != nil {
 		return err
 	}
@@ -267,12 +281,14 @@ func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) (bool,
 			}
 			img, err := readArtwork(l.root, filepath.Join(sr.dir, name))
 			var jpg []byte
+			var f media.Format
 			if err == nil {
 				w, h := s.thumbBounds(ctx)
-				jpg, err = media.Thumbnail(img, w, h)
+				f = s.thumbFormat(ctx)
+				jpg, err = media.Thumbnail(img, w, h, f)
 			}
 			if err == nil {
-				thumb, err := s.writeThumb("series-"+sr.id, jpg)
+				thumb, err := s.writeThumb("series-"+sr.id, jpg, f)
 				if err != nil {
 					return false, err
 				}

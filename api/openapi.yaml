@@ -1818,7 +1818,7 @@ components:
         port: { type: integer, description: "Takes effect after a restart" }
         taskThreads: { type: integer }
         thumbnailSize: { type: string, enum: [small, medium, large, xlarge] }
-        thumbnailFormat: { type: string, enum: [webp, jpeg, avif], description: "Only jpeg is produced today" }
+        thumbnailFormat: { type: string, enum: [webp, jpeg, avif], description: "Format of thumbnails made from now on; existing ones change when regenerated. OPDS and the Komga API always serve JPEG." }
         rememberMeDays: { type: integer }
         deleteEmptyCollections: { type: boolean }
         opdsEnabled: { type: boolean, description: "Serves the OPDS 1.2 catalog at /opds/v1.2/catalog" }

@@ -114,7 +114,7 @@ func settingsProblem(v ServerSettings) string {
 		return "bad_request.login_backdrop"
 	case !v.ThumbnailSize.Valid():
 		return "bad_request.thumbnail_size"
-	case v.ThumbnailFormat != ServerSettingsThumbnailFormatJpeg:
+	case !v.ThumbnailFormat.Valid():
 		return "bad_request.thumbnail_format"
 	}
 	return ""

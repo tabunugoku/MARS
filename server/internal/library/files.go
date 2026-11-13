@@ -21,28 +21,28 @@ var ErrNotReady = errors.New("library: book not analysed")
 // ErrBadPage means a cover page outside 1..page count.
 var ErrBadPage = errors.New("library: no such page")
 
-// writeThumb stores jpg as a new thumbnail file named after prefix and
-// returns its name. Every write gets a fresh name, so a thumbnail URL that
-// carries the name changes with the image; the caller removes the file the
-// row used to name.
-func (s *Service) writeThumb(prefix string, jpg []byte) (string, error) {
+// writeThumb stores data, a thumbnail encoded as f, as a new file named after
+// prefix and returns its name. Every write gets a fresh name, so a thumbnail
+// URL that carries the name changes with the image; the caller removes the
+// file the row used to name.
+func (s *Service) writeThumb(prefix string, data []byte, f media.Format) (string, error) {
 	if err := os.MkdirAll(s.ThumbDir, 0o755); err != nil {
 		return "", err
 	}
-	name := newThumbName(prefix)
-	f, err := os.CreateTemp(s.ThumbDir, name+".*.tmp")
+	name := newThumbName(prefix, f.Ext())
+	tmp, err := os.CreateTemp(s.ThumbDir, name+".*.tmp")
 	if err != nil {
 		return "", err
 	}
-	_, err = f.Write(jpg)
-	if cerr := f.Close(); err == nil {
+	_, err = tmp.Write(data)
+	if cerr := tmp.Close(); err == nil {
 		err = cerr
 	}
 	if err == nil {
-		err = os.Rename(f.Name(), filepath.Join(s.ThumbDir, name))
+		err = os.Rename(tmp.Name(), filepath.Join(s.ThumbDir, name))
 	}
 	if err != nil {
-		os.Remove(f.Name())
+		os.Remove(tmp.Name())
 		return "", err
 	}
 	return name, nil
@@ -116,11 +116,12 @@ func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error
 		return err
 	}
 	w, h := s.thumbBounds(ctx)
-	jpg, err := media.Thumbnail(img, w, h)
+	f := s.thumbFormat(ctx)
+	jpg, err := media.Thumbnail(img, w, h, f)
 	if err != nil {
 		return err
 	}
-	name, err := s.writeThumb(bookID, jpg)
+	name, err := s.writeThumb(bookID, jpg, f)
 	if err != nil {
 		return err
 	}

@@ -49,10 +49,10 @@ func (s *server) komgaRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(api+"series", s.komgaSeriesList)
 	mux.HandleFunc(api+"series/{seriesId}", s.komgaSeriesOne)
 	mux.HandleFunc(api+"series/{seriesId}/books", s.komgaSeriesBooks)
-	mux.HandleFunc(api+"series/{seriesId}/thumbnail", s.serveThumbnail("series"))
+	mux.HandleFunc(api+"series/{seriesId}/thumbnail", s.serveThumbnail("series", true))
 	mux.HandleFunc(api+"books", s.komgaBookList)
 	mux.HandleFunc(api+"books/{bookId}", s.komgaBookOne)
-	mux.HandleFunc(api+"books/{bookId}/thumbnail", s.serveThumbnail("book"))
+	mux.HandleFunc(api+"books/{bookId}/thumbnail", s.serveThumbnail("book", true))
 	mux.HandleFunc(api+"books/{bookId}/pages", s.komgaPages)
 	mux.HandleFunc(api+"books/{bookId}/pages/{page}", s.komgaPage)
 	mux.HandleFunc(api+"readlists", s.komgaReadLists)
@@ -695,7 +695,7 @@ func (s *server) komgaReadListThumbnail(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// The members are already limited to books the caller may see.
-	s.sendThumbnail(w, r, "book", l.BookIds[0])
+	s.sendThumbnail(w, r, "book", l.BookIds[0], true)
 }
 
 // ─── Collections ─────────────────────────────────────────────────────────────

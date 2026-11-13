@@ -116,8 +116,8 @@ func (s *server) opdsRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /opds/v1.2/search.xml", s.opdsSearchDoc)
 	mux.HandleFunc("GET /opds/v1.2/search", s.opdsSearch)
 	mux.HandleFunc("GET /opds/v1.2/books/{bookId}/pages/{pageNumber}", s.opdsPage)
-	mux.HandleFunc("GET /opds/v1.2/series/{seriesId}/thumbnail", s.serveThumbnail("series"))
-	mux.HandleFunc("GET /opds/v1.2/books/{bookId}/thumbnail", s.serveThumbnail("book"))
+	mux.HandleFunc("GET /opds/v1.2/series/{seriesId}/thumbnail", s.serveThumbnail("series", true))
+	mux.HandleFunc("GET /opds/v1.2/books/{bookId}/thumbnail", s.serveThumbnail("book", true))
 	mux.HandleFunc("GET /opds/v1.2/books/{bookId}/file", s.serveBookFile)
 }
 

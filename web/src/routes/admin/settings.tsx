@@ -34,6 +34,7 @@ const m = defineMessages({
     sizeXlarge: "特大",
     thumbFormat: "形式",
     thumbNote: "新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。",
+    thumbFormatNote: "新しく作るサムネイルから使われます。今あるものは、シリーズやライブラリの「表紙を作り直す」で切り替わります。OPDS と Komga 互換 API には、常に JPEG で返します。",
     auth: "認証",
     rememberDays: "ログイン保持の日数",
     loginScreen: "ログイン画面",
@@ -86,6 +87,7 @@ const m = defineMessages({
     sizeXlarge: "Extra large",
     thumbFormat: "Format",
     thumbNote: "Applies to newly made thumbnails. To remake existing ones, use Regenerate covers on a series or library.",
+    thumbFormatNote: "Applies to newly made thumbnails. Existing ones change when you use Regenerate covers on a series or library. OPDS and the Komga API always get JPEG.",
     auth: "Authentication",
     rememberDays: "Days to stay signed in",
     loginScreen: "Sign-in screen",
@@ -143,6 +145,11 @@ export default function Screen() {
     medium: t("sizeMedium"),
     large: t("sizeLarge"),
     xlarge: t("sizeXlarge"),
+  };
+  const formatLabel: Record<ServerSettings["thumbnailFormat"], string> = {
+    jpeg: "JPEG",
+    webp: "WebP",
+    avif: "AVIF",
   };
   const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = {
     planet: t("backdropPlanet"),
@@ -310,11 +317,18 @@ export default function Screen() {
               <FieldDescription>{t("thumbNote")}</FieldDescription>
             </Field>
             <Field>
-              {/* JPEG is the only format the server writes, so it is shown, not offered. */}
-              <FieldLabel id="set-thumb-format">{t("thumbFormat")}</FieldLabel>
-              <p aria-labelledby="set-thumb-format" className={cn(typeClass("body"), "text-foreground")}>
-                JPEG
-              </p>
+              <FieldLabel htmlFor="set-thumb-format">{t("thumbFormat")}</FieldLabel>
+              <Select value={cur.thumbnailFormat} onValueChange={(v) => patch({ thumbnailFormat: v as ServerSettings["thumbnailFormat"] })}>
+                <SelectTrigger id="set-thumb-format" className="w-full" />
+                <SelectContent>
+                  {(Object.keys(formatLabel) as ServerSettings["thumbnailFormat"][]).map((k, i) => (
+                    <SelectItem key={k} index={i} value={k}>
+                      {formatLabel[k]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>{t("thumbFormatNote")}</FieldDescription>
             </Field>
           </FieldGroup>
         </section>

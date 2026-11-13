@@ -37,6 +37,15 @@ func (s *Service) thumbBounds(ctx context.Context) (int, int) {
 	return 400, 600
 }
 
+// thumbFormat returns the encoding for a new book or series thumbnail:
+// ThumbFormat when set, otherwise JPEG.
+func (s *Service) thumbFormat(ctx context.Context) media.Format {
+	if s.ThumbFormat != nil {
+		return s.ThumbFormat(ctx)
+	}
+	return media.FormatJPEG
+}
+
 type Service struct {
 	DB       *sql.DB
 	Queue    *task.Queue
@@ -51,6 +60,9 @@ type Service struct {
 	// ThumbSize gives the thumbnail box (width, height) for thumbnails made
 	// from now on; nil means 400x600.
 	ThumbSize func(ctx context.Context) (w, h int)
+	// ThumbFormat gives the encoding (JPEG, WebP or AVIF) of thumbnails made
+	// from now on; nil means JPEG. Page thumbnails are always JPEG.
+	ThumbFormat func(ctx context.Context) media.Format
 
 	scanLocks  sync.Map     // library id -> ctxMutex; one walk+sync at a time per library
 	coverLocks sync.Map     // book id -> ctxMutex; see coverLock
@@ -416,8 +428,9 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	thumb := ""
 	if !keep {
 		w, h := s.thumbBounds(ctx)
-		if jpg, err := media.Thumbnail(a.Cover, w, h); err == nil {
-			if thumb, err = s.writeThumb(bookID, jpg); err != nil {
+		f := s.thumbFormat(ctx)
+		if jpg, err := media.Thumbnail(a.Cover, w, h, f); err == nil {
+			if thumb, err = s.writeThumb(bookID, jpg, f); err != nil {
 				return "", nil, err
 			}
 		} else {
