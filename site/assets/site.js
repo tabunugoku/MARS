@@ -1,181 +1,100 @@
-/* MARS website. Vanilla JS, no dependencies.
- * Theme toggle, mobile menu, copy button and the faux reader slideshow. */
-(function () {
-  "use strict";
+// MARS website: theme toggle, copy buttons and the two quiet moments
+// (the tagline's words lighting up, the start steps filling in like the
+// app's dot track). The theme itself is set by the inline script in <head>
+// before first paint; this file only reacts to the toggle.
+(() => {
+  const root = document.documentElement;
+  const KEY = "mars-site-theme";
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  var root = document.documentElement;
-  var THEME_KEY = "mars-theme";
-  var reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-  var lightQuery = window.matchMedia("(prefers-color-scheme: light)");
-
-  function readTheme() {
-    try {
-      var v = localStorage.getItem(THEME_KEY);
-      return v === "light" || v === "dark" ? v : null;
-    } catch (e) {
-      return null;
+  // Screenshots that have a light-theme twin swap with the theme.
+  const syncShots = () => {
+    const light = root.dataset.theme === "light";
+    for (const img of document.querySelectorAll("img[data-light]")) {
+      const want = light ? img.dataset.light : img.dataset.dark;
+      if (img.getAttribute("src") !== want) img.setAttribute("src", want);
     }
-  }
-  function saveTheme(v) {
-    try {
-      localStorage.setItem(THEME_KEY, v);
-    } catch (e) { /* private mode or blocked storage: the choice just is not remembered */ }
-  }
-  function currentTheme() {
-    var forced = root.getAttribute("data-theme");
-    if (forced === "light" || forced === "dark") return forced;
-    return lightQuery.matches ? "light" : "dark";
-  }
+  };
+  syncShots();
 
-  // Apply a stored choice (the inline head script already did this before paint).
-  var stored = readTheme();
-  if (stored) root.setAttribute("data-theme", stored);
-
-  var themeBtn = document.querySelector("[data-theme-toggle]");
-  if (themeBtn) {
-    themeBtn.addEventListener("click", function () {
-      var next = currentTheme() === "dark" ? "light" : "dark";
-      root.setAttribute("data-theme", next);
-      saveTheme(next);
-    });
-  }
-
-  // Mobile menu: one button, aria-expanded, Escape closes and returns focus.
-  var menuBtn = document.querySelector("[data-menu-toggle]");
-  var menu = document.getElementById("mobile-menu");
-  function setMenu(open) {
-    if (!menuBtn || !menu) return;
-    menuBtn.setAttribute("aria-expanded", open ? "true" : "false");
-    menu.hidden = !open;
-    document.body.style.overflow = open ? "hidden" : "";
-  }
-  if (menuBtn && menu) {
-    menuBtn.addEventListener("click", function () {
-      setMenu(menuBtn.getAttribute("aria-expanded") !== "true");
-    });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && menuBtn.getAttribute("aria-expanded") === "true") {
-        setMenu(false);
-        menuBtn.focus();
-      }
-    });
-    menu.addEventListener("click", function (e) {
-      if (e.target.closest("a")) setMenu(false);
-    });
-    var wide = window.matchMedia("(min-width: 768px)");
-    var onWide = function () { if (wide.matches) setMenu(false); };
-    if (wide.addEventListener) wide.addEventListener("change", onWide);
-  }
-
-  // Copy button for the one-line Docker command.
-  var copyBtn = document.querySelector("[data-copy]");
-  if (copyBtn) {
-    var label = copyBtn.querySelector("[data-copy-label]");
-    var copiedText = copyBtn.getAttribute("data-copied");
-    var idleText = label ? label.textContent : "";
-    var timer = null;
-    var target = document.getElementById(copyBtn.getAttribute("aria-controls"));
-
-    var flash = function () {
-      copyBtn.classList.add("is-copied");
-      if (label) label.textContent = copiedText;
-      clearTimeout(timer);
-      timer = setTimeout(function () {
-        copyBtn.classList.remove("is-copied");
-        if (label) label.textContent = idleText;
-      }, 2000);
+  const toggle = document.querySelector("[data-theme-toggle]");
+  if (toggle) {
+    const label = () => {
+      const light = root.dataset.theme === "light";
+      toggle.setAttribute("aria-pressed", String(!light));
+      toggle.setAttribute("aria-label", light ? toggle.dataset.toDark : toggle.dataset.toLight);
+      toggle.title = toggle.getAttribute("aria-label");
     };
-    // Select the command so the reader can press Ctrl+C / Cmd+C if the clipboard API is refused.
-    var fallback = function () {
-      if (!target) return;
+    label();
+    toggle.addEventListener("click", () => {
+      root.dataset.theme = root.dataset.theme === "light" ? "dark" : "light";
+      try { localStorage.setItem(KEY, root.dataset.theme); } catch { /* private mode */ }
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", root.dataset.theme === "light" ? "#f8f5f4" : "#120d0b");
+      label();
+      syncShots();
+    });
+  }
+
+  // A hairline under the nav once the page has scrolled.
+  const nav = document.querySelector(".nav");
+  if (nav) {
+    const onScroll = () => nav.classList.toggle("is-scrolled", scrollY > 8);
+    addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+  }
+
+  // Copy buttons next to commands.
+  for (const btn of document.querySelectorAll("[data-copy]")) {
+    btn.addEventListener("click", async () => {
+      const text = document.getElementById(btn.dataset.copy)?.textContent ?? "";
+      const status = btn.querySelector(".label");
       try {
-        var range = document.createRange();
-        range.selectNodeContents(target);
-        var sel = window.getSelection();
+        await navigator.clipboard.writeText(text.trim());
+        btn.classList.add("is-copied");
+        if (status) status.textContent = btn.dataset.done;
+        document.getElementById("copy-status").textContent = btn.dataset.done;
+        setTimeout(() => {
+          btn.classList.remove("is-copied");
+          if (status) status.textContent = btn.dataset.idle;
+        }, 1800);
+      } catch {
+        // Clipboard refused (insecure context): select the text instead.
+        const pre = document.getElementById(btn.dataset.copy);
+        const range = document.createRange();
+        range.selectNodeContents(pre);
+        const sel = getSelection();
         sel.removeAllRanges();
         sel.addRange(range);
-        if (document.execCommand("copy")) {
-          flash();
-          sel.removeAllRanges();
-        }
-      } catch (e) { /* the text stays selected for a manual copy */ }
-    };
-
-    copyBtn.addEventListener("click", function () {
-      var text = target ? target.textContent.trim() : "";
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(flash, fallback);
-      } else {
-        fallback();
       }
     });
   }
 
-  // Faux reader: pages slide in from the left (right-to-left reading).
-  // Runs only while on screen, pauses on hover, static under reduced motion.
-  var stage = document.getElementById("reader-window");
-  if (stage) {
-    var pages = Array.prototype.slice.call(stage.querySelectorAll("img"));
-    var pager = Array.prototype.slice.call(document.querySelectorAll(".pager span"));
-    var cur = 0;
-    var timer2 = null;
-    var inView = false;
-    var hovered = false;
-    var INTERVAL = 3500;
-    var SLIDE = 600;
-
-    var updatePager = function () {
-      pager.forEach(function (d, i) { d.classList.toggle("is-on", i === cur); });
-    };
-
-    var show = function (next) {
-      var prev = pages[cur];
-      var inc = pages[next];
-      pages.forEach(function (p) { p.style.zIndex = "1"; });
-      prev.style.zIndex = "2";
-      inc.style.zIndex = "3";
-      // Park the incoming page off the left edge without a transition, then let it slide in.
-      inc.style.transition = "none";
-      inc.style.transform = "translate3d(-100%, 0, 0)";
-      void inc.offsetWidth;
-      inc.style.transition = "";
-      inc.style.transform = "translate3d(0, 0, 0)";
-      cur = next;
-      updatePager();
-      setTimeout(function () {
-        if (cur === next) {
-          inc.style.zIndex = "2";
-          prev.style.zIndex = "1";
-        }
-      }, SLIDE + 50);
-    };
-
-    var tick = function () {
-      if (!hovered) show((cur + 1) % pages.length);
-    };
-    var start = function () {
-      if (timer2 || reduceMotion.matches) return;
-      timer2 = setInterval(tick, INTERVAL);
-    };
-    var stop = function () {
-      clearInterval(timer2);
-      timer2 = null;
-    };
-
-    pages.forEach(function (p, i) {
-      p.style.zIndex = i === 0 ? "2" : "1";
-    });
-    updatePager();
-
-    stage.addEventListener("mouseenter", function () { hovered = true; });
-    stage.addEventListener("mouseleave", function () { hovered = false; });
-
-    if ("IntersectionObserver" in window && !reduceMotion.matches) {
-      var io = new IntersectionObserver(function (entries) {
-        inView = entries[0].isIntersecting;
-        if (inView) start(); else stop();
-      }, { threshold: 0.35 });
-      io.observe(stage);
+  // Tagline: each word lights up as it crosses the lower third of the
+  // screen, in reading order, once.
+  const words = [...document.querySelectorAll(".tagline .w")];
+  // Start steps: the dots fill one after another when the list is in view.
+  const steps = [...document.querySelectorAll(".step")];
+  if (reduce || !("IntersectionObserver" in window)) {
+    words.forEach((w) => w.classList.add("on"));
+    steps.forEach((s) => s.classList.add("is-done"));
+    return;
+  }
+  const wordIO = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("on");
+      wordIO.unobserve(e.target);
     }
+  }, { rootMargin: "0px 0px -35% 0px" });
+  words.forEach((w) => wordIO.observe(w));
+
+  const list = document.querySelector(".steps");
+  if (list) {
+    const stepIO = new IntersectionObserver((entries) => {
+      if (!entries.some((e) => e.isIntersecting)) return;
+      steps.forEach((s, i) => setTimeout(() => s.classList.add("is-done"), 180 * i));
+      stepIO.disconnect();
+    }, { rootMargin: "0px 0px -25% 0px" });
+    stepIO.observe(list);
   }
 })();
