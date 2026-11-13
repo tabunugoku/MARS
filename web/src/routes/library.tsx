@@ -494,7 +494,7 @@ export default function Screen() {
     label?: (value: string) => string,
   ) =>
     options.length > 0 && (
-      <FilterGroup title={title}>
+      <FilterGroup title={title} count={selected.length}>
         <CheckList
           options={options}
           selected={selected}
@@ -576,12 +576,12 @@ export default function Screen() {
 
       {panelOpen && (
         <div className="mb-4 grid gap-4 rounded-[12px] bg-card p-4 md:grid-cols-3">
-          <FilterGroup title={t("readState")}>
+          <FilterGroup title={t("readState")} count={read.length}>
             {READ_STATES.map((o) => (
               <CheckRow key={o.value} label={t(o.label)} checked={read.includes(o.value)} onChange={() => toggle("read", read, o.value)} />
             ))}
           </FilterGroup>
-          <FilterGroup title={t("status")}>
+          <FilterGroup title={t("status")} count={status.length}>
             {STATUSES.map((v) => (
               <CheckRow key={v} label={statusLabel()[v]} checked={status.includes(v)} onChange={() => toggle("status", status, v)} />
             ))}
@@ -592,7 +592,7 @@ export default function Screen() {
           {listGroup(t("languages"), languages, language, "language", languageName)}
           {listGroup(t("authors"), authors, author, "author")}
           {ageRatings.length > 0 && (
-            <FilterGroup title={t("ageRating")}>
+            <FilterGroup title={t("ageRating")} count={age === undefined ? 0 : 1}>
               <Select value={age === undefined ? "any" : String(age)} onValueChange={(v) => update({ age: v === "any" ? null : v })}>
                 <SelectTrigger aria-label={t("ageRating")} />
                 <SelectContent>
@@ -608,7 +608,7 @@ export default function Screen() {
               </Select>
             </FilterGroup>
           )}
-          <FilterGroup title={t("completion")}>
+          <FilterGroup title={t("completion")} count={complete === undefined ? 0 : 1}>
             <Select
               value={complete === undefined ? "any" : complete ? "yes" : "no"}
               onValueChange={(v) => update({ complete: v === "yes" ? "1" : v === "no" ? "0" : null })}

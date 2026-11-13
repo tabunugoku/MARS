@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
+import { ChevronDown } from "@keyline-icons/react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
@@ -10,11 +11,33 @@ import { cn } from "@/lib/utils";
 /** A list with more options than this gets a search box above it. */
 const SEARCH_FROM = 8;
 
-export function FilterGroup({ title, children }: { title: string; children: ReactNode }) {
+/** One filter category, folded by its heading. It starts open on wide screens
+ *  and on a phone only when something in it is chosen, so the panel does not
+ *  fill a small screen; `count` (how many are chosen) shows beside the title. */
+export function FilterGroup({ title, count = 0, children }: { title: string; count?: number; children: ReactNode }) {
+  const [open, setOpen] = useState(() => count > 0 || window.matchMedia("(min-width: 48rem)").matches);
+  const body = useId();
   return (
     <div className="space-y-2">
-      <p className={cn(typeClass("caption"), "text-muted-foreground")}>{title}</p>
-      <div className="flex flex-col gap-2">{children}</div>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={body}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          typeClass("caption"),
+          "touch-hit relative flex w-full items-center gap-2 text-left text-muted-foreground hover:text-foreground",
+        )}
+      >
+        <span className="flex-1">
+          {title}
+          {count > 0 && <span className="ml-1.5 font-mono tabular-nums text-foreground">{count}</span>}
+        </span>
+        <ChevronDown size={14} className={cn("shrink-0 transition-transform duration-80", open && "rotate-180")} />
+      </button>
+      <div id={body} hidden={!open} className="flex flex-col gap-2">
+        {children}
+      </div>
     </div>
   );
 }
