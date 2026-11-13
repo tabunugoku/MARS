@@ -12,7 +12,7 @@ MARS writes the following files to the data folder (`/data` in the Docker image)
 | --- | --- | --- |
 | `mars.db` | The database. It holds users, API keys, reading progress, collections, read lists, server settings, and metadata edits. | The most important file. If it is lost, all of this data is lost. |
 | `mars.db-wal`, `mars.db-shm` | Helper files for the database. They exist only while the server is running. | They are normally removed when the server stops. |
-| `thumbnails/` | Cover thumbnails. `thumbnails/jpeg/` holds JPEG copies for the OPDS and Komga-compatible API. | Can be regenerated. |
+| `thumbnails/` | Cover thumbnails. Cover images you upload are also stored here. `thumbnails/jpeg/` holds JPEG copies for the OPDS and Komga-compatible API. | Uploaded cover images are lost and cannot be regenerated. Other thumbnails can be regenerated. |
 | `cache/pages/` | Temporary copies of pages extracted from archives. The limit is 2 GiB. | Can be regenerated. |
 | `cache/page-thumbs/` | Temporary copies of page thumbnails. | Can be regenerated. |
 | `listen-addr` | A file written when the server starts. It is used for the health check. | It is recreated on the next start. |
@@ -25,10 +25,11 @@ Book files are not in the data folder. They are in your library folders. MARS ba
 | Item | Needed? |
 | --- | --- |
 | `mars.db` | Yes. |
-| `thumbnails/`, `cache/` | No. They can be regenerated if lost. |
+| `thumbnails/` | Yes, if you have uploaded cover images. Uploaded images exist only here. |
+| `cache/` | No. It can be regenerated if lost. |
 | Book files (library folders) | Managed outside MARS, so keep them with your usual backup tools. |
 
-If you leave out thumbnails and the cache, the backup is smaller. Regenerating them takes time, though. To regenerate covers, see [Libraries and scanning](libraries.md#thumbnails).
+Leaving out the cache makes the backup smaller. If you have not uploaded any cover images, you can leave out `thumbnails/` too. Regenerating thumbnails takes time, though. To regenerate covers, see [Libraries and scanning](libraries.md#thumbnails).
 
 ## Back up safely
 
