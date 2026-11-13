@@ -82,7 +82,7 @@ func TestRemoveThumbRemovesJPEGCopy(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	s.removeThumb("b1-aa.webp")
+	s.RemoveThumb("b1-aa.webp")
 	for _, p := range []string{filepath.Join(dir, "b1-aa.webp"), filepath.Join(copyDir, "b1-aa.jpg")} {
 		if _, err := os.Stat(p); !os.IsNotExist(err) {
 			t.Errorf("%s still exists", p)

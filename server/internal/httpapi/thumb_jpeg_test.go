@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/gen2brain/webp"
 	"github.com/tabunugoku/mars/server/internal/auth"
@@ -131,4 +132,43 @@ func TestWebPThumbnailKomgaIsJPEG(t *testing.T) {
 
 	rec = f.do(komgaReader, "/komga/api/v1/series/"+f.alpha.Id+"/thumbnail")
 	checkJPEG(t, rec.Code, rec.Header().Get("Content-Type"), rec.Body.Bytes(), 40)
+}
+
+// TestEmptyTrashRemovesJPEGCopy checks that emptying the trash removes a WebP
+// thumbnail together with the JPEG copy made for OPDS and the Komga API.
+func TestEmptyTrashRemovesJPEGCopy(t *testing.T) {
+	e := newEnv(t)
+	root := t.TempDir()
+	img := pngBytes(t, 40, 60, color.RGBA{10, 10, 10, 255})
+	writeCBZ(t, filepath.Join(root, "Gone", "Gone v01.cbz"), map[string][]byte{"1.png": img})
+	var l Library
+	e.admin.json("POST", "/api/v1/libraries", map[string]any{"name": "T", "root": root, "kind": "manga"}, 201, &l)
+	e.waitTasks()
+	var book string
+	for _, s := range seriesOf(e, l.Id) {
+		for _, bk := range booksOf(e, s.Id) {
+			book = bk.Id
+		}
+	}
+	thumbs := filepath.Join(e.data, "thumbs")
+	stored := filepath.Join(thumbs, "trash-aa.webp")
+	copied := filepath.Join(thumbs, library.JPEGCopyDir, "trash-aa.jpg")
+	if err := os.MkdirAll(filepath.Dir(copied), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, p := range []string{stored, copied} {
+		if err := os.WriteFile(p, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	if _, err := e.db.Exec(`UPDATE books SET thumbnail = 'trash-aa.webp', deleted_at = ? WHERE id = ?`, now, book); err != nil {
+		t.Fatal(err)
+	}
+	e.admin.json("POST", "/api/v1/trash/empty", nil, 200, nil)
+	for _, p := range []string{stored, copied} {
+		if _, err := os.Stat(p); !os.IsNotExist(err) {
+			t.Errorf("%s still exists after emptying the trash", p)
+		}
+	}
 }

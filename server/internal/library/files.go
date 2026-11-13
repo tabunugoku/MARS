@@ -127,10 +127,10 @@ func (s *Service) thumbFromPage(ctx context.Context, bookID string, n int) error
 	}
 	// A page thumbnail replaces an uploaded one: the upload flag goes too.
 	if _, err = s.DB.ExecContext(ctx, `UPDATE books SET thumbnail = ?, thumbnail_uploaded = 0 WHERE id = ? AND deleted_at IS NULL`, name, bookID); err != nil {
-		s.removeThumb(name)
+		s.RemoveThumb(name)
 		return err
 	}
-	s.removeThumb(oldThumb)
+	s.RemoveThumb(oldThumb)
 	// The file may be new under the same name: tell open screens either way.
 	var libID, seriesID string
 	if err := s.DB.QueryRowContext(ctx, `SELECT library_id, series_id FROM books WHERE id = ?`, bookID).Scan(&libID, &seriesID); err == nil {

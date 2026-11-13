@@ -452,11 +452,11 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		WHERE id = ? AND size_bytes = ? AND mtime = ? AND deleted_at IS NULL`,
 		len(a.Pages), keep, thumb, coverChanged, a.CoverPage, ts, bookID, v.size, v.mtime)
 	if err != nil {
-		s.removeThumb(thumb)
+		s.RemoveThumb(thumb)
 		return "", nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		s.removeThumb(thumb)
+		s.RemoveThumb(thumb)
 		return seriesID, nil, nil // rescanned meanwhile; the next analysis takes it
 	}
 	if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id = ?`, bookID); err != nil {
@@ -481,11 +481,11 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 		}
 	}
 	if err := tx.Commit(); err != nil {
-		s.removeThumb(thumb)
+		s.RemoveThumb(thumb)
 		return "", nil, err
 	}
 	if !keep {
-		s.removeThumb(oldThumb) // replaced by thumb (or cleared when none was made)
+		s.RemoveThumb(oldThumb) // replaced by thumb (or cleared when none was made)
 	}
 	s.bookChanged(l.id, seriesID, bookID, "ready")
 	return seriesID, ci, nil

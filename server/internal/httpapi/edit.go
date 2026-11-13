@@ -5,8 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"os"
-	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -571,7 +569,7 @@ func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (Emp
 	// Files go only after the rows are gone. A file left behind is harmless
 	// (its name is unique to a removed book), so errors are ignored.
 	for _, name := range thumbs {
-		_ = os.Remove(filepath.Join(s.Library.ThumbDir, filepath.Base(name)))
+		s.Library.RemoveThumb(name)
 	}
 	return EmptyTrash200JSONResponse(res), nil
 }
