@@ -1,8 +1,8 @@
 /* Glow: the only light in an otherwise flat design (adopted after the
    exp/glow trial; the flat version is tag design/flat-v1). It stays on the
    night chart: light comes only from what the chart would light — the
-   cyan "you are here" dot like a beacon, the violet route already travelled,
-   the one call to action, the compass needle catching starlight. Surfaces,
+   blue "you are here" dot like a beacon, the red route already travelled,
+   the one call to action, the login compass needle catching starlight. Surfaces,
    text and chrome stay flat. Dots and small marks use filter: drop-shadow so
    their rings (box-shadow) survive; the CTA uses box-shadow because its hover
    already animates filter. */
@@ -37,18 +37,18 @@
 }
 
 /* The one call to action. Kept off while focused so the focus ring shows. */
-a.bg-brand:not(:focus-visible),
-button.bg-brand:not(:focus-visible) {
+a.bg-brand-fill:not(:focus-visible),
+button.bg-brand-fill:not(:focus-visible) {
   box-shadow:
-    0 0 0 1px color-mix(in oklab, var(--brand) 60%, white 0%),
+    0 0 0 1px color-mix(in oklab, var(--brand-fill) 60%, white 0%),
     0 0 22px -2px var(--glow-brand),
     0 10px 32px -6px var(--glow-brand);
   transition-property: filter, transform, box-shadow;
 }
-a.bg-brand:not(:focus-visible):hover,
-button.bg-brand:not(:focus-visible):hover {
+a.bg-brand-fill:not(:focus-visible):hover,
+button.bg-brand-fill:not(:focus-visible):hover {
   box-shadow:
-    0 0 0 1px var(--brand),
+    0 0 0 1px var(--brand-fill),
     0 0 28px 2px var(--glow-brand),
     0 10px 36px -6px var(--glow-brand);
 }
@@ -63,7 +63,7 @@ button.bg-brand:not(:focus-visible):hover {
   filter: drop-shadow(0 0 10px var(--glow-star));
 }
 
-/* A lifted cover throws violet light on the chart below it. */
+/* A lifted cover throws red light on the chart below it. */
 @media (hover: hover) {
   .group:hover [data-cover-lift] {
     filter: drop-shadow(0 12px 22px var(--glow-brand-soft));
@@ -71,6 +71,6 @@ button.bg-brand:not(:focus-visible):hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  a.bg-brand,
-  button.bg-brand { transition-property: filter; }
+  a.bg-brand-fill,
+  button.bg-brand-fill { transition-property: filter; }
 }

@@ -10,7 +10,7 @@ function applyTheme(t: Theme) {
   root.style.colorScheme = t;
   // The browser / installed app's title bar takes the page ground (the
   // --background tokens in styles/tokens.css, as hex).
-  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "dark" ? "#09080e" : "#f6f6fa");
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", t === "dark" ? "#0c0807" : "#f9f6f5");
 }
 
 // Where the wipe starts: the element that asked for it, else the last pointer

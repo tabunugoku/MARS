@@ -3,7 +3,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 
 // Progress drawn as one row of dots, like a route on a chart: read dots are
-// violet, the current position is one cyan dot ("you are here"), the rest are
+// red, the current position is one blue dot ("you are here"), the rest are
 // faint. The row holds as many dots as fit its width (never more than `max`,
 // e.g. a book's page count), and `percent` (0..100) colours that share of
 // them. Dots fill in left to right on mount (a short stagger), once.

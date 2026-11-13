@@ -65,7 +65,7 @@ export function SelectTile({
             aria-hidden
             className={cn(
               "pointer-events-none absolute left-2 top-2 z-20 flex size-6 items-center justify-center rounded-full border-2 transition-colors duration-160",
-              selected ? "border-brand bg-brand text-brand-foreground" : "border-foreground/60 bg-background/80",
+              selected ? "border-brand-fill bg-brand-fill text-brand-foreground" : "border-foreground/60 bg-background/80",
             )}
           >
             {selected && <Check size={14} strokeWidth={2.5} />}

@@ -841,8 +841,8 @@ function WebtoonView({
   );
 }
 
-/** The page slider drawn as a route of dots: violet up to the current page,
- *  a cyan dot where you are, faint dots ahead. Runs in reading direction (RTL
+/** The page slider drawn as a route of dots: red up to the current page,
+ *  a blue dot where you are, faint dots ahead. Runs in reading direction (RTL
  *  books fill from the right). The real control is a native range input laid
  *  over it at opacity 0, so keyboard, touch and screen readers keep working. */
 function DotRail({ value, max, rtl, onChange }: { value: number; max: number; rtl: boolean; onChange: (page: number) => void }) {

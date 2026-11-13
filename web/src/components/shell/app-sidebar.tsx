@@ -103,7 +103,7 @@ function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconCompo
   return (
     <SidebarMenuItem className="relative">
       {/* The span is an invisible anchor in the gutter (its ref tells which
-          sidebar copy this row is in). Only the cyan "you are here" dot is
+          sidebar copy this row is in). Only the blue "you are here" dot is
           drawn, gliding to the current row. */}
       <span ref={gutter} aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1" />
       {active && copy && (

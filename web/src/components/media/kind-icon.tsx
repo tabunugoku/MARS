@@ -1,4 +1,4 @@
-// Library-kind tile: the kind's Keyline glyph in violet on a flat violet-tint
+// Library-kind tile: the kind's Keyline glyph in red on a flat red-tint
 // tile (no screentone: the dots made the small glyph hard to read). Used in the
 // admin library list and the libraries screen; navigation rows use the bare glyph.
 import type { Library } from "@/api";
