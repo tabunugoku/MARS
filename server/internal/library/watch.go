@@ -209,7 +209,7 @@ func (s *Service) Watch(ctx context.Context) {
 }
 
 func (s *Service) reconcileWatches(ctx context.Context, ws *watchSet) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id, root, watch, exclude FROM libraries`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, root, watch, exclude FROM libraries WHERE deleting = 0`)
 	if err != nil {
 		slog.Error("watch", "err", err)
 		return

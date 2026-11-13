@@ -91,3 +91,39 @@ func TestSearchRowsMigration(t *testing.T) {
 		t.Fatalf("author search: %q %v", ref, err)
 	}
 }
+
+// Migration 0012 adds libraries.deleting and rebuilds tasks for kind 'delete':
+// rows that exist before it must survive, and the new kind must be accepted.
+func TestDeletingMigrationKeepsTasks(t *testing.T) {
+	ctx := context.Background()
+	d, err := sql.Open("sqlite", "file:"+filepath.ToSlash(filepath.Join(t.TempDir(), "old.db")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	if err := migrateTo(ctx, d, 11); err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`INSERT INTO libraries (id, name, root, kind, created_at) VALUES ('L', 'L', '/x', 'manga', '')`,
+		`INSERT INTO tasks (id, kind, label, library_id, state, created_at, label_code, label_arg) VALUES ('T', 'scan', 'Scan L', 'L', 'done', '', 'task.scan', 'L')`,
+	} {
+		if _, err := d.Exec(q); err != nil {
+			t.Fatalf("%s: %v", q, err)
+		}
+	}
+	if err := Migrate(ctx, d); err != nil {
+		t.Fatal(err)
+	}
+	var kind, code string
+	var deleting int
+	if err := d.QueryRow(`SELECT t.kind, t.label_code, l.deleting FROM tasks t JOIN libraries l ON l.id = t.library_id WHERE t.id = 'T'`).Scan(&kind, &code, &deleting); err != nil {
+		t.Fatal(err)
+	}
+	if kind != "scan" || code != "task.scan" || deleting != 0 {
+		t.Errorf("after migration: kind %q, label code %q, deleting %d", kind, code, deleting)
+	}
+	if _, err := d.Exec(`INSERT INTO tasks (id, kind, label, state, created_at) VALUES ('D', 'delete', 'Delete L', 'queued', '')`); err != nil {
+		t.Errorf("kind delete refused: %v", err)
+	}
+}

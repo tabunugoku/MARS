@@ -6,7 +6,9 @@ A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
 Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
-Current phase: **v1.0.0 released** (public repo and image, 2026-11-13).
+Current phase: **v1.0.0 withdrawn** (2026-11-14; release, tag and GHCR
+images deleted after large-library OOM and SQLITE_BUSY). The repo and site
+stay public; the next release follows a re-test on the real library.
 Distribution: `Dockerfile` (distroless/static), CI builds and smoke-tests the
 image, `release.yml` publishes amd64/arm64 images to GHCR on a `v*` tag; the
 site in `site/` deploys to GitHub Pages (`pages.yml`). Next: the phases in

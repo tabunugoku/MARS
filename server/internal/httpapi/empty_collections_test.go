@@ -39,6 +39,7 @@ func TestDeleteEmptyCollections(t *testing.T) {
 	// Deleting a library.
 	onlyCharlie := mk("only charlie", charlie)
 	c.json("DELETE", "/api/v1/libraries/"+f.libB.Id, nil, 204, nil)
+	f.e.waitLibraryGone(f.libB.Id)
 	if exists(onlyCharlie) {
 		t.Error("the collection of a deleted library's series is still there")
 	}
@@ -47,6 +48,7 @@ func TestDeleteEmptyCollections(t *testing.T) {
 	c.json("PATCH", "/api/v1/settings", map[string]any{"deleteEmptyCollections": false}, 200, nil)
 	onlyAlpha := mk("only alpha", alpha)
 	c.json("DELETE", "/api/v1/libraries/"+f.libA.Id, nil, 204, nil)
+	f.e.waitLibraryGone(f.libA.Id)
 	if !exists(onlyAlpha) || !exists(fresh) {
 		t.Errorf("setting off: only alpha %v, fresh %v; want both kept", exists(onlyAlpha), exists(fresh))
 	}

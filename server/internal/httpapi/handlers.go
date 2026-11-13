@@ -279,34 +279,30 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 }
 
 func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObject) (DeleteLibraryResponseObject, error) {
+	// Marking the library hides it at once; its rows go in the background,
+	// in small batches, so other writers do not wait for the whole library
+	// (see library.Service.QueueDelete).
 	tx, err := s.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback()
-	// The library's series go with it (ON DELETE CASCADE).
-	emptied, err := collectionsLosing(ctx, tx, `SELECT id FROM series WHERE library_id = ?`, req.LibraryId)
-	if err != nil {
-		return nil, err
-	}
-	res, err := tx.ExecContext(ctx, `DELETE FROM libraries WHERE id = ?`, req.LibraryId)
+	res, err := tx.ExecContext(ctx, `UPDATE libraries SET deleting = 1 WHERE id = ? AND deleting = 0`, req.LibraryId)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return DeleteLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
-	if err := dropEmptied(ctx, tx, emptied); err != nil {
-		return nil, err
-	}
-	if _, err := tx.ExecContext(ctx, `DELETE FROM search_rows WHERE library_id = ?`, req.LibraryId); err != nil {
-		return nil, err
-	}
 	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	if _, err := s.Library.QueueDelete(ctx, req.LibraryId); err != nil {
 		return nil, err
 	}
 	return DeleteLibrary204Response{}, nil
 }
+
 
 func (s *server) ScanLibrary(ctx context.Context, req ScanLibraryRequestObject) (ScanLibraryResponseObject, error) {
 	queue := s.Library.QueueScan
@@ -624,7 +620,8 @@ func (s *server) ListMediaIssues(ctx context.Context, _ ListMediaIssuesRequestOb
 	rows, err := s.DB.QueryContext(ctx, `
 		SELECT id, CASE WHEN deleted_at IS NOT NULL THEN 'missing' ELSE media_status END,
 		  CASE WHEN deleted_at IS NOT NULL THEN path ELSE path || ': ' || media_error END
-		FROM books WHERE deleted_at IS NOT NULL OR media_status IN ('error', 'unsupported')
+		FROM books WHERE (deleted_at IS NOT NULL OR media_status IN ('error', 'unsupported'))
+		  AND library_id IN (SELECT id FROM libraries WHERE deleting = 0)
 		ORDER BY path`)
 	if err != nil {
 		return nil, err

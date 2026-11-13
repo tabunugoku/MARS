@@ -142,11 +142,10 @@ Here are some examples of exclude patterns.
 
 ## Scanning
 
-MARS scans in three situations:
+MARS scans in two situations:
 
 - **Manual**: Select "Scan" (the refresh icon) in the library list.
 - **Scheduled**: Runs at the interval you set in the scan interval.
-- **At startup**: Each time the server starts, MARS scans all libraries once.
 
 You can check scan progress under Admin > Tasks.
 

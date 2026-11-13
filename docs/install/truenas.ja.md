@@ -2,6 +2,8 @@
 
 # TrueNAS SCALE への MARS のインストール
 
+> 次の版を公開するまで、この手順は使えません。公開イメージ `ghcr.io/tabunugoku/mars` を取り下げているためです。
+
 このガイドは **TrueNAS SCALE 25.10（Goldeye）** と、Docker ベースの Apps を対象としています。MARS が必要とする 2 つのデータセット、`apps` ユーザーの権限、そしてカスタムアプリをインストールする 2 つの方法（**Install via YAML** と **Custom App** フォーム）を説明します。どちらか一方を選んでください。どちらの方法でも、同じアプリになります。
 
 例では、プール名を `tank` としています。お使いの環境に合わせて、プール名とパスを置き換えてください。
@@ -83,12 +85,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
 ```
 
 イメージにはヘルスチェックが組み込まれています。サーバーが応答すると、アプリは正常と表示されます。ほかに設定する必要はありません。
 
-メモリの上限について。テストに使ったライブラリでは、最大で約 64 MiB でした。数万冊のライブラリでは、初回スキャン中にこれより多くのメモリを使います。**Installed** 画面でアプリのメモリ使用量を確認し、上限に近づいたら引き上げてください。
+メモリの上限について。MARS は、コンテナのメモリ上限からメモリの目標値を自動で決めます。大きなライブラリの初回スキャンでは、最も多くのメモリを使います。スキャン中にアプリが再起動する場合は、上限を引き上げてください。
 
 保存すると、アプリが起動します。
 
@@ -111,7 +113,7 @@ services:
 | Storage Configuration | Storage > Add | **Type** Host Path、**Host Path** `/mnt/tank/apps/mars`、**Mount Path** `/data` |
 | | Storage > Add | **Type** Host Path、**Host Path** `/mnt/tank/media/comics`、**Mount Path** `/comics`、**Read Only** をチェック |
 | | Storage > Add（任意） | **Type** Host Path、**Host Path** `/mnt/tank/apps/mars/cache`、**Mount Path** `/data/cache` |
-| Resources Configuration | Enable Resource Limits | チェックし、**Memory** に `512`（MB）を入力します。方法 A の注意を参照してください |
+| Resources Configuration | Enable Resource Limits | チェックし、**Memory** に `1024`（MB）を入力します。方法 A の注意を参照してください |
 
 **Entrypoint**、**Command**、環境変数は空のままにしてください。イメージには、すでに `MARS_DATA=/data` と `MARS_PORT=25600` が設定されています。
 

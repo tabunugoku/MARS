@@ -14,7 +14,8 @@ import (
 	"sort"
 	"strings"
 
-	_ "golang.org/x/image/webp" // decoder registration for DecodeConfig
+	_ "github.com/gen2brain/avif" // decoder registration for DecodeConfig
+	_ "golang.org/x/image/webp"   // decoder registration for DecodeConfig
 
 	"github.com/tabunugoku/mars/server/internal/archive"
 	"github.com/tabunugoku/mars/server/internal/natsort"
@@ -27,6 +28,7 @@ var imageTypes = map[string]string{
 	".png":  "image/png",
 	".gif":  "image/gif",
 	".webp": "image/webp",
+	".avif": "image/avif",
 }
 
 // isIgnored reports whether an entry is never a page or ComicInfo: macOS

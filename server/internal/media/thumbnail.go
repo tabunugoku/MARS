@@ -2,6 +2,7 @@ package media
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"image"
@@ -21,10 +22,11 @@ func Thumbnail(img []byte, maxW, maxH int, f Format) ([]byte, error) {
 	if maxW <= 0 || maxH <= 0 {
 		return nil, fmt.Errorf("media: thumbnail bounds %dx%d", maxW, maxH)
 	}
-	src, err := decodeChecked(img)
+	src, release, err := decodeChecked(context.Background(), img)
 	if err != nil {
 		return nil, fmt.Errorf("media: thumbnail: %w", err)
 	}
+	defer release()
 
 	b := src.Bounds()
 	w, h := b.Dx(), b.Dy()
@@ -50,10 +52,11 @@ func Thumbnail(img []byte, maxW, maxH int, f Format) ([]byte, error) {
 // (quality 85) at its own size. Transparent and palette images are
 // composited onto white. The pixel limit is checked before any decode.
 func ToJPEG(img []byte) ([]byte, error) {
-	src, err := decodeChecked(img)
+	src, release, err := decodeChecked(context.Background(), img)
 	if err != nil {
 		return nil, fmt.Errorf("media: to jpeg: %w", err)
 	}
+	defer release()
 	b := src.Bounds()
 	dst := image.NewRGBA(image.Rect(0, 0, b.Dx(), b.Dy()))
 	xdraw.Draw(dst, dst.Bounds(), image.White, image.Point{}, xdraw.Src)
@@ -65,16 +68,16 @@ func ToJPEG(img []byte) ([]byte, error) {
 	return out.Bytes(), nil
 }
 
-// decodeChecked decodes img after the pixel guard. An image over MaxPixels is
-// ErrTooLarge.
-func decodeChecked(img []byte) (image.Image, error) {
+// decodeChecked decodes img after the pixel guard, under the decode budget. An
+// image over MaxPixels is ErrTooLarge. The caller calls release once the image
+// is no longer used.
+func decodeChecked(ctx context.Context, img []byte) (image.Image, func(), error) {
 	if _, err := CheckPixels(bytes.NewReader(img), MaxPixels); errors.Is(err, ErrTooManyPixels) {
-		return nil, ErrTooLarge
+		return nil, nil, ErrTooLarge
 	} else if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	src, _, err := image.Decode(bytes.NewReader(img))
-	return src, err
+	return DecodeBudgeted(ctx, img)
 }
 
 // encode writes m in format f. AVIF uses speed 8 (of 0 to 10), the chosen

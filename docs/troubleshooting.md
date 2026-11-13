@@ -118,7 +118,7 @@ When you investigate a problem, look at lines marked `ERROR` or `WARN`. Lines wi
 
 Report bugs as [GitHub issues](https://github.com/tabunugoku/MARS/issues). The following information makes the cause easier to find.
 
-- The MARS version. It appears below the sign-in screen as "MARS" followed by the version number. If it does not appear, give the Docker image tag you use (for example, `1.0.0`).
+- The MARS version. It appears below the sign-in screen as "MARS" followed by the version number. If it does not appear, give the commit you built (for example, `main@abc1234`).
 - Your environment (Docker, TrueNAS SCALE, whether you use a reverse proxy, and so on)
 - The steps you took, and the result you expected and the result you got
 - The relevant lines from `docker logs mars`

@@ -39,14 +39,14 @@ func (s *server) coverWall(ctx context.Context) ([]LoginCover, error) {
 	case Covers:
 		query = `
 		SELECT s.id, s.title FROM series s
-		WHERE s.deleted_at IS NULL AND EXISTS (
+		WHERE s.deleted_at IS NULL AND s.library_id IN (SELECT id FROM libraries WHERE deleting = 0) AND EXISTS (
 		  SELECT 1 FROM books b WHERE b.series_id = s.id AND b.deleted_at IS NULL AND b.thumbnail != '')
 		ORDER BY s.created_at DESC, s.id LIMIT ?`
 	case BookCovers:
 		query = `
 		SELECT b.id, s.title || ' ' || b.title FROM books b
 		JOIN series s ON s.id = b.series_id
-		WHERE b.deleted_at IS NULL AND b.thumbnail != '' AND s.deleted_at IS NULL
+		WHERE b.deleted_at IS NULL AND b.thumbnail != '' AND s.deleted_at IS NULL AND b.library_id IN (SELECT id FROM libraries WHERE deleting = 0)
 		ORDER BY b.created_at DESC, b.id LIMIT ?`
 	default:
 		return out, nil

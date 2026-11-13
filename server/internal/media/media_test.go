@@ -256,3 +256,66 @@ func TestThumbnailTooLarge(t *testing.T) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
 	}
 }
+
+func TestAnalyzeAVIFOnlyBook(t *testing.T) {
+	dir := t.TempDir()
+	cover := encodedAs(t, FormatAVIF, 64, 96)
+	path := writeZip(t, filepath.Join(dir, "avif.cbz"), []zipEntry{
+		{"002.avif", encodedAs(t, FormatAVIF, 32, 48)},
+		{"001.avif", cover},
+	})
+
+	got, err := Analyze(path)
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	want := []Page{
+		{Number: 1, Entry: "001.avif", MediaType: "image/avif", Width: 64, Height: 96},
+		{Number: 2, Entry: "002.avif", MediaType: "image/avif", Width: 32, Height: 48},
+	}
+	if len(got.Pages) != len(want) {
+		t.Fatalf("got %d pages, want %d: %+v", len(got.Pages), len(want), got.Pages)
+	}
+	for i := range want {
+		if got.Pages[i] != want[i] {
+			t.Errorf("page %d = %+v, want %+v", i+1, got.Pages[i], want[i])
+		}
+	}
+	if !bytes.Equal(got.Cover, cover) {
+		t.Errorf("Cover does not equal 001.avif bytes (len %d)", len(got.Cover))
+	}
+	thumb, err := Thumbnail(got.Cover, 32, 48, FormatJPEG)
+	if err != nil {
+		t.Fatalf("cover thumbnail: %v", err)
+	}
+	if cfg, name, err := image.DecodeConfig(bytes.NewReader(thumb)); err != nil || name != "jpeg" || cfg.Width != 32 || cfg.Height != 48 {
+		t.Errorf("cover thumbnail = %v %q %v, want 32x48 jpeg", cfg, name, err)
+	}
+}
+
+func TestAnalyzeMixedAVIFAndJPEGKeepsNaturalOrder(t *testing.T) {
+	dir := t.TempDir()
+	path := writeZip(t, filepath.Join(dir, "mixed.cbz"), []zipEntry{
+		{"p10.avif", encodedAs(t, FormatAVIF, 20, 20)},
+		{"p2.jpg", jpegBytes(t, 30, 40)},
+		{"p1.avif", encodedAs(t, FormatAVIF, 64, 96)},
+	})
+
+	got, err := Analyze(path)
+	if err != nil {
+		t.Fatalf("Analyze: %v", err)
+	}
+	want := []Page{
+		{Number: 1, Entry: "p1.avif", MediaType: "image/avif", Width: 64, Height: 96},
+		{Number: 2, Entry: "p2.jpg", MediaType: "image/jpeg", Width: 30, Height: 40},
+		{Number: 3, Entry: "p10.avif", MediaType: "image/avif", Width: 20, Height: 20},
+	}
+	if len(got.Pages) != len(want) {
+		t.Fatalf("got %d pages, want %d: %+v", len(got.Pages), len(want), got.Pages)
+	}
+	for i := range want {
+		if got.Pages[i] != want[i] {
+			t.Errorf("page %d = %+v, want %+v", i+1, got.Pages[i], want[i])
+		}
+	}
+}

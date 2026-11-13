@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"image"
+	"image/jpeg"
+	"math/rand"
 	"testing"
 
 	"github.com/gen2brain/avif"
@@ -94,5 +96,57 @@ func TestToJPEGRejectsBadAndHugeInput(t *testing.T) {
 	huge := patchPNGSize(t, pngBytes(t, 4, 4), 20000, 20000)
 	if _, err := ToJPEG(huge); !errors.Is(err, ErrTooLarge) {
 		t.Fatalf("err = %v, want ErrTooLarge", err)
+	}
+}
+
+// realisticPage is a w x h page: a gradient with noise on every pixel, so the
+// encoders have real work to do.
+func realisticPage(w, h int) *image.RGBA {
+	rnd := rand.New(rand.NewSource(1))
+	img := image.NewRGBA(image.Rect(0, 0, w, h))
+	for y := 0; y < h; y++ {
+		for x := 0; x < w; x++ {
+			i := img.PixOffset(x, y)
+			img.Pix[i] = uint8((x*255/w + rnd.Intn(32)) & 0xff)
+			img.Pix[i+1] = uint8((y*255/h + rnd.Intn(32)) & 0xff)
+			img.Pix[i+2] = uint8((x + y + rnd.Intn(32)) & 0xff)
+			img.Pix[i+3] = 255
+		}
+	}
+	return img
+}
+
+// BenchmarkAVIFPageThumbnail makes a cover thumbnail (the scanner's size and
+// format) from one AVIF manga page. The page is encoded once, outside the
+// timed loop.
+func BenchmarkAVIFPageThumbnail(b *testing.B) {
+	var buf bytes.Buffer
+	if err := avif.Encode(&buf, realisticPage(1600, 2400), avif.Options{Quality: 60, Speed: 8}); err != nil {
+		b.Fatal(err)
+	}
+	page := buf.Bytes()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Thumbnail(page, 400, 600, FormatJPEG); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkJPEGPageThumbnail is BenchmarkAVIFPageThumbnail for a JPEG page of
+// the same size and quality.
+func BenchmarkJPEGPageThumbnail(b *testing.B) {
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, realisticPage(1600, 2400), &jpeg.Options{Quality: 60}); err != nil {
+		b.Fatal(err)
+	}
+	page := buf.Bytes()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Thumbnail(page, 400, 600, FormatJPEG); err != nil {
+			b.Fatal(err)
+		}
 	}
 }

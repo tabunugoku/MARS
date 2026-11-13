@@ -182,7 +182,7 @@ func (s *server) trashedSeries(ctx context.Context) ([]TrashedSeries, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT s.id, s.library_id,
 		CASE WHEN s.oneshot_file != '' THEN s.oneshot_file ELSE s.dir END, s.title, s.deleted_at,
 		(SELECT count(*) FROM books b WHERE b.series_id = s.id)
-		FROM series s WHERE s.deleted_at IS NOT NULL`)
+		FROM series s WHERE s.deleted_at IS NOT NULL AND s.library_id IN (SELECT id FROM libraries WHERE deleting = 0)`)
 	if err != nil {
 		return nil, err
 	}
@@ -208,7 +208,7 @@ func (s *server) trashedSeries(ctx context.Context) ([]TrashedSeries, error) {
 func (s *server) trashedBooks(ctx context.Context) ([]TrashedBook, error) {
 	rows, err := s.DB.QueryContext(ctx, `SELECT b.id, b.library_id, b.series_id, sr.title, b.path, b.title, b.deleted_at
 		FROM books b JOIN series sr ON sr.id = b.series_id
-		WHERE b.deleted_at IS NOT NULL AND sr.deleted_at IS NULL`)
+		WHERE b.deleted_at IS NOT NULL AND sr.deleted_at IS NULL AND b.library_id IN (SELECT id FROM libraries WHERE deleting = 0)`)
 	if err != nil {
 		return nil, err
 	}

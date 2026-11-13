@@ -21,6 +21,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gen2brain/avif"
 	"github.com/tabunugoku/mars/server/internal/auth"
 	"github.com/tabunugoku/mars/server/internal/library"
 	"github.com/tabunugoku/mars/server/internal/media"
@@ -612,6 +613,34 @@ func TestKomgaSeriesBooksReadyInNumberOrder(t *testing.T) {
 
 // ─── Pages and convert=png ───────────────────────────────────────────────────
 
+// TestKomgaConvertDecodesAVIF checks that the convert=png decoder reads an AVIF
+// page (registered by the media package) and that the result encodes as PNG.
+func TestKomgaConvertDecodesAVIF(t *testing.T) {
+	src := image.NewRGBA(image.Rect(0, 0, 64, 96))
+	for y := 0; y < 96; y++ {
+		for x := 0; x < 64; x++ {
+			src.Set(x, y, color.RGBA{uint8(x * 4), uint8(y * 2), 90, 255})
+		}
+	}
+	var buf bytes.Buffer
+	if err := avif.Encode(&buf, src, avif.Options{Quality: 60, Speed: 10}); err != nil {
+		t.Fatal(err)
+	}
+	img, release, err := komgaDecodePage(context.Background(), buf.Bytes())
+	if err != nil {
+		t.Fatalf("komgaDecodePage: %v", err)
+	}
+	defer release()
+	var out bytes.Buffer
+	if err := png.Encode(&out, img); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := png.DecodeConfig(&out)
+	if err != nil || cfg.Width != 64 || cfg.Height != 96 {
+		t.Errorf("converted AVIF page: %+v %v, want 64x96 PNG", cfg, err)
+	}
+}
+
 func TestKomgaPagesOneBasedAndConvert(t *testing.T) {
 	f := newKomgaFix(t)
 	r := komgaReader
@@ -679,10 +708,11 @@ func pngHeaderOnly(w, h uint32) []byte {
 
 func TestKomgaConvertGuards(t *testing.T) {
 	small := pngBytes(t, 3, 2, color.RGBA{1, 2, 3, 255})
-	img, err := komgaDecodePage(small)
+	img, release, err := komgaDecodePage(context.Background(), small)
 	if err != nil {
 		t.Fatalf("small page: %v", err)
 	}
+	defer release()
 	var out bytes.Buffer
 	if err := png.Encode(&out, img); err != nil {
 		t.Fatalf("small page encode: %v", err)
@@ -692,10 +722,10 @@ func TestKomgaConvertGuards(t *testing.T) {
 	}
 	// 6000 x 6000 is 36e6 pixels: over komgaConvertMaxPixels (32e6) though
 	// under media.MaxPixels, so it is refused from the header.
-	if _, err := komgaDecodePage(pngHeaderOnly(6000, 6000)); !errors.Is(err, errPageTooLarge) {
+	if _, _, err := komgaDecodePage(context.Background(), pngHeaderOnly(6000, 6000)); !errors.Is(err, errPageTooLarge) {
 		t.Fatalf("huge header: %v, want errPageTooLarge", err)
 	}
-	if _, err := komgaDecodePage([]byte("not an image")); !errors.Is(err, errPageFormat) {
+	if _, _, err := komgaDecodePage(context.Background(), []byte("not an image")); !errors.Is(err, errPageFormat) {
 		t.Fatalf("garbage: %v, want errPageFormat", err)
 	}
 }

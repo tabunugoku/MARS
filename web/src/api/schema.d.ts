@@ -89,7 +89,10 @@ export interface paths {
         get: operations["getLibrary"];
         put?: never;
         post?: never;
-        /** Forget a library (files on disk are not touched) */
+        /**
+         * Forget a library (files on disk are not touched)
+         * @description The library is hidden at once. Its books and series are removed in the background, in small batches, and the library is gone when that finishes; until then it is not listed and cannot be scanned or changed.
+         */
         delete: operations["deleteLibrary"];
         options?: never;
         head?: never;
