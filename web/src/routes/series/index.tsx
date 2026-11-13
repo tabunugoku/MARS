@@ -285,6 +285,18 @@ function SeriesPage({ id }: { id: string }) {
         ]
       : []),
   ];
+  // The More menu holds only what this user may do: editing and the admin
+  // tasks need an admin (the server refuses them otherwise).
+  const menu: { label: string; onSelect: () => void }[] = [
+    ...(isAdmin
+      ? [
+          { label: t("editMetadata"), onSelect: () => { setEditRun((r) => r + 1); setEditOpen(true); } },
+          { label: t("addToCollection"), onSelect: () => setAddOpen(true) },
+        ]
+      : []),
+    ...(canDownload && books.length > 0 ? [{ label: t("downloadAll"), onSelect: () => startDownload(seriesFileUrl(id)) }] : []),
+    ...(isAdmin ? [{ label: t("regenerate"), onSelect: regenerate }] : []),
+  ];
 
   const shown = order === "asc" ? books : [...books].reverse();
   const authors = series.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
@@ -351,24 +363,23 @@ function SeriesPage({ id }: { id: string }) {
             <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)} className="max-sm:shrink-0">
               {allRead ? t("markUnread") : t("markRead")}
             </Button>
-            <DropdownMenu>
-              <DropdownTrigger
-                render={
-                  <Button variant="secondary" className="max-sm:shrink-0 max-sm:px-2.5">
-                    <MoreHorizontal size={16} className="sm:hidden" />
-                    <span className="max-sm:sr-only">{t("more")}</span>
-                  </Button>
-                }
-              />
-              <DropdownContent align="start" sideOffset={4} className="w-56">
-                <MenuItem index={0} label={t("editMetadata")} onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
-                {isAdmin && <MenuItem index={1} label={t("addToCollection")} onSelect={() => setAddOpen(true)} />}
-                {canDownload && books.length > 0 && (
-                  <MenuItem index={isAdmin ? 2 : 1} label={t("downloadAll")} onSelect={() => startDownload(seriesFileUrl(id))} />
-                )}
-                {isAdmin && <MenuItem index={(isAdmin ? 2 : 1) + (canDownload && books.length > 0 ? 1 : 0)} label={t("regenerate")} onSelect={regenerate} />}
-              </DropdownContent>
-            </DropdownMenu>
+            {menu.length > 0 && (
+              <DropdownMenu>
+                <DropdownTrigger
+                  render={
+                    <Button variant="secondary" className="max-sm:shrink-0 max-sm:px-2.5">
+                      <MoreHorizontal size={16} className="sm:hidden" />
+                      <span className="max-sm:sr-only">{t("more")}</span>
+                    </Button>
+                  }
+                />
+                <DropdownContent align="start" sideOffset={4} className="w-56">
+                  {menu.map((item, i) => (
+                    <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
+                  ))}
+                </DropdownContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {series.summary && (
@@ -453,13 +464,15 @@ function SeriesPage({ id }: { id: string }) {
         </dl>
       </TabsPanel>
 
-      <EditDialog
-        key={editRun}
-        series={series}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSaved={(s) => setSaved(s)}
-      />
+      {isAdmin && (
+        <EditDialog
+          key={editRun}
+          series={series}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSaved={(s) => setSaved(s)}
+        />
+      )}
       {isAdmin && <AddToCollectionDialog seriesId={id} open={addOpen} onOpenChange={setAddOpen} />}
 
       <AnimatePresence>

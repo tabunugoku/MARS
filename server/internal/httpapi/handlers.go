@@ -278,14 +278,30 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 }
 
 func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObject) (DeleteLibraryResponseObject, error) {
-	res, err := s.DB.ExecContext(ctx, `DELETE FROM libraries WHERE id = ?`, req.LibraryId)
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+	// The library's series go with it (ON DELETE CASCADE).
+	emptied, err := collectionsLosing(ctx, tx, `SELECT id FROM series WHERE library_id = ?`, req.LibraryId)
+	if err != nil {
+		return nil, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM libraries WHERE id = ?`, req.LibraryId)
 	if err != nil {
 		return nil, err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return DeleteLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
-	if _, err := s.DB.ExecContext(ctx, `DELETE FROM search_rows WHERE library_id = ?`, req.LibraryId); err != nil {
+	if err := dropEmptied(ctx, tx, emptied); err != nil {
+		return nil, err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM search_rows WHERE library_id = ?`, req.LibraryId); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return DeleteLibrary204Response{}, nil

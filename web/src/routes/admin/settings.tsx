@@ -33,7 +33,6 @@ const m = defineMessages({
     sizeLarge: "大",
     sizeXlarge: "特大",
     thumbFormat: "形式",
-    webpLater: "WebP と AVIF は後で対応します",
     thumbNote: "新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。",
     auth: "認証",
     rememberDays: "ログイン保持の日数",
@@ -68,6 +67,7 @@ const m = defineMessages({
     settingsSaved: "設定を保存しました",
     collections: "コレクション",
     autoDeleteCollections: "空のコレクションを自動で削除する",
+    autoDeleteCollectionsNote: "ゴミ箱を空にしたときやライブラリを削除したときに、シリーズがひとつも残らなかったコレクションを削除します",
     deleteKeyTitle: "APIキーを削除しますか",
     deleteKeyBody: "「{name}」を使っているアプリは接続できなくなります。",
   },
@@ -85,7 +85,6 @@ const m = defineMessages({
     sizeLarge: "Large",
     sizeXlarge: "Extra large",
     thumbFormat: "Format",
-    webpLater: "WebP and AVIF will come later",
     thumbNote: "Applies to newly made thumbnails. To remake existing ones, use Regenerate covers on a series or library.",
     auth: "Authentication",
     rememberDays: "Days to stay signed in",
@@ -120,6 +119,7 @@ const m = defineMessages({
     settingsSaved: "Settings saved",
     collections: "Collections",
     autoDeleteCollections: "Delete empty collections automatically",
+    autoDeleteCollectionsNote: "When emptying the trash or deleting a library leaves a collection with no series, the collection is deleted too",
     deleteKeyTitle: "Delete this API key?",
     deleteKeyBody: "Apps using \"{name}\" will no longer be able to connect.",
   },
@@ -310,15 +310,11 @@ export default function Screen() {
               <FieldDescription>{t("thumbNote")}</FieldDescription>
             </Field>
             <Field>
+              {/* JPEG is the only format the server writes, so it is shown, not offered. */}
               <FieldLabel id="set-thumb-format">{t("thumbFormat")}</FieldLabel>
-              <RadioGroup
-                aria-labelledby="set-thumb-format"
-                value={cur.thumbnailFormat}
-                onValueChange={(v) => patch({ thumbnailFormat: v as ServerSettings["thumbnailFormat"] })}
-              >
-                <RadioItem index={0} value="jpeg" label="JPEG" />
-              </RadioGroup>
-              <FieldDescription>{t("webpLater")}</FieldDescription>
+              <p aria-labelledby="set-thumb-format" className={cn(typeClass("body"), "text-foreground")}>
+                JPEG
+              </p>
             </Field>
           </FieldGroup>
         </section>
@@ -452,11 +448,14 @@ export default function Screen() {
 
         <section>
           <SectionTitle>{t("collections")}</SectionTitle>
-          <Switch
-            label={t("autoDeleteCollections")}
-            checked={cur.deleteEmptyCollections}
-            onToggle={() => patch({ deleteEmptyCollections: !cur.deleteEmptyCollections })}
-          />
+          <Field>
+            <Switch
+              label={t("autoDeleteCollections")}
+              checked={cur.deleteEmptyCollections}
+              onToggle={() => patch({ deleteEmptyCollections: !cur.deleteEmptyCollections })}
+            />
+            <FieldDescription>{t("autoDeleteCollectionsNote")}</FieldDescription>
+          </Field>
         </section>
       </div>
 

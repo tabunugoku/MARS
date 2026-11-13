@@ -544,11 +544,19 @@ func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (Emp
 		return nil, err
 	}
 
+	emptied, err := collectionsLosing(ctx, tx, `SELECT id FROM series WHERE deleted_at IS NOT NULL`)
+	if err != nil {
+		return nil, err
+	}
+
 	var res TrashResult
 	if res.Books, err = execCount(ctx, tx, `DELETE FROM books WHERE deleted_at IS NOT NULL`); err != nil {
 		return nil, err
 	}
 	if res.Series, err = execCount(ctx, tx, `DELETE FROM series WHERE deleted_at IS NOT NULL`); err != nil {
+		return nil, err
+	}
+	if err := dropEmptied(ctx, tx, emptied); err != nil {
 		return nil, err
 	}
 	// Search rows for the removed rows (the sync keeps the rest current).
