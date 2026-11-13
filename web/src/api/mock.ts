@@ -555,6 +555,21 @@ export const mockApi: Api = {
   putBookPrefs: (id: string, p: ReaderPrefs) => savePrefs((all) => void (all.books[id] = p)),
   deleteBookPrefs: (id: string) => savePrefs((all) => void delete all.books[id]),
 
+  directories: (path = "") => {
+    if (path && !path.startsWith("/")) return fail(400, "絶対パスで指定してください");
+    const p = path.length > 1 ? path.replace(/\/+$/, "") : "/" + path.replace(/^\/+/, "");
+    if (db.unreadableFolders.includes(p)) return fail(400, "このフォルダは読めません");
+    const children = db.folderTree[p];
+    if (!children) return fail(404, "フォルダが見つかりません");
+    const parent = p === "/" ? null : p.slice(0, p.lastIndexOf("/")) || "/";
+    const child = (name: string) => (p === "/" ? `/${name}` : `${p}/${name}`);
+    return delay({
+      path: p,
+      parent,
+      directories: children.map((name) => ({ name, path: child(name), readable: !db.unreadableFolders.includes(child(name)) })),
+    });
+  },
+
   users: () => delay(db.users),
   createUser: (body) => {
     const u: User = {

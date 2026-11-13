@@ -38,6 +38,23 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/LoginScreen" }
+  /fs/directories:
+    get:
+      operationId: listDirectories
+      summary: Folders directly inside a server folder, for picking a library folder (administrators only)
+      description: |
+        Lists only folders, never files. Names starting with a dot are left out.
+        An empty path starts at the filesystem root.
+      parameters:
+        - { name: path, in: query, required: false, schema: { type: string }, description: "Absolute folder path on the server; empty for the root" }
+      responses:
+        "200":
+          description: The folder and the folders in it
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DirectoryListing" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
   /libraries:
     get:
       operationId: listLibraries
@@ -1284,6 +1301,22 @@ components:
     ScanInterval:
       type: string
       enum: ["off", hourly, daily, weekly]
+    DirectoryListing:
+      type: object
+      required: [path, directories]
+      properties:
+        path: { type: string, description: "The listed folder, cleaned and absolute" }
+        parent: { type: string, nullable: true, description: "The folder above it; null at the root" }
+        directories:
+          type: array
+          items: { $ref: "#/components/schemas/DirectoryEntry" }
+    DirectoryEntry:
+      type: object
+      required: [name, path, readable]
+      properties:
+        name: { type: string }
+        path: { type: string, description: "Absolute path of this folder" }
+        readable: { type: boolean, description: "Whether the server can list it (a library folder must be readable)" }
     Library:
       type: object
       required: [id, name, root, kind, seriesCount, bookCount, sizeBytes, lastScan, scanInterval, watch, importComicInfo, importLocalArtwork, exclude]

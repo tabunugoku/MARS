@@ -4,7 +4,7 @@ import { ApiError, query, request, requestPage } from "./http";
 import type {
   AdjacentBooks, ApiKey, ApiKeyCreated, Book, BookUpdate, Collection, CollectionCreate, CollectionUpdate,
   Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
-  ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
+  DirectoryListing, ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
   SeriesFacets, SeriesBulkUpdate, BookBulkUpdate, BulkResult, CblImportResult,
   SeriesUpdate, ServerSettings, SetupRequest, Task, TrashList, TrashResult, User, UserCreate, UserUpdate,
 } from "./types";
@@ -151,6 +151,8 @@ export const realApi = {
   deleteBookPrefs: (id: string) => request<void>("DELETE", `/me/reader-prefs/books/${enc(id)}`),
 
   // Administration
+  /** Folders under an absolute path (empty: the filesystem root), for picking a library folder. */
+  directories: (path?: string) => get<DirectoryListing>("/fs/directories" + query({ path: path || undefined })),
   users: () => get<User[]>("/users"),
   createUser: (body: UserCreate) => request<User>("POST", "/users", body),
   updateUser: (id: string, body: UserUpdate) => request<User>("PATCH", `/users/${enc(id)}`, body),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { RefreshCw, SquarePen, Bin } from "@keyline-icons/react";
 import { api, errorMessage, formatBytes, useApi, type Library, type LibraryCreate, type LibraryUpdate } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
@@ -25,6 +25,9 @@ import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
 import { ConfirmDialog, IconAction, TableSkeleton, relTime } from "./_parts";
+
+// Loaded on first use of 選ぶ / Browse, so the libraries chunk stays small.
+const FolderPicker = lazy(() => import("./folder-picker"));
 
 type Kind = Library["kind"];
 type Interval = Library["scanInterval"];
@@ -73,6 +76,7 @@ const m = defineMessages({
     editLibrary: "ライブラリを編集",
     name: "名前",
     folder: "フォルダ",
+    browse: "選ぶ",
     rootLocked: "フォルダは作成後に変更できません",
     rootHint: "サーバー上の絶対パス。Docker ではマウント先のパス（例: /comics）",
     typeField: "種別",
@@ -126,6 +130,7 @@ const m = defineMessages({
     editLibrary: "Edit library",
     name: "Name",
     folder: "Folder",
+    browse: "Browse",
     rootLocked: "The folder cannot be changed after creation",
     rootHint: "Absolute path on the server. In Docker, the mount path (for example /comics)",
     typeField: "Type",
@@ -199,6 +204,9 @@ export default function Screen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [removing, setRemoving] = useState<Library | null>(null);
   const [removeOpen, setRemoveOpen] = useState(false);
+  // The picker mounts on its first opening and then stays mounted, so its close animation runs.
+  const [browsed, setBrowsed] = useState(false);
+  const [browseOpen, setBrowseOpen] = useState(false);
 
   const set = (patch: Partial<LibForm>) => setForm((f) => ({ ...f, ...patch }));
   const openAdd = () => {
@@ -379,13 +387,26 @@ export default function Screen() {
             </Field>
             <Field>
               <FieldLabel htmlFor="lib-root">{t("folder")}</FieldLabel>
-              <Input
-                id="lib-root"
-                className="font-mono"
-                value={form.root}
-                disabled={dlg.id !== null}
-                onChange={(e) => set({ root: e.target.value })}
-              />
+              <div className="flex gap-2">
+                <Input
+                  id="lib-root"
+                  className="min-w-0 flex-1 font-mono"
+                  value={form.root}
+                  disabled={dlg.id !== null}
+                  onChange={(e) => set({ root: e.target.value })}
+                />
+                {dlg.id === null && (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setBrowsed(true);
+                      setBrowseOpen(true);
+                    }}
+                  >
+                    {t("browse")}
+                  </Button>
+                )}
+              </div>
               <FieldDescription>
                 {dlg.id ? t("rootLocked") : t("rootHint")}
               </FieldDescription>
@@ -487,6 +508,17 @@ export default function Screen() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {browsed && (
+        <Suspense fallback={null}>
+          <FolderPicker
+            open={browseOpen}
+            onOpenChange={setBrowseOpen}
+            initialPath={form.root.trim()}
+            onPick={(path) => set({ root: path })}
+          />
+        </Suspense>
+      )}
 
       <ConfirmDialog
         open={removeOpen}
