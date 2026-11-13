@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>MARS: A Reading Server</title>
+  <meta name="description" content="MARS is a lightweight, self-hosted server that lets you read your own manga and comics in any browser. No Java, no external database.">
+  <link rel="canonical" href="https://tabunugoku.github.io/MARS/">
+  <link rel="alternate" hreflang="en" href="https://tabunugoku.github.io/MARS/">
+  <link rel="alternate" hreflang="ja" href="https://tabunugoku.github.io/MARS/ja/">
+  <link rel="alternate" hreflang="x-default" href="https://tabunugoku.github.io/MARS/">
+
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="MARS">
+  <meta property="og:locale" content="en_US">
+  <meta property="og:locale:alternate" content="ja_JP">
+  <meta property="og:title" content="MARS: A Reading Server">
+  <meta property="og:description" content="MARS is a lightweight, self-hosted server that lets you read your own manga and comics in any browser. No Java, no external database.">
+  <meta property="og:url" content="https://tabunugoku.github.io/MARS/">
+  <meta property="og:image" content="https://tabunugoku.github.io/MARS/assets/shots/en-home.webp">
+  <meta property="og:image:alt" content="MARS home screen with a grid of series covers.">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="MARS: A Reading Server">
+  <meta name="twitter:description" content="MARS is a lightweight, self-hosted server that lets you read your own manga and comics in any browser. No Java, no external database.">
+  <meta name="twitter:image" content="https://tabunugoku.github.io/MARS/assets/shots/en-home.webp">
+
+  <link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&display=swap">
+  <link rel="stylesheet" href="assets/site.css">
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem("mars-theme");
+        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    })();
+  </script>
+  <script src="assets/site.js" defer></script>
+</head>
+<body id="top">
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="wrap header-inner">
+      <a class="brand" href="#top" aria-label="MARS, back to top">
+        <img src="assets/logo.svg" alt="" width="28" height="28">
+        <span>MARS</span>
+      </a>
+
+      <nav class="primary-nav" aria-label="Main">
+        <ul>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.md">Docs</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.md">API</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.md">Roadmap</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/releases">Releases</a></li>
+        </ul>
+      </nav>
+
+      <div class="header-tools">
+        <nav class="lang" aria-label="Language">
+          <a href="./" lang="en" aria-current="page"><span class="here-dot" aria-hidden="true"></span>English</a>
+          <a href="ja/" lang="ja">日本語</a>
+        </nav>
+        <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="Switch theme" title="Switch theme">
+          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16.5 12C16.5 14.4854 14.4854 16.5 12 16.5C9.5147 16.5 7.5 14.4854 7.5 12C7.5 9.5147 9.5147 7.5 12 7.5C14.4854 7.5 16.5 9.5147 16.5 12ZM20.5 12L22 12M18.0104 18.0104L19.0711 19.0711M12 20.5L12 22M5.9896 18.0104L4.9289 19.0711M3.5 12L2 12M5.9896 5.9896L4.9289 4.9289M12 3.5L12 2M18.0104 5.9896L19.0711 4.9289"/></svg>
+          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12C21 16.9706 16.9706 21 12 21C7.0294 21 3 16.9706 3 12C3 7.0294 7.0294 3 12 3C9.9618 5.5477 10.1652 9.2206 12.4723 11.5277C14.7794 13.8348 18.4523 14.0382 21 12Z"/></svg>
+        </button>
+        <a class="gh-link" href="https://github.com/tabunugoku/MARS">GitHub</a>
+        <button class="icon-btn menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-menu" aria-label="Menu">
+          <svg class="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 6H20M4 12H20M4 18H20"/></svg>
+          <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M7 7L17 17M17 7L7 17"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="mobile-menu" id="mobile-menu" hidden>
+      <ul>
+        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.md">Docs</a></li>
+        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.md">API</a></li>
+        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.md">Roadmap</a></li>
+        <li><a href="https://github.com/tabunugoku/MARS/releases">Releases</a></li>
+        <li><a href="https://github.com/tabunugoku/MARS">GitHub</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- 1. Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <h1 class="display" id="hero-title">
+            <span>Your manga.</span>
+            <span>Your server.</span>
+            <span>Your universe.</span>
+          </h1>
+          <p class="lead">MARS is a lightweight, self-hosted server that lets you read your own manga and comics in any browser. No Java, no external database.</p>
+          <div class="actions">
+            <a class="btn btn-primary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.md">Get started</a>
+            <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS">View on GitHub</a>
+          </div>
+          <div class="cmd">
+            <code id="docker-cmd">docker run -d -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</code>
+            <button class="copy-btn" type="button" data-copy aria-controls="docker-cmd" data-copied="Copied" aria-label="Copy command">
+              <svg class="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
+              <svg class="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12L9.66667 17L19 7"/></svg>
+              <span class="copy-tip" data-copy-label role="status"></span>
+            </button>
+          </div>
+        </div>
+
+        <figure class="window">
+          <img class="shot-dark" src="assets/shots/en-home.webp" alt="MARS home screen with a grid of series covers." width="1920" height="1200">
+          <img class="shot-light" src="assets/shots/en-home-light.webp" alt="MARS home screen in light theme with a grid of series covers." width="1920" height="1200" loading="lazy">
+        </figure>
+      </div>
+    </section>
+
+    <!-- 2. Features -->
+    <section class="section" aria-label="Features">
+      <div class="wrap">
+        <div class="feature-grid">
+          <article class="feature f1">
+            <div class="shot">
+              <img class="pos-top" src="assets/shots/en-library.webp" alt="Library screen listing manga series built from a folder." width="1920" height="1200" loading="lazy">
+            </div>
+            <div class="feature-body">
+              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 7C3 5.3431 4.3431 4 6 4L8.6716 4C9.202 4 9.7107 4.2107 10.0858 4.5858L11.4142 5.9142C11.7893 6.2893 12.298 6.5 12.8284 6.5L18 6.5C19.6569 6.5 21 7.8431 21 9.5L21 17C21 18.6569 19.6569 20 18 20L6 20C4.3431 20 3 18.6569 3 17Z"/></svg></span>
+              <h3 class="title-1">Point it at a folder</h3>
+              <p>CBZ, CBR (including RAR5), CB7 and PDF. Series and volumes come from your folder layout and ComicInfo.xml, and MARS can watch the folders to pick up new books on its own.</p>
+            </div>
+          </article>
+
+          <article class="feature f2">
+            <div class="shot">
+              <img class="pos-center" src="assets/shots/en-series.webp" alt="Series page with its volumes and reading progress." width="1920" height="1200" loading="lazy">
+            </div>
+            <div class="feature-body">
+              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 4L8 4C10.2091 4 12 5.7909 12 8C12 5.7909 13.7909 4 16 4L20 4C21.1046 4 22 4.8954 22 6L22 15C22 16.1046 21.1046 17 20 17L15 17C13.3431 17 12 18.3431 12 20C12 18.3431 10.6569 17 9 17L4 17C2.8954 17 2 16.1046 2 15L2 6C2 4.8954 2.8954 4 4 4ZM12 8L12 20"/></svg></span>
+              <h3 class="title-1">Made for how manga is read</h3>
+              <p>Right to left, two-page spreads and webtoon scrolling. Your place syncs across devices, and the next volume is one tap away when you finish.</p>
+            </div>
+          </article>
+
+          <article class="feature f3">
+            <div class="feature-body">
+              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M8 14H10C13.3137 14 16 16.6863 16 20C16 20.5523 15.5523 21 15 21H3C2.44772 21 2 20.5523 2 20C2 16.6863 4.68629 14 8 14ZM9 4C10.6569 4 12 5.34315 12 7C12 8.65685 10.6569 10 9 10C7.34315 10 6 8.65685 6 7C6 5.34315 7.34315 4 9 4ZM16 4C17.6569 4 19 5.34315 19 7C19 8.65685 17.6569 10 16 10M18.3333 14.4713C20.554 15.409 22 17.589 22 20C22 20.5523 21.5523 21 21 21"/></svg></span>
+              <h3 class="title-1">Share it, read it anywhere</h3>
+              <p>Choose which libraries each user can see and what they may do. OPDS 1.2 and a Komga-compatible API let you read from Mihon and OPDS apps too.</p>
+            </div>
+          </article>
+
+          <article class="feature f4">
+            <div class="feature-body">
+              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M22 12C22 17.5228 17.5228 22 12 22C6.4772 22 2 17.5228 2 12C2 6.4772 6.4772 2 12 2C17.5228 2 22 6.4772 22 12ZM12 12L12 7"/></svg></span>
+              <h3 class="title-1">Small and quick</h3>
+              <p>One Go binary and a Docker image of about 8 MiB. After scanning 109 books it used about 51 MiB of memory. Runs on amd64 and arm64.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. Reader moment -->
+    <section class="section reader-moment tone" aria-labelledby="reader-title">
+      <div class="wrap reader-grid">
+        <div class="section-head">
+          <h2 class="section-title" id="reader-title">Pages turn the way the book does</h2>
+          <p>Manga turns right to left, and spreads show the cover on its own. Webtoons scroll as one long strip, and you choose how pages fit and the background colour.</p>
+        </div>
+        <div>
+          <figure class="reader-window" id="reader-window">
+            <img src="assets/shots/en-reader.webp" alt="Reader showing a manga page, read right to left." width="1920" height="1200" loading="lazy">
+            <img src="assets/shots/en-reader-57.webp" alt="" width="1920" height="1200" loading="lazy">
+            <img src="assets/shots/en-reader-58.webp" alt="" width="1920" height="1200" loading="lazy">
+          </figure>
+          <div class="pager" aria-hidden="true"><span class="is-on"></span><span></span><span></span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. Phones -->
+    <section class="section" aria-labelledby="phones-title">
+      <div class="wrap phones-grid">
+        <div class="section-head">
+          <h2 class="section-title" id="phones-title">Add it to your home screen</h2>
+          <p>Open MARS over HTTPS and add it to the home screen of a phone or tablet to use it like an app.</p>
+        </div>
+        <div class="phones">
+          <figure class="phone"><img src="assets/shots/en-mobile-home.webp" alt="MARS home screen on a phone." width="780" height="1688" loading="lazy"></figure>
+          <figure class="phone"><img src="assets/shots/en-mobile-series.webp" alt="MARS series page on a phone." width="780" height="1688" loading="lazy"></figure>
+          <figure class="phone"><img src="assets/shots/en-mobile-reader.webp" alt="MARS reader on a phone." width="780" height="1688" loading="lazy"></figure>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. Get started -->
+    <section class="section" aria-labelledby="start-title">
+      <div class="wrap">
+        <h2 class="section-title" id="start-title">Start reading in three steps</h2>
+        <ol class="steps">
+          <li><span class="step-n" aria-hidden="true">1</span><p>Start the container with Docker.</p></li>
+          <li><span class="step-n" aria-hidden="true">2</span><p>Enter the setup token from the start-up log and create the administrator.</p></li>
+          <li><span class="step-n" aria-hidden="true">3</span><p>Add your manga folder as a library.</p></li>
+        </ol>
+        <div class="start-links">
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.md">Install with Docker</a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/truenas.md">Install on TrueNAS</a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/configuration.md">Configuration</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap footer-grid">
+      <div>
+        <a class="footer-brand" href="#top">
+          <img src="assets/logo.svg" alt="" width="32" height="32">
+          <span>MARS: A Reading Server</span>
+        </a>
+      </div>
+      <div class="footer-legal">
+        <ul class="footer-links">
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.md">Docs</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.md">API</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.md">Roadmap</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/releases">Releases</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS">GitHub</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/CHANGELOG.md">Changelog</a></li>
+          <li><a href="https://github.com/tabunugoku/MARS/blob/main/LICENSE">License</a></li>
+        </ul>
+        <p class="fineprint">Released under the MIT License.</p>
+        <p class="fineprint">Screenshots show invented sample data.</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

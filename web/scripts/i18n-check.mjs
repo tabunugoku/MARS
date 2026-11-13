@@ -1,5 +1,5 @@
 // Fails when Japanese text is left outside a defineMessages `ja:` block in
-// web/src (see docs/i18n.md). The files are parsed with the TypeScript
+// web/src (see docs/dev/i18n.md). The files are parsed with the TypeScript
 // compiler (the tsconfig.app.json program), so apostrophes in JSX text, URLs
 // and comments are handled as the compiler sees them. The invented mock data,
 // the mock client and the i18n module itself are skipped.
@@ -102,7 +102,7 @@ try {
 
 for (const line of report) console.log(line);
 if (bad) {
-  console.log(`\n${bad} line(s) with Japanese outside a defineMessages ja: block. See docs/i18n.md.`);
+  console.log(`\n${bad} line(s) with Japanese outside a defineMessages ja: block. See docs/dev/i18n.md.`);
   process.exit(1);
 }
 console.log("i18n:check OK");

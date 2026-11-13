@@ -28,7 +28,7 @@ import (
 	"github.com/tabunugoku/mars/server/internal/webui"
 )
 
-// version is set at build time: -ldflags "-X main.version=v0.1.0".
+// version is set at build time: -ldflags "-X main.version=v1.0.0".
 var version = "dev"
 
 func main() {

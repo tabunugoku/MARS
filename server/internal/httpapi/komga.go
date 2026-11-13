@@ -24,7 +24,7 @@ import (
 )
 
 // The Komga-shaped browse API for the Mihon/Tachiyomi Komga extension (see
-// docs/opds-komga.md). Every list reads series, books, read lists and
+// docs/dev/opds-komga-spec.md). Every list reads series, books, read lists and
 // collections through the same builders as the main API, so a caller only
 // ever sees what it may see; anything else is 404 (or left out of a list).
 //

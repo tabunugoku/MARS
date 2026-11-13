@@ -76,7 +76,7 @@ function ThemedToaster() {
   return <Toaster position="bottom-center" theme={theme} labels={{ region: t("notifications"), dismiss: t("dismiss") }} />;
 }
 
-// The signed-in user's language (see docs/i18n.md). It sits above the router,
+// The signed-in user's language (see docs/dev/i18n.md). It sits above the router,
 // so it asks once per page load on every route, the reader included. A
 // language change remounts the router below, but not this, so nothing repeats.
 function LocaleSync() {

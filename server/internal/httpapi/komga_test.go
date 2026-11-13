@@ -29,7 +29,7 @@ import (
 // The Komga-shaped API, tested through NewCompat with HTTP Basic sign-in.
 //
 // The field lists below are the contract the Mihon/Tachiyomi clients parse
-// (docs/opds-komga.md, "Komga-shaped API"): a field the client declares
+// (docs/dev/opds-komga-spec.md, "Komga-shaped API"): a field the client declares
 // without a default must be present, with the JSON type given here, even
 // when it is null or empty. Extra fields are allowed.
 

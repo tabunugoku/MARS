@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-// OPDS 1.2 catalog (see docs/opds-komga.md). Feeds are Atom documents built
+// OPDS 1.2 catalog (see docs/dev/opds-komga-spec.md). Feeds are Atom documents built
 // with encoding/xml. Series and books are read only through listSeries,
 // listBooks and oneSeries/oneBook, so the caller's libraries decide what
 // appears; collections and read lists keep their visibility rule.

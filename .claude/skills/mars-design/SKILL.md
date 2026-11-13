@@ -1,6 +1,6 @@
 ---
 name: mars-design
-description: MARS's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
+description: MARS's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/dev/screens/.
 ---
 
 # MARS design system
@@ -22,7 +22,7 @@ panels, headings, icons, secondary buttons).
 
 ## Before you write code
 
-1. Read the screen spec in `docs/screens/NN-*.md`. It lists the data, the
+1. Read the screen spec in `docs/dev/screens/NN-*.md`. It lists the data, the
    states and the files you may touch. Touch nothing else.
 2. Read the shared pieces you will compose (they are short):
    - `web/src/components/media/layout.tsx` — `Page`, `PageHeader`,
@@ -121,6 +121,6 @@ panels, headings, icons, secondary buttons).
 
 ## References
 
-`docs/design-references.md` explains which reference site informed which
+`docs/dev/design-references.md` explains which reference site informed which
 rule. Deeper craft for Fluid components:
 `~/.claude/skills/fluid-functionalism/references/craft.md`.

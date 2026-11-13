@@ -1,174 +1,125 @@
+English | [日本語](README.ja.md)
+
 # MARS
 
 **MARS: A Reading Server**
 
 *Your manga. Your server. Your universe.*
 
-A lightweight, self-hosted comic and manga server. One static Go binary
-(SQLite inside, web UI embedded) that scans your folders, builds series and
-books from them, and serves a reader to any browser. No Java, no external
-database.
+![MARS home screen](docs/screenshots/desktop-home.webp)
 
-- **Formats:** CBZ / ZIP, CBR / RAR (including RAR5 and solid archives) and
-  CB7 / 7z. A folder of archives is a series; `ComicInfo.xml` is imported
-  when present.
-- **Image:** `ghcr.io/tabunugoku/mars`, for `linux/amd64` and
-  `linux/arm64`, on distroless (no shell), running as uid 65532.
+MARS is a lightweight, self-hosted comic and manga server. A single static Go binary includes SQLite and the web UI. It scans your folders, builds series and books, and lets you read them in the reader from any browser. It needs neither Java nor an external database.
+
+## Key features
+
+### Library
+
+- Register multiple libraries by folder, and scan them manually, on a schedule, or at startup.
+- Watch files for changes and scan automatically.
+- A deep scan re-analyzes books whether or not their files have changed.
+- Supported formats are CBZ / ZIP, CBR / RAR (including RAR5), CB7 / 7z, and PDF.
+- A folder that contains archives becomes a series.
+- MARS reads `ComicInfo.xml` and the cover images in each folder, such as cover, folder, and poster.
+- Exclude patterns keep directories and files out of scans.
+- Edit metadata in the web UI. Lock a field to keep scans from overwriting it.
+- Deleted files go to the trash, and you can empty it later.
+- Thumbnails can be JPEG, WebP, or AVIF.
+
+### Reader
+
+- Read left to right, right to left, or vertically. You can also use continuous vertical scrolling, as in a webtoon, and two-page spreads.
+- Reading in incognito mode does not save your reading progress.
+- Your progress is saved, and you can continue to the next book.
+- Choose a background color: black, gray, or white.
+
+### Collections and read lists
+
+- Collections group series in a manual or automatic order.
+- Read lists group books. You can import CBL files.
+- Mark several books or series as read or unread at once.
+
+### Sharing and integrations
+
+- Create multiple users. Separate administrators from regular users.
+- Limit which users can access each library.
+- Issue API keys to use MARS from external apps.
+- OPDS 1.2 is supported. You can use it from e-book apps such as Panels, Chunky, and KyBook.
+- MARS provides a Komga-compatible API, which the Komga extension and tracker in Mihon use.
+- The UI updates in real time as the server changes (SSE).
+- Install MARS as a PWA on the home screen of your phone or tablet.
+- The UI is available in Japanese and English.
+
+### Operations
+
+- MARS runs as a single binary. The Docker image supports `linux/amd64` and `linux/arm64`.
+- See the progress of tasks on screen.
+- Regenerate thumbnails and re-analyze media.
+- View analysis errors and missing files in a list.
+- Download a book's file, or download a whole series as a ZIP.
 
 ## Quick start
+
+Run the following command on a system where Docker is available. Replace `/path/to/comics` with your comics folder.
 
 ```sh
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:latest
+  ghcr.io/tabunugoku/mars:1
 ```
 
-Open http://localhost:25600 and add a library pointing at `/comics`.
+1. Open http://localhost:25600 in your browser.
+2. On the first-time setup screen, enter the setup token and create the administrator account. Run this command to find the token:
 
-### docker compose
+   ```sh
+   docker logs mars 2>&1 | grep token=
+   ```
 
-```yaml
-services:
-  mars:
-    image: ghcr.io/tabunugoku/mars:latest
-    container_name: mars
-    restart: unless-stopped
-    ports:
-      - "25600:25600"
-    environment:
-      TZ: Asia/Tokyo
-    volumes:
-      - ./data:/data              # database, thumbnails, page cache
-      - /path/to/comics:/comics:ro
-```
+3. Go to Admin > Libraries, select **Add library**, enter `/comics` as the folder, and save.
 
-The container runs as uid/gid 65532. A named volume is writable out of the
-box; a bind-mounted data folder such as `./data` must be owned by that user:
+For more detail, see [Install with Docker](docs/install/docker.md). For TrueNAS SCALE, see [Install MARS on TrueNAS SCALE](docs/install/truenas.md).
 
-```sh
-mkdir -p data && sudo chown 65532:65532 data
-```
+## Documentation
 
-Comic folders only need to be readable (`:ro` is recommended).
-
-The image has a built-in health check (`mars healthcheck`), so `docker ps`
-shows the container as healthy once the server answers.
-
-On **TrueNAS SCALE**, see [docs/install/truenas.md](docs/install/truenas.md)
-(datasets, permissions for the `apps` user, and both install methods).
-
-### First-run setup
-
-Until an administrator exists, the sign-in page shows a setup form that asks
-for a one-time **setup token**. The server prints it on its first start and
-also writes it to `/data/setup-token`:
-
-```sh
-docker logs mars 2>&1 | grep token=
-# or, with a bind-mounted data folder:
-sudo cat ./data/setup-token
-```
-
-The image has no shell, so `docker exec … cat` does not work; use the log or
-the host side of the data folder (`docker cp mars:/data/setup-token .`
-also works for a named volume).
-The token is deleted once the administrator has been created.
-
-## Configuration
-
-| Variable | Default | Meaning |
-| --- | --- | --- |
-| `MARS_DATA` | `/data` in the image, `./data` otherwise | Database, thumbnails and page cache |
-| `MARS_PORT` | `25600` | Listen port |
-| `MARS_HOST` | all interfaces | Listen address, e.g. `127.0.0.1` |
-| `MARS_TRUSTED_PROXIES` | none | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For` is trusted |
-| `MARS_DEV` | unset | `1` serves the API only (the Vite dev server serves the UI) |
-
-## OPDS and Mihon
-
-Reader apps that speak OPDS (Panels, Chunky, KyBook) use
-`http://HOST:25600/opds/v1.2/catalog`. The Mihon Komga extension and tracker
-use `http://HOST:25600/komga`. Both are off by default: turn them on in
-設定 > サーバー, under 連携. Sign in with a MARS user name and password,
-or an API key. Details are in [docs/opds-komga.md](docs/opds-komga.md).
-
-## Installing on a phone or tablet (PWA)
-
-MARS is an installable web app: *Add to Home Screen* (iOS Safari) or
-*Install app* (Chrome, Edge, Android) opens it full screen with its own icon.
-The service worker caches only the app shell (scripts, styles, icons). It
-never stores book data, page images or reading progress, and it is not an
-offline mode.
-
-Browsers allow installation and service workers only on **HTTPS** (or on
-`localhost`). Over plain HTTP on the LAN, such as `http://192.168.1.10:25600`,
-MARS works the same in the browser but offers no installation; that is
-expected, not an error. To install it, put HTTPS in front:
-
-- **Tailscale** (simplest when the readers are already on your tailnet): in
-  the admin console enable *MagicDNS* and *HTTPS Certificates*, then on the
-  machine running Tailscale run
-  `tailscale serve --bg http://127.0.0.1:25600` (use the server's LAN
-  address instead if Tailscale runs in its own network namespace). Open
-  `https://<machine>.<tailnet>.ts.net` on the phone and install from there.
-- **A reverse proxy** (Caddy, Traefik, nginx …) with a certificate. It must
-  pass the original `Host` header and set `X-Forwarded-Proto: https`; with
-  nginx that means `proxy_set_header Host $http_host;` (not `$host`, which
-  drops a non-standard port such as `:8443` and makes sign-in fail) and
-  `proxy_set_header X-Forwarded-Proto $scheme;`. For the event stream
-  (`/api/v1/events`) turn response buffering off (`proxy_buffering off;`).
-  Set `MARS_TRUSTED_PROXIES` to the proxy's address.
-
-After an upgrade, the installed app picks up the new version on its next
-launch: page loads always go to the server first, and only a server that
-cannot be reached falls back to the cached shell.
+- [Documentation index](docs/README.md)
+- [Install with Docker](docs/install/docker.md)
+- [Install MARS on TrueNAS SCALE](docs/install/truenas.md)
+- [Configuration](docs/configuration.md)
+- [Libraries](docs/libraries.md)
+- [Reading](docs/reading.md)
+- [Users and permissions](docs/users.md)
+- [OPDS and the Komga-compatible API](docs/opds-komga.md)
+- [API](docs/api.md)
+- [Backup](docs/backup.md)
+- [Troubleshooting](docs/troubleshooting.md)
 
 ## Footprint
 
-Measured in CI (`.github/scripts/smoke-image.sh`): first-run setup, then a
-scan with thumbnails of a generated library (100 CBZ books of 12 pages, plus
-the CBR/CB7 test archives: 21 series, 109 books) on a GitHub-hosted runner.
+These values were measured in CI (`.github/scripts/smoke-image.sh`). After setup, the test scanned a generated library with 100 CBZ books (12 pages each) and test archives in CBR and CB7 formats, and created thumbnails. The result was 21 series and 109 books. The measurements ran on GitHub-hosted runners.
 
 | | linux/amd64 | linux/arm64 |
 | --- | --- | --- |
-| Image size (uncompressed) | 8.0 MiB | 7.5 MiB |
-| Memory after scan (`docker stats`) | 50.7 MiB | not measured |
-| Peak memory during scan (cgroup) | 64 MiB | not measured |
+| Image size (unpacked) | 8.0 MiB | 7.5 MiB |
+| Memory after scan (`docker stats`) | 50.7 MiB | Not measured |
+| Peak memory during scan (cgroup) | 64 MiB | Not measured |
 
 ## Building from source
 
-Needs Node 22 and Go (the version in `server/go.mod`). The binary is pure Go
-(`CGO_ENABLED=0`), so it cross-compiles anywhere.
+You need Node 22 and the Go version listed in `server/go.mod`. The binary is pure Go (`CGO_ENABLED=0`), so it cross-compiles to any platform.
 
 ```sh
-cd web && npm ci && npm run build:embed   # builds the UI into server/internal/webui/dist
+cd web && npm ci && npm run build:embed   # build the UI into server/internal/webui/dist
 cd ../server && CGO_ENABLED=0 go build -tags nodynamic -trimpath -ldflags="-s -w" -o mars ./cmd/mars
 ./mars
 ```
 
-Or build the image: `docker build -t mars .`
+To build the Docker image, run `docker build -t mars .`. For development steps, see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Development
+## Roadmap
 
-```sh
-# terminal 1: API only, data in server/data
-cd server && MARS_DEV=1 go run ./cmd/mars
-# terminal 2: UI with hot reload on http://localhost:5173, proxying /api to :25600
-cd web && npm run dev
-```
+Planned work is listed in [docs/roadmap.md](docs/roadmap.md).
 
-`npm run dev:mock` runs the UI on built-in sample data with no server.
-`go test ./...` (in `server/`) and `npm run build` (in `web/`) must pass.
-The API contract is `api/openapi.yaml`.
+## License
 
-## Releasing
-
-Push a version tag; `.github/workflows/release.yml` builds both architectures
-and pushes `X.Y.Z`, `X.Y` (and `X` from 1.0 on) and `latest` to GHCR.
-A new GHCR package starts private; make it public in the package settings.
-
-```sh
-git tag v0.1.0 && git push origin v0.1.0
-```
+MIT License. See [LICENSE](LICENSE) for details.

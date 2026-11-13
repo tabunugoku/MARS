@@ -21,7 +21,7 @@ import (
 // series' few books (books_series) and looks each up in read_progress by
 // primary key. With a plain JOIN and no statistics the planner started from
 // all of the user's progress rows instead, once per series: about 30 s for
-// /series at 2,500 series and 4,700 books read (docs/perf-large-library.md).
+// /series at 2,500 series and 4,700 books read (docs/dev/perf-large-library.md).
 
 const seriesCols = `s.id, s.library_id, s.title, s.title_sort, s.alternate_titles, s.status, s.summary, s.publisher,
 	s.reading_direction, s.age_rating, s.language, s.genres, s.tags, s.authors, s.total_book_count, s.locked_fields,

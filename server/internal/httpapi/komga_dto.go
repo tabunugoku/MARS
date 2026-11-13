@@ -8,7 +8,7 @@ import (
 
 // The Komga-shaped JSON types and their converters from our own DTOs. Field
 // names and types follow the Komga API as the Mihon/Tachiyomi extension and
-// the Mihon tracker parse it (docs/opds-komga.md, "Komga-shaped API"). Every
+// the Mihon tracker parse it (docs/dev/opds-komga-spec.md, "Komga-shaped API"). Every
 // field those clients read, or declare without a default, is present. Values
 // we do not keep (file dates, read-list and collection dates, lock flags) are
 // fixed placeholders: komgaEpoch for a date, false for a flag, "" or [] for

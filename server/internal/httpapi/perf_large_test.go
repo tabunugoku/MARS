@@ -1,6 +1,6 @@
 //go:build perf
 
-// Large-library measurements (docs/perf-large-library.md). Not part of the
+// Large-library measurements (docs/dev/perf-large-library.md). Not part of the
 // normal test run: build with -tags perf.
 //
 //	PERF_LIB=D:/perf/lib go test -tags perf -run TestPerfGenerate -timeout 2h ./internal/httpapi

@@ -1,0 +1,24 @@
+{
+  "name": "mars-promo",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Promo video for MARS, rendered with Remotion",
+  "scripts": {
+    "audio": "node scripts/audio.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render:en": "remotion render src/index.ts promo-en out/mars-promo-en.mp4",
+    "render:ja": "remotion render src/index.ts promo-ja out/mars-promo-ja.mp4",
+    "render": "npm run render:en && npm run render:ja"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.543",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "remotion": "4.0.543"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.8",
+    "typescript": "^5.9.3"
+  }
+}
