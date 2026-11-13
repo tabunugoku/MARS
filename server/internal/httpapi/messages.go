@@ -108,6 +108,7 @@ var messages = map[string]struct{ ja, en string }{
 	"server.page_unreadable":          {"ページを読めませんでした", "The page could not be read"},
 	"task.analyze":             {"%s の解析", "Analyze %s"},
 	"task.analyze_deep":        {"%s の詳細解析", "Deep analyze %s"},
+	"task.delete_library":      {"%s を削除", "Delete %s"},
 	"task.folder_unreadable":   {"フォルダを読めません", "Cannot read the folder"},
 	"task.internal_error":      {"内部エラーで中断しました", "Stopped by an internal error"},
 	"task.interrupted_restart": {"サーバーの再起動で中断しました", "Interrupted by a server restart"},

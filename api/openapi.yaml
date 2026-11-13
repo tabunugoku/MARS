@@ -110,6 +110,7 @@ paths:
     delete:
       operationId: deleteLibrary
       summary: Forget a library (files on disk are not touched)
+      description: The library is hidden at once. Its books and series are removed in the background, in small batches, and the library is gone when that finishes; until then it is not listed and cannot be scanned or changed.
       responses:
         "204": { description: Deleted }
         "404": { $ref: "#/components/responses/NotFound" }

@@ -16,6 +16,7 @@ MARS has two places for settings.
 | `MARS_HOST` | Empty (all interfaces) | The address to listen on, for example `127.0.0.1`. For details, see [Listen address](#listen-address) |
 | `MARS_TRUSTED_PROXIES` | None | The IP addresses or CIDR ranges of trusted reverse proxies. Separate several with commas. For details, see [Reverse proxy](#reverse-proxy) |
 | `MARS_DEV` | Not set | Set to `1` to serve only the API. The UI is served by the Vite dev server. This is a development setting |
+| `GOMEMLIMIT` | Set from the container limit | Set automatically when the container has a memory limit: three quarters of it. Set this variable to use your own value instead |
 
 Restart the server after you change an environment variable.
 

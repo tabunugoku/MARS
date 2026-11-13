@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 )
 
@@ -91,12 +92,37 @@ func (b *Batch) Flush() error {
 	held := time.Since(b.begun)
 	b.Commits++
 	b.Longest = max(b.Longest, held)
-	// Leave the lock free for as long as it was held. SQLite's lock is not
-	// fair: a writer kept waiting (busy_timeout) retries every 100ms or so,
-	// and back-to-back batches won nearly every race, so a progress write
-	// waited 2.4s behind a stream of 50ms transactions.
-	time.Sleep(held)
+	rest(held)
 	return nil
+}
+
+// rest leaves the write lock free for as long as a transaction held it.
+// SQLite's lock is not fair: a writer kept waiting (busy_timeout) retries
+// every 100ms or so, and back-to-back batches won nearly every race, so a
+// progress write waited 2.4s behind a stream of 50ms transactions.
+func rest(held time.Duration) { time.Sleep(held) }
+
+// Unit runs fn in one short write transaction on d, retrying it while the
+// database is busy (see RetryBusy), then rests as Flush does. fn must be safe
+// to run again. Use it for each batch of a long delete, so another writer
+// waits at most one batch.
+func Unit(ctx context.Context, d *sql.DB, fn func(tx *sql.Tx) error) error {
+	return RetryBusy(ctx, func() error {
+		tx, err := d.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		begun := time.Now()
+		if err := fn(tx); err != nil {
+			tx.Rollback()
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+		rest(time.Since(begun))
+		return nil
+	})
 }
 
 // Close rolls back the open transaction, if any. Call it (deferred) on
@@ -109,4 +135,23 @@ func (b *Batch) Close() {
 		b.tx.Rollback()
 		b.tx = nil
 	}
+}
+
+// RetryBusy runs fn again, for up to about 30 seconds, while it fails with
+// SQLITE_BUSY: a write that waited out busy_timeout behind a long writer is
+// retried whole, so fn must be safe to run again (a transaction that began
+// and failed, for instance). Other errors, and ctx ending, return at once.
+func RetryBusy(ctx context.Context, fn func() error) error {
+	var err error
+	for attempt := 1; attempt <= 6; attempt++ {
+		if err = fn(); err == nil || !strings.Contains(err.Error(), "database is locked") {
+			return err
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(time.Duration(attempt) * 2 * time.Second):
+		}
+	}
+	return err
 }

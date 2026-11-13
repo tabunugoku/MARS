@@ -85,15 +85,20 @@ func requireAdmin(f StrictHandlerFunc, op string) StrictHandlerFunc {
 // see. It returns an SQL condition on col (a library id column) and its
 // arguments. Every query that returns library content goes through it, and
 // anything outside the scope answers 404 as if it did not exist.
+//
+// Every caller also gets the libraries that are being deleted left out (see
+// library.Service.QueueDelete): they are gone for everyone until their last
+// rows go, administrators included.
 func libScope(ctx context.Context, col string) (string, []any) {
+	live := col + ` IN (SELECT id FROM libraries WHERE deleting = 0)`
 	u, ok := userFrom(ctx)
 	switch {
 	case !ok || u.ID == "":
 		return "0", nil
 	case u.IsAdmin() || u.AllLibraries:
-		return "1", nil
+		return "(" + live + ")", nil
 	}
-	return col + ` IN (SELECT library_id FROM user_libraries WHERE user_id = ?)`, []any{u.ID}
+	return "(" + live + " AND " + col + ` IN (SELECT library_id FROM user_libraries WHERE user_id = ?))`, []any{u.ID}
 }
 
 // visible reports whether the row id in table (books or series) exists, is

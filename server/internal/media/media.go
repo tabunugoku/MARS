@@ -29,7 +29,7 @@ const (
 type Page struct {
 	Number    int
 	Entry     string // archive entry name (data, never a filesystem path)
-	MediaType string // image/jpeg, image/png, image/gif, image/webp
+	MediaType string // image/jpeg, image/png, image/gif, image/webp, image/avif
 	Width     int
 	Height    int
 }

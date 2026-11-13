@@ -2,13 +2,25 @@
 
 # Docker でのインストール
 
-このページでは、Docker で MARS を動かす手順を説明します。イメージは `ghcr.io/tabunugoku/mars` で公開されています。
+このページでは、Docker で MARS を動かす手順を説明します。次の版では、公開イメージが再び利用できるようになる予定です。
 
 ## 必要なもの
 
 - Docker（Docker Engine または Docker Desktop）と、Docker Compose（任意）
 - マンガやコミックを置いたフォルダ
 - `linux/amd64` または `linux/arm64` の環境
+
+## イメージを作る
+
+公開イメージは取り下げているため、ソースコードからイメージを作ります。Git と Docker が必要です。
+
+```sh
+git clone https://github.com/tabunugoku/MARS.git
+cd MARS
+docker build -t mars .
+```
+
+作られるイメージの名前は `mars` です。以下の例では、このイメージを使います。
 
 ## docker run で起動する
 
@@ -17,7 +29,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:1
+  mars
 ```
 
 - `-v mars-data:/data` は、データベース、サムネイル、ページのキャッシュを保存します。`mars-data` は Docker が管理する名前付きボリュームです。
@@ -31,7 +43,7 @@ docker run -d --name mars \
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:1
+    image: mars
     container_name: mars
     restart: unless-stopped
     ports:
@@ -96,41 +108,32 @@ docker compose up -d
 
 イメージにはシェルが入っていないため、`docker exec` でファイルを読むことはできません。ログか `docker cp` を使ってください。
 
-## イメージのタグ
-
-タグによって、どのバージョンに追従するかが変わります。
-
-| タグ | 追従する範囲 | 使う場面 |
-| --- | --- | --- |
-| `1` | 1.x.y のすべて | 通常はこれを使います |
-| `1.0` | 1.0.x のすべて | 1.0 系の修正だけを受け取りたい場合 |
-| `1.0.0` | このバージョンだけ | 変更を一切受け取りたくない場合 |
-| `latest` | 最新の正式版 | メジャーバージョンが上がると、1.x から移ります |
-
-`1` を選ぶと、1.x の機能追加と修正を受け取れます。2.0 が出ても、`1` のタグは 1.x のまま変わりません。2.0 へ移るには、タグを `2` に変えて、このページの手順で作り直します。
-
 ## アップグレード
 
 アップグレードの前に、データをバックアップしてください。手順は [バックアップ](../backup.ja.md) を参照してください。
 
-docker run で起動している場合は、新しいイメージを取得してコンテナを作り直します。
+docker run で起動している場合は、ソースを更新してイメージを作り直し、コンテナを作り直します。
 
 ```sh
-docker pull ghcr.io/tabunugoku/mars:1
+cd MARS
+git pull
+docker build -t mars .
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:1
+  mars
 ```
 
 データは名前付きボリュームに残るため、作り直しても失われません。
 
-docker compose で起動している場合は、次のコマンドを実行します。
+docker compose で起動している場合は、ソースを更新してイメージを作り直し、コンテナを作り直します。
 
 ```sh
-docker compose pull
+cd MARS
+git pull
+docker build -t mars .
 docker compose up -d
 ```
 

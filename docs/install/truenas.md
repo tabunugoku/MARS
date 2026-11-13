@@ -2,6 +2,8 @@ English | [日本語](truenas.ja.md)
 
 # Install MARS on TrueNAS SCALE
 
+> This guide cannot be used until the next release: the published image `ghcr.io/tabunugoku/mars` has been withdrawn.
+
 This guide covers **TrueNAS SCALE 25.10 (Goldeye)** and its Docker-based Apps. It explains the two datasets MARS needs, the permissions for the `apps` user, and two ways to install the custom app: **Install via YAML** and the **Custom App** form. Choose one. Both methods produce the same app.
 
 The examples use a pool named `tank`. Replace the pool name and paths to match your system.
@@ -83,12 +85,12 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 1G
 ```
 
 The image includes a health check. When the server responds, the app shows as healthy. You do not need to set anything else.
 
-About the memory limit: in our test library, usage peaked at about 64 MiB. With a library of tens of thousands of books, the first scan uses more memory. Check the app's memory usage on the **Installed** screen, and raise the limit if it gets close to the limit.
+About the memory limit: MARS sets its own memory target from the container limit. The first scan of a large library uses the most memory. If the app restarts during a scan, raise the limit.
 
 When you save, the app starts.
 
@@ -111,7 +113,7 @@ Open **Apps > Discover Apps** and select **Custom App**. Enter the following.
 | Storage Configuration | Storage > Add | **Type** Host Path, **Host Path** `/mnt/tank/apps/mars`, **Mount Path** `/data` |
 | | Storage > Add | **Type** Host Path, **Host Path** `/mnt/tank/media/comics`, **Mount Path** `/comics`, check **Read Only** |
 | | Storage > Add (optional) | **Type** Host Path, **Host Path** `/mnt/tank/apps/mars/cache`, **Mount Path** `/data/cache` |
-| Resources Configuration | Enable Resource Limits | Check it and enter `512` (MB) for **Memory**. See the note under Method A |
+| Resources Configuration | Enable Resource Limits | Check it and enter `1024` (MB) for **Memory**. See the note under Method A |
 
 Leave **Entrypoint**, **Command**, and environment variables empty. The image already sets `MARS_DATA=/data` and `MARS_PORT=25600`.
 

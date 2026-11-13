@@ -6,6 +6,8 @@
 
 *Your manga. Your server. Your universe.*
 
+> v1.0.0 は、大きなライブラリで不具合が見つかったため取り下げました。修正した版を準備しています。それまでは、ソースからビルドして使ってください。
+
 ![MARS のホーム画面](docs/screenshots/desktop-home.ja.webp)
 
 MARS は軽量でセルフホストできるコミック・マンガのサーバーです。1 つの静的な Go バイナリに、SQLite と Web UI が含まれています。フォルダをスキャンしてシリーズと巻を作り、どのブラウザからでもリーダーで読めます。外部のデータベースは必要ありません。
@@ -14,7 +16,7 @@ MARS は軽量でセルフホストできるコミック・マンガのサーバ
 
 ### ライブラリ
 
-- フォルダ単位で複数のライブラリを登録し、手動・定期・起動時にスキャンできます。
+- フォルダ単位で複数のライブラリを登録し、手動または定期的にスキャンできます。
 - ファイルの変更を監視して、自動でスキャンできます。
 - 詳細スキャンで、ファイルの更新の有無にかかわらず再解析できます。
 - 対応形式は CBZ / ZIP、CBR / RAR（RAR5 を含む）、CB7 / 7z、PDF です。
@@ -59,14 +61,17 @@ MARS は軽量でセルフホストできるコミック・マンガのサーバ
 
 ## クイックスタート
 
-Docker が使える環境で、次のコマンドを実行します。`/path/to/comics` は、マンガのフォルダに置き換えてください。
+Docker が使える環境で、リポジトリを取得してイメージを作り、起動します。`/path/to/comics` は、マンガのフォルダに置き換えてください。
 
 ```sh
+git clone https://github.com/tabunugoku/MARS.git
+cd MARS
+docker build -t mars .
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:1
+  mars
 ```
 
 1. ブラウザで http://localhost:25600 を開きます。

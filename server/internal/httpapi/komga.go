@@ -17,7 +17,9 @@ import (
 	"github.com/tabunugoku/mars/server/internal/library"
 	"github.com/tabunugoku/mars/server/internal/media"
 
-	// Decoders for convert=png: the page formats MARS reads.
+	// Decoders for convert=png: the page formats MARS reads. AVIF is
+	// registered with image.RegisterFormat by the media package (thumbnail.go),
+	// which this file imports, so image.Decode reads it too.
 	_ "golang.org/x/image/webp"
 	_ "image/gif"
 	_ "image/jpeg"
@@ -674,22 +676,27 @@ var (
 
 // komgaDecodePage checks the header of a page and decodes it for conversion.
 // The header is read first, so a page over komgaConvertMaxPixels is refused
-// before any pixel is decoded. The caller encodes the image.
-func komgaDecodePage(data []byte) (image.Image, error) {
+// before any pixel is decoded. The decode holds the process decode budget
+// until the caller calls release, after it has encoded the image. A context
+// that ends while waiting for the budget returns ctx.Err().
+func komgaDecodePage(ctx context.Context, data []byte) (image.Image, func(), error) {
 	if len(data) > media.MaxEntryBytes {
-		return nil, errPageTooLarge
+		return nil, nil, errPageTooLarge
 	}
 	if _, err := media.CheckPixels(bytes.NewReader(data), komgaConvertMaxPixels); err != nil {
 		if errors.Is(err, media.ErrTooManyPixels) {
-			return nil, errPageTooLarge
+			return nil, nil, errPageTooLarge
 		}
-		return nil, errPageFormat
+		return nil, nil, errPageFormat
 	}
-	img, _, err := image.Decode(bytes.NewReader(data))
+	img, release, err := media.DecodeBudgeted(ctx, data)
 	if err != nil {
-		return nil, errPageFormat
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		return nil, nil, errPageFormat
 	}
-	return img, nil
+	return img, release, nil
 }
 
 // komgaPage serves page {page} (1-based) of a book. Without convert=png it is
@@ -729,7 +736,10 @@ func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.page_unreadable")
 		return
 	}
-	img, err := komgaDecodePage(data)
+	img, release, err := komgaDecodePage(ctx, data)
+	if ctx.Err() != nil {
+		return // the client left while the decode waited for the budget
+	}
 	switch {
 	case errors.Is(err, errPageTooLarge):
 		writeError(ctx, w, http.StatusUnprocessableEntity, "too_large.page_convert")
@@ -738,6 +748,7 @@ func (s *server) komgaPage(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusUnsupportedMediaType, "unsupported.page_convert")
 		return
 	}
+	defer release()
 	h := w.Header()
 	h.Set("Content-Type", "image/png")
 	h.Set("Cache-Control", "private, no-cache")

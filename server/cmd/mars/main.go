@@ -51,9 +51,20 @@ func main() {
 	}
 }
 
+// minDecodeBudget is the smallest decode budget set from a container limit.
+const minDecodeBudget = 64 << 20
+
 func run() error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Before any work starts: the Go memory target and the decode budget follow
+	// the container's memory limit when there is one.
+	if limit := applyMemoryLimit(os.Getenv, defaultCgroupFiles); limit > 0 {
+		budget := max(limit/3, minDecodeBudget)
+		media.SetDecodeBudget(budget)
+		slog.Info("decode budget", "bytes", budget)
+	}
 
 	cfg, err := config.Load()
 	if err != nil {

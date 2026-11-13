@@ -2,9 +2,27 @@
 
 All notable changes to MARS are listed here. Versions follow
 [Semantic Versioning](https://semver.org/). Docker images are published as
-`ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`.
+`ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
+once a release is out.
 
-## 1.0.0 — 2026-11-13
+## Unreleased
+
+### Changed
+
+- The server no longer scans every library when it starts. Libraries are scanned by hand, by their scan interval, when created, and by file watching.
+
+### Fixed
+
+- Books whose pages are AVIF images are read instead of reported as having no images.
+- The server no longer runs out of memory under a container memory limit while analysing many large pages: it sets its Go memory target from the limit and bounds how many images are decoded at once.
+- Deleting a large library no longer blocks other changes for minutes: the library disappears at once and its books are removed in the background in small batches.
+
+## 1.0.0 — 2026-11-13 (withdrawn)
+
+Withdrawn on 2026-11-14: testing on a large real library found the server
+running out of memory and blocking writes for minutes while deleting a
+library. The release, its tag and its images were removed; the fixes are
+listed under Unreleased.
 
 The first public release.
 

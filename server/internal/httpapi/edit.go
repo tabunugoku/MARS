@@ -245,7 +245,7 @@ func (s *server) UpdateSeries(ctx context.Context, req UpdateSeriesRequestObject
 	}
 	defer tx.Rollback()
 	var libraryID, locks string
-	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM series WHERE id = ? AND deleted_at IS NULL`, req.SeriesId).
+	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM series WHERE id = ? AND deleted_at IS NULL AND library_id IN (SELECT id FROM libraries WHERE deleting = 0)`, req.SeriesId).
 		Scan(&libraryID, &locks)
 	if errors.Is(err, sql.ErrNoRows) {
 		return UpdateSeries404JSONResponse{notFound(ctx, "not_found.series")}, nil
@@ -349,7 +349,7 @@ func (s *server) UpdateBook(ctx context.Context, req UpdateBookRequestObject) (U
 	}
 	defer tx.Rollback()
 	var libraryID, locks string
-	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM books WHERE id = ? AND deleted_at IS NULL`, req.BookId).
+	err = tx.QueryRowContext(ctx, `SELECT library_id, locked_fields FROM books WHERE id = ? AND deleted_at IS NULL AND library_id IN (SELECT id FROM libraries WHERE deleting = 0)`, req.BookId).
 		Scan(&libraryID, &locks)
 	if errors.Is(err, sql.ErrNoRows) {
 		return UpdateBook404JSONResponse{notFound(ctx, "not_found.book")}, nil

@@ -68,6 +68,12 @@ type Service struct {
 	coverLocks sync.Map     // book id -> ctxMutex; see coverLock
 	scans      scanGate     // every scan sync against PauseScans
 	watchDirty watchPending // per library: top-level entries a watcher saw change, not yet scanned
+
+	// deleteBatch is how many books or series one delete transaction removes
+	// (see QueueDelete); 0 means deleteBatchSize. deleteHook, when set, runs
+	// after each committed batch. Tests use both.
+	deleteBatch int
+	deleteHook  func()
 }
 
 // coverLock orders the writers of a book's cover: an analysis, a cover
@@ -98,7 +104,7 @@ func (s *Service) load(ctx context.Context, id string) (lib, error) {
 	var l lib
 	var excl string
 	err := s.DB.QueryRowContext(ctx,
-		`SELECT id, name, root, kind, scan_interval, import_comicinfo, import_local_artwork, exclude, last_scan FROM libraries WHERE id = ?`, id).
+		`SELECT id, name, root, kind, scan_interval, import_comicinfo, import_local_artwork, exclude, last_scan FROM libraries WHERE id = ? AND deleting = 0`, id).
 		Scan(&l.id, &l.name, &l.root, &l.kind, &l.interval, &l.importComicInfo, &l.importArtwork, &excl, &l.lastScan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return l, ErrNotFound
@@ -789,48 +795,17 @@ func (s *Service) ThumbnailPath(ctx context.Context, kind, id string) (string, e
 
 var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time.Hour, "weekly": 7 * 24 * time.Hour}
 
-// Schedule scans every library once at startup, then each library again
-// when its scan interval has passed. It returns when ctx is done.
+// Schedule runs the first check when the server starts, then one every
+// minute. Each check queues a scan of every library that is due: one never
+// scanned, or one whose scan interval has passed since last_scan. A library
+// with interval "off" is not scanned. Libraries are not
+// scanned just because the server starts. Schedule returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
 	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
 		slog.Error("reanalyse PDFs", "err", err)
 	}
-	tick := func(startup bool) {
-		rows, err := s.DB.QueryContext(ctx, `SELECT id, scan_interval, last_scan FROM libraries`)
-		if err != nil {
-			slog.Error("schedule", "err", err)
-			return
-		}
-		var ids []string
-		for rows.Next() {
-			var id, interval string
-			var last sql.NullString
-			if err := rows.Scan(&id, &interval, &last); err != nil {
-				continue
-			}
-			every, ok := intervals[interval]
-			switch {
-			case startup:
-				ids = append(ids, id)
-			case !ok:
-			case !last.Valid:
-				ids = append(ids, id)
-			default:
-				t, err := time.Parse(time.RFC3339Nano, last.String)
-				if err != nil || time.Since(t) >= every {
-					ids = append(ids, id)
-				}
-			}
-		}
-		rows.Close()
-		slices.Sort(ids)
-		for _, id := range ids {
-			if _, err := s.QueueScan(ctx, id); err != nil {
-				slog.Error("schedule scan", "library", id, "err", err)
-			}
-		}
-	}
-	tick(true)
+	s.queueDeletes(ctx)
+	s.queueDue(ctx)
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
 	for {
@@ -838,7 +813,42 @@ func (s *Service) Schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			tick(false)
+			s.queueDue(ctx)
+		}
+	}
+}
+
+// queueDue queues a scan for each library that is due (see Schedule).
+func (s *Service) queueDue(ctx context.Context) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT id, scan_interval, last_scan FROM libraries WHERE deleting = 0`)
+	if err != nil {
+		slog.Error("schedule", "err", err)
+		return
+	}
+	var ids []string
+	for rows.Next() {
+		var id, interval string
+		var last sql.NullString
+		if err := rows.Scan(&id, &interval, &last); err != nil {
+			continue
+		}
+		every, ok := intervals[interval]
+		switch {
+		case !ok:
+		case !last.Valid:
+			ids = append(ids, id)
+		default:
+			t, err := time.Parse(time.RFC3339Nano, last.String)
+			if err != nil || time.Since(t) >= every {
+				ids = append(ids, id)
+			}
+		}
+	}
+	rows.Close()
+	slices.Sort(ids)
+	for _, id := range ids {
+		if _, err := s.QueueScan(ctx, id); err != nil {
+			slog.Error("schedule scan", "library", id, "err", err)
 		}
 	}
 }

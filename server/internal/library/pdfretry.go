@@ -36,7 +36,8 @@ func (s *Service) ReanalysePDFsOnce(ctx context.Context) (int, error) {
 		return 0, nil
 	}
 
-	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT library_id FROM books WHERE `+pdfToReanalyse+` ORDER BY library_id`)
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT library_id FROM books WHERE `+pdfToReanalyse+
+		` AND library_id IN (SELECT id FROM libraries WHERE deleting = 0) ORDER BY library_id`)
 	if err != nil {
 		return 0, err
 	}

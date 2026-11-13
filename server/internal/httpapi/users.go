@@ -164,7 +164,7 @@ const takenMsg = "bad_request.name_taken"
 func checkLibraries(ctx context.Context, tx *sql.Tx, idList []string) (string, error) {
 	for _, id := range idList {
 		var one int
-		err := tx.QueryRowContext(ctx, `SELECT 1 FROM libraries WHERE id = ?`, id).Scan(&one)
+		err := tx.QueryRowContext(ctx, `SELECT 1 FROM libraries WHERE id = ? AND deleting = 0`, id).Scan(&one)
 		if errors.Is(err, sql.ErrNoRows) {
 			return "bad_request.unknown_library", nil
 		}

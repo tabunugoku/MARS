@@ -2,13 +2,25 @@ English | [日本語](docker.ja.md)
 
 # Install with Docker
 
-This page explains how to run MARS with Docker. The image is published at `ghcr.io/tabunugoku/mars`.
+This page explains how to run MARS with Docker. A published image will return with the next release.
 
 ## Requirements
 
 - Docker (Docker Engine or Docker Desktop), and Docker Compose (optional)
 - A folder that holds your manga or comics
 - A `linux/amd64` or `linux/arm64` system
+
+## Build the image
+
+The published image is withdrawn for now, so build the image from the source code. You need Git and Docker.
+
+```sh
+git clone https://github.com/tabunugoku/MARS.git
+cd MARS
+docker build -t mars .
+```
+
+This creates a local image named `mars`. The examples below use it.
 
 ## Start with docker run
 
@@ -17,7 +29,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:1
+  mars
 ```
 
 - `-v mars-data:/data` stores the database, thumbnails, and page cache. `mars-data` is a named volume that Docker manages.
@@ -31,7 +43,7 @@ Create a `docker-compose.yml` file.
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:1
+    image: mars
     container_name: mars
     restart: unless-stopped
     ports:
@@ -96,41 +108,32 @@ While no administrator exists, the login screen shows the first-time setup scree
 
 The image has no shell, so you cannot read files with `docker exec`. Use the log or `docker cp` instead.
 
-## Image tags
-
-The tag controls which versions you receive updates for.
-
-| Tag | Updates within | When to use |
-| --- | --- | --- |
-| `1` | All 1.x.y releases | Use this in most cases |
-| `1.0` | All 1.0.x releases | When you want only fixes in the 1.0 line |
-| `1.0.0` | This version only | When you do not want to receive any changes |
-| `latest` | The latest stable release | Moves off 1.x when a new major version is released |
-
-Choosing `1` gives you the feature additions and fixes in 1.x. Even when 2.0 is released, the `1` tag stays on 1.x. To move to 2.0, change the tag to `2` and recreate the container as described on this page.
-
 ## Upgrade
 
 Back up your data before you upgrade. See [Backup](../backup.md).
 
-If you started MARS with `docker run`, pull the new image and recreate the container.
+If you started MARS with `docker run`, update the source, build the image again, and recreate the container.
 
 ```sh
-docker pull ghcr.io/tabunugoku/mars:1
+cd MARS
+git pull
+docker build -t mars .
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:1
+  mars
 ```
 
 Your data stays in the named volume, so it is not lost when you recreate the container.
 
-If you use docker compose, run the following commands.
+If you use docker compose, update the source, build the image again, and recreate the container.
 
 ```sh
-docker compose pull
+cd MARS
+git pull
+docker build -t mars .
 docker compose up -d
 ```
 
