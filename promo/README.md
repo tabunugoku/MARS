@@ -22,7 +22,8 @@ captions are the original; the English captions are translations of them.
 
 Each scene overlaps the next by 8 frames. Every motion is a spring
 (`src/motion.ts`): mass, stiffness and damping come from the `feel` skill's
-vocabulary, so no motion has a hand-picked duration.
+vocabulary, so no motion has a hand-picked duration (the typed command
+advances at a steady rate of characters per frame).
 
 ## Files
 

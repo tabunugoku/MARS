@@ -63,7 +63,9 @@ const Ground: FC = () => (
 /** Fades a whole scene out on a soft spring over its last frames. */
 const Scene: FC<{ dur: number; children: ReactNode }> = ({ dur, children }) => {
   const f = useCurrentFrame();
-  const out = sp(f, "soft", dur - OVERLAP - 6);
+  // The soft spring needs about 25 frames to settle, so it starts early
+  // enough to reach zero before the Sequence ends.
+  const out = sp(f, "soft", dur - 26);
   return <AbsoluteFill style={{ opacity: 1 - out }}>{children}</AbsoluteFill>;
 };
 
