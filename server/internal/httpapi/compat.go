@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -91,12 +92,34 @@ func (s *server) compatGate(on func(ServerSettings) bool, cache *basicCache, nex
 		if r.Body != nil {
 			r.Body = http.MaxBytesReader(w, r.Body, compatBody)
 		}
+		// A browser sends the compat cookie, or Basic credentials it
+		// remembers, on a form posted from another page of the same site
+		// (SameSite=Lax lets those through). Native clients send neither
+		// Origin nor Sec-Fetch-Site, so they pass.
+		if !safeMethod(r.Method) && crossSiteBrowser(r) {
+			writeError(r.Context(), w, http.StatusForbidden, "forbidden.cross_site")
+			return
+		}
 		u, ok := s.compatUser(w, r, cache)
 		if !ok {
 			return // compatUser answered
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey, u)))
 	})
+}
+
+// crossSiteBrowser reports a browser request that did not come from a page of
+// this origin. Unlike sameOrigin, a request with neither header passes: that
+// is a native client, which carries no ambient credentials of a browser.
+func crossSiteBrowser(r *http.Request) bool {
+	if o := r.Header.Get("Origin"); o != "" {
+		u, err := url.Parse(o)
+		return err != nil || u.Host == "" || !strings.EqualFold(u.Host, r.Host)
+	}
+	if f := r.Header.Get("Sec-Fetch-Site"); f != "" {
+		return f != "same-origin" && f != "none"
+	}
+	return false
 }
 
 // compatUser finds the caller, or answers (401, 429, 503, 500) and returns

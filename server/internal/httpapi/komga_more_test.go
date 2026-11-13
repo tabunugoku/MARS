@@ -239,6 +239,25 @@ func TestKomgaSeriesProgressWrites(t *testing.T) {
 		}
 	}
 
+	// A form posted from another page of the same site carries the
+	// browser's credentials; it is refused and nothing changes.
+	for _, h := range [][2]string{{"Origin", "http://other.example:8080"}, {"Sec-Fetch-Site", "same-site"}, {"Sec-Fetch-Site", "cross-site"}} {
+		req := httptest.NewRequest("POST", target+f.alpha.Id+"/read-progress", strings.NewReader(""))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set(h[0], h[1])
+		req.SetBasicAuth(komgaReader.mail, komgaReader.pass)
+		rec := httptest.NewRecorder()
+		f.h.ServeHTTP(rec, req)
+		if rec.Code != 403 {
+			t.Errorf("POST with %s: %s: status %d, want 403", h[0], h[1], rec.Code)
+		}
+	}
+	for _, b := range f.alphaBooks {
+		if p := f.coreBook(komgaReader, b.Id).Progress; p != nil && p.Completed {
+			t.Errorf("book %s after a cross-site POST: progress %+v", b.Id, p)
+		}
+	}
+
 	// Beta is another library's series.
 	wantCode(f, komgaReader, "POST", target+f.beta.Id+"/read-progress", "", 404)
 	wantCode(f, komgaReader, "DELETE", target+f.beta.Id+"/read-progress", "", 404)
