@@ -124,7 +124,7 @@ const m = defineMessages({
     pageOf: "{page} / {total} pages",
     progress: "Reading progress",
     openInBrowser: "Open in browser",
-    continueReading: "Continue reading",
+    continueReading: "Resume",
     startReading: "Read",
     readFromStart: "Read from start",
     markUnread: "Mark as unread",

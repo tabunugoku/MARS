@@ -82,7 +82,7 @@ const m = defineMessages({
     markedUnread: "Marked as unread",
     thumbnailsStarted: "Thumbnail regeneration started",
     readAgain: "Read again",
-    continueReading: "Continue reading",
+    continueReading: "Resume",
     readFromFirst: "Read from book 1",
     markUnread: "Mark as unread",
     markRead: "Mark as read",

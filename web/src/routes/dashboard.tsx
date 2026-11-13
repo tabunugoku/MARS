@@ -47,7 +47,7 @@ const m = defineMessages({
     lastRead: "Last read",
     readingProgress: "Reading progress",
     pagesLeft: ({ left }) => `${left} pages left`,
-    resume: "Continue reading",
+    resume: "Resume",
     bookDetails: "Book details",
   },
 });
