@@ -9,7 +9,7 @@ import (
 	"github.com/tabunugoku/mars/server/internal/task"
 )
 
-func TestRetryRefusedPDFsResetsOnlyPageRefusals(t *testing.T) {
+func TestReanalysePDFsOnce(t *testing.T) {
 	ctx := context.Background()
 	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
@@ -30,6 +30,7 @@ func TestRetryRefusedPDFsResetsOnlyPageRefusals(t *testing.T) {
 	books := []struct{ id, path, status, msg string }{
 		{"page", "Series/page.pdf", "unsupported", "archive: unsupported: PDF page 2 is not a single image"},
 		{"encrypted", "Series/encrypted.pdf", "unsupported", "archive: unsupported: encrypted PDF"},
+		{"ready", "Series/ready.pdf", "ready", ""},
 	}
 	for _, b := range books {
 		if _, err := conn.ExecContext(ctx, `INSERT INTO books
@@ -43,14 +44,14 @@ func TestRetryRefusedPDFsResetsOnlyPageRefusals(t *testing.T) {
 
 	// The queue is not run, so the analysis it queues does not touch the books.
 	s := &Service{DB: conn, Queue: task.New(conn, 1)}
-	n, err := s.RetryRefusedPDFs(ctx)
+	n, err := s.ReanalysePDFsOnce(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != 1 {
-		t.Fatalf("reset %d books, want 1", n)
+	if n != 2 {
+		t.Fatalf("reset %d books, want 2", n)
 	}
-	want := map[string]string{"page": "outdated", "encrypted": "unsupported"}
+	want := map[string]string{"page": "outdated", "encrypted": "unsupported", "ready": "outdated"}
 	for id, status := range want {
 		var got string
 		if err := conn.QueryRowContext(ctx, `SELECT media_status FROM books WHERE id = ?`, id).Scan(&got); err != nil {
@@ -61,8 +62,12 @@ func TestRetryRefusedPDFsResetsOnlyPageRefusals(t *testing.T) {
 		}
 	}
 
-	// Running it again finds nothing left to reset.
-	if n, err := s.RetryRefusedPDFs(ctx); err != nil || n != 0 {
+	// It runs once: a book refused again later (a page pdfium cannot read
+	// either) is not queued on every start.
+	if _, err := conn.ExecContext(ctx, `UPDATE books SET media_status = 'unsupported' WHERE id = 'page'`); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := s.ReanalysePDFsOnce(ctx); err != nil || n != 0 {
 		t.Errorf("second run = %d, %v; want 0, nil", n, err)
 	}
 }

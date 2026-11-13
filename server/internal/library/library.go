@@ -776,8 +776,8 @@ var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time
 // Schedule scans every library once at startup, then each library again
 // when its scan interval has passed. It returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
-	if _, err := s.RetryRefusedPDFs(ctx); err != nil {
-		slog.Error("retry refused PDFs", "err", err)
+	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
+		slog.Error("reanalyse PDFs", "err", err)
 	}
 	tick := func(startup bool) {
 		rows, err := s.DB.QueryContext(ctx, `SELECT id, scan_interval, last_scan FROM libraries`)
