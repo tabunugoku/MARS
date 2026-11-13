@@ -130,7 +130,7 @@ const m = defineMessages({
 function AddressRow({ url, copyLabel, onCopy }: { url: string; copyLabel: string; onCopy: (url: string) => void }) {
   return (
     <div className="flex items-center gap-1 rounded-lg bg-card py-1 pl-3 pr-1">
-      <code className="min-w-0 flex-1 select-all break-all font-mono text-foreground">{url}</code>
+      <code className={cn(typeClass("body"), "min-w-0 flex-1 select-all break-all font-mono text-foreground")}>{url}</code>
       <IconAction label={copyLabel} icon={Copy} onClick={() => onCopy(url)} />
     </div>
   );
@@ -438,7 +438,7 @@ export default function Screen() {
                     {t("keyNote", { name: createdKey.name })}
                   </p>
                   <div className="flex items-center gap-1">
-                    <code className="min-w-0 flex-1 break-all font-mono text-foreground">{createdKey.key}</code>
+                    <code className={cn(typeClass("body"), "min-w-0 flex-1 break-all font-mono text-foreground")}>{createdKey.key}</code>
                     <IconAction label={t("copy")} icon={Copy} onClick={() => void copyText(createdKey.key, t("keyCopied"))} />
                   </div>
                   <Button variant="ghost" onClick={() => setCreatedKey(null)}>
