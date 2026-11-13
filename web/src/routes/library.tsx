@@ -512,9 +512,9 @@ export default function Screen() {
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
         <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
-        {/* One row on a phone too: there Select and Filters show their icon
-            only (the label stays for screen readers), plus the filter count. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
+        {/* One row on a phone too: there the sort menu is only as wide as
+            its label and the buttons' padding is 12 px, so the labels fit. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           {/* Stays in place while selecting, pressed, so the controls beside
               it do not shift; pressing it again ends selection, like the
               bar's close button. */}
@@ -522,7 +522,7 @@ export default function Screen() {
             <Button
               variant={sel.active ? "primary" : "secondary"}
               aria-pressed={sel.active}
-              className="max-sm:gap-0 max-sm:px-2.5"
+              className="max-sm:px-3"
               onClick={() => {
                 if (sel.active) {
                   sel.exit();
@@ -534,11 +534,11 @@ export default function Screen() {
               }}
               leadingIcon={ListChecks as IconComponent}
             >
-              <span className="max-sm:sr-only">{t("select")}</span>
+              {t("select")}
             </Button>
           )}
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
-            <SelectTrigger aria-label={t("sortLabel")} />
+            <SelectTrigger aria-label={t("sortLabel")} className="max-sm:min-w-0" />
             <SelectContent>
               {SORTS.map((s, i) => (
                 <SelectItem key={s.value} index={i} value={s.value}>
@@ -562,14 +562,9 @@ export default function Screen() {
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((o) => !o)}
             leadingIcon={SlidersHorizontal as IconComponent}
-            className="max-sm:gap-0 max-sm:px-2.5"
+            className="max-sm:px-3"
           >
-            <span className="max-sm:sr-only">{filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}</span>
-            {filterCount > 0 && (
-              <span aria-hidden className="ml-1 font-mono tabular-nums sm:hidden">
-                {filterCount}
-              </span>
-            )}
+            {filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}
           </Button>
         </div>
       </div>
