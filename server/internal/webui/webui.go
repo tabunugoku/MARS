@@ -41,7 +41,7 @@ func Handler() http.Handler {
 func handler(root fs.FS) http.Handler {
 	if _, err := fs.Stat(root, "index.html"); err != nil {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			http.Error(w, "ComiNavi: this build has no web UI. Run `npm run build:embed` in web/ and rebuild.", http.StatusNotFound)
+			http.Error(w, "MARS: this build has no web UI. Run `npm run build:embed` in web/ and rebuild.", http.StatusNotFound)
 		})
 	}
 	files := http.FileServerFS(root)

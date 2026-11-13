@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 // newTestStore opens a fresh database and inserts a library and two users,

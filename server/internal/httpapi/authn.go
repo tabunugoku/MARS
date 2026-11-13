@@ -19,8 +19,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
-	"github.com/tabunugoku/cominavi/server/internal/ids"
+	"github.com/tabunugoku/mars/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/ids"
 )
 
 const (

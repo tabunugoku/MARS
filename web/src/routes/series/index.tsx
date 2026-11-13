@@ -2,7 +2,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { AnimatePresence } from "motion/react";
-import { ArrowDown, ArrowUp, ChevronLeft, Circle, CircleCheck, ListChecks, ListPlus, Play, Tag } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, ChevronLeft, Circle, CircleCheck, ListChecks, ListPlus, MoreHorizontal, Play, Tag } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, formatDate, seriesFileUrl, startDownload, statusLabel, useApi, type Series } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -82,7 +82,7 @@ const m = defineMessages({
     markedUnread: "Marked as unread",
     thumbnailsStarted: "Thumbnail regeneration started",
     readAgain: "Read again",
-    continueReading: "Continue reading",
+    continueReading: "Resume",
     readFromFirst: "Read from book 1",
     markUnread: "Mark as unread",
     markRead: "Mark as read",
@@ -285,6 +285,18 @@ function SeriesPage({ id }: { id: string }) {
         ]
       : []),
   ];
+  // The More menu holds only what this user may do: editing and the admin
+  // tasks need an admin (the server refuses them otherwise).
+  const menu: { label: string; onSelect: () => void }[] = [
+    ...(isAdmin
+      ? [
+          { label: t("editMetadata"), onSelect: () => { setEditRun((r) => r + 1); setEditOpen(true); } },
+          { label: t("addToCollection"), onSelect: () => setAddOpen(true) },
+        ]
+      : []),
+    ...(canDownload && books.length > 0 ? [{ label: t("downloadAll"), onSelect: () => startDownload(seriesFileUrl(id)) }] : []),
+    ...(isAdmin ? [{ label: t("regenerate"), onSelect: regenerate }] : []),
+  ];
 
   const shown = order === "asc" ? books : [...books].reverse();
   const authors = series.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
@@ -336,29 +348,38 @@ function SeriesPage({ id }: { id: string }) {
             <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
               <CountUp value={series.booksRead} /> {t("booksRead", { total })}
             </p>
-            <DotTrack total={series.bookCount} value={series.booksRead} label={t("progress")} />
+            <DotTrack percent={series.bookCount ? (series.booksRead / series.bookCount) * 100 : 0} max={series.bookCount} label={t("progress")} />
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* One row on a phone, as on the book page: there More shows its
+              icon only (the label stays for screen readers) and the main
+              action takes the rest of the row. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
             {primary && (
-              <BrandAction to={primary.to} icon={Play}>
+              <BrandAction to={primary.to} icon={Play} className="max-sm:flex-1">
                 {primary.label}
               </BrandAction>
             )}
-            <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)}>
+            <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)} className="max-sm:shrink-0">
               {allRead ? t("markUnread") : t("markRead")}
             </Button>
-            <DropdownMenu>
-              <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
-              <DropdownContent align="start" sideOffset={4}>
-                <MenuItem index={0} label={t("editMetadata")} onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
-                {isAdmin && <MenuItem index={1} label={t("addToCollection")} onSelect={() => setAddOpen(true)} />}
-                {canDownload && books.length > 0 && (
-                  <MenuItem index={isAdmin ? 2 : 1} label={t("downloadAll")} onSelect={() => startDownload(seriesFileUrl(id))} />
-                )}
-                {isAdmin && <MenuItem index={(isAdmin ? 2 : 1) + (canDownload && books.length > 0 ? 1 : 0)} label={t("regenerate")} onSelect={regenerate} />}
-              </DropdownContent>
-            </DropdownMenu>
+            {menu.length > 0 && (
+              <DropdownMenu>
+                <DropdownTrigger
+                  render={
+                    <Button variant="secondary" className="max-sm:shrink-0 max-sm:px-2.5">
+                      <MoreHorizontal size={16} className="sm:hidden" />
+                      <span className="max-sm:sr-only">{t("more")}</span>
+                    </Button>
+                  }
+                />
+                <DropdownContent align="start" sideOffset={4} className="w-56">
+                  {menu.map((item, i) => (
+                    <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
+                  ))}
+                </DropdownContent>
+              </DropdownMenu>
+            )}
           </div>
 
           {series.summary && (
@@ -378,11 +399,11 @@ function SeriesPage({ id }: { id: string }) {
                   to={`/libraries/${series.libraryId}?genre=${encodeURIComponent(g)}`}
                   className="touch-hit relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                 >
-                  <Badge variant="dot">{g}</Badge>
+                  <Badge variant="solid">{g}</Badge>
                 </Link>
               ))}
               {series.tags.map((tag) => (
-                <Badge key={tag} variant="dot">
+                <Badge key={tag} variant="solid">
                   {tag}
                 </Badge>
               ))}
@@ -443,13 +464,15 @@ function SeriesPage({ id }: { id: string }) {
         </dl>
       </TabsPanel>
 
-      <EditDialog
-        key={editRun}
-        series={series}
-        open={editOpen}
-        onOpenChange={setEditOpen}
-        onSaved={(s) => setSaved(s)}
-      />
+      {isAdmin && (
+        <EditDialog
+          key={editRun}
+          series={series}
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          onSaved={(s) => setSaved(s)}
+        />
+      )}
       {isAdmin && <AddToCollectionDialog seriesId={id} open={addOpen} onOpenChange={setAddOpen} />}
 
       <AnimatePresence>

@@ -13,7 +13,7 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 func testWriteFile(t *testing.T, root, rel string) {

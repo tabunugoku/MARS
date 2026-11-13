@@ -19,12 +19,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
-	"github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/media"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 func pngBytes(t *testing.T, w, h int, c color.Color) []byte {

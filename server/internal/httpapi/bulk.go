@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/scan"
 )
 
 // Bulk operations change or add many series, books or list members in one

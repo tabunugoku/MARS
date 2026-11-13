@@ -16,8 +16,8 @@ import (
 
 	_ "golang.org/x/image/webp" // decoder registration for DecodeConfig
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
-	"github.com/tabunugoku/cominavi/server/internal/natsort"
+	"github.com/tabunugoku/mars/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/natsort"
 )
 
 // imageTypes maps a lower-case extension to the media type served for it.

@@ -29,7 +29,7 @@ const m = defineMessages({
     addLibrary: "ライブラリを追加",
     lastRead: "前回の続き",
     readingProgress: "読書の進捗",
-    pagesLeft: ({ total, left }) => `${total} · 残り ${left} ページ`,
+    pagesLeft: ({ left }) => `残り ${left} ページ`,
     resume: "続きから読む",
     bookDetails: "巻の詳細",
   },
@@ -46,7 +46,7 @@ const m = defineMessages({
     addLibrary: "Add library",
     lastRead: "Last read",
     readingProgress: "Reading progress",
-    pagesLeft: ({ total, left }) => `${total} · ${left} pages left`,
+    pagesLeft: ({ left }) => `${left} pages left`,
     resume: "Resume",
     bookDetails: "Book details",
   },
@@ -146,8 +146,10 @@ export default function Screen() {
       <h1 className="sr-only">{t("home")}</h1>
 
       {hero && (
-        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone">
-          <div className="w-[96px] shrink-0 sm:w-[120px]">
+        // On phones the text column is too narrow for both buttons, so their
+        // row spans the card under the cover; wider, it stays in the column.
+        <section className="mb-10 grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-[12px] bg-card p-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:grid-rows-[1fr_auto] md:p-5 tone">
+          <div className="sm:row-span-2">
             <Cover src={hero.thumbnailUrl} title={heroSeriesTitle} label={String(hero.number)} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -161,19 +163,24 @@ export default function Screen() {
             </h2>
             <p className={cn(typeClass("body"), "line-clamp-2 text-muted-foreground")}>{hero.title}</p>
             <div className="mt-auto space-y-1.5 pt-3">
-              <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label={t("readingProgress")} />
-              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
-                P.<CountUp value={heroPage} /> / {t("pagesLeft", { total: hero.pageCount, left: hero.pageCount - heroPage })}
+              <DotTrack percent={heroPct} max={hero.pageCount} label={t("readingProgress")} />
+              {/* One line on a phone too: the smaller size there, and if the
+                  numbers are still too long it breaks only at the dot. */}
+              <p className={cn(typeClass("micro"), "font-mono text-muted-foreground sm:text-[length:var(--fs-caption,12px)] sm:leading-[var(--lh-caption,16px)]")}>
+                <span className="whitespace-nowrap">
+                  P.<CountUp value={heroPage} /> / {hero.pageCount} ·
+                </span>{" "}
+                <span className="whitespace-nowrap">{t("pagesLeft", { left: hero.pageCount - heroPage })}</span>
               </p>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <BrandAction to={`/read/${hero.id}`} icon={Play}>
-                {t("resume")}
-              </BrandAction>
-              <Button variant="secondary" asChild>
-                <Link to={`/books/${hero.id}`}>{t("bookDetails")}</Link>
-              </Button>
-            </div>
+          </div>
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2">
+            <BrandAction to={`/read/${hero.id}`} icon={Play}>
+              {t("resume")}
+            </BrandAction>
+            <Button variant="secondary" asChild>
+              <Link to={`/books/${hero.id}`}>{t("bookDetails")}</Link>
+            </Button>
           </div>
         </section>
       )}

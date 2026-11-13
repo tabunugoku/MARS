@@ -15,7 +15,7 @@ import { MenuItem } from "@/components/ui/menu-item";
 import { SidebarUserFooter } from "@/components/sidebar-app/user-footer";
 import { SidebarSearchField } from "@/components/sidebar-app/search-field";
 import type { IconComponent } from "@/lib/icon-context";
-import { useEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, useApi } from "@/api";
 import { defineMessages, useT } from "@/i18n";
 import { fontWeights } from "@/lib/font-weight";
@@ -44,7 +44,7 @@ const I = (c: unknown) => c as IconComponent;
 
 const m = defineMessages({
   ja: {
-    homeLabel: "ComiNavi ホーム",
+    homeLabel: "MARS ホーム",
     searchPlaceholder: "シリーズ・巻・著者を検索",
     search: "検索",
     home: "ホーム",
@@ -66,7 +66,7 @@ const m = defineMessages({
     logout: "ログアウト",
   },
   en: {
-    homeLabel: "ComiNavi home",
+    homeLabel: "MARS home",
     searchPlaceholder: "Search series, books, authors",
     search: "Search",
     home: "Home",
@@ -92,14 +92,23 @@ const m = defineMessages({
 function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconComponent; label: string; badge?: string | number; exact?: boolean }) {
   const { pathname } = useLocation();
   const active = exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
+  // On phones the sidebar is mounted twice (the hidden rail and the sheet),
+  // and two dots sharing one layoutId would hide each other. Each copy gets
+  // its own id, read from where the row sits before the first paint.
+  const gutter = useRef<HTMLSpanElement>(null);
+  const [copy, setCopy] = useState<"rail" | "sheet">();
+  useLayoutEffect(() => {
+    setCopy(gutter.current?.closest('[data-mobile="true"]') ? "sheet" : "rail");
+  }, []);
   return (
     <SidebarMenuItem className="relative">
-      {/* The route: one faint dot per row in the gutter, and the cyan
-          "you are here" dot that glides along it to the current row. */}
-      <span aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1 rounded-full bg-foreground/20" />
-      {active && (
+      {/* The span is an invisible anchor in the gutter (its ref tells which
+          sidebar copy this row is in). Only the blue "you are here" dot is
+          drawn, gliding to the current row. */}
+      <span ref={gutter} aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1" />
+      {active && copy && (
         <motion.span
-          layoutId="cn-nav-here"
+          layoutId={`cn-nav-here-${copy}`}
           aria-hidden
           className="absolute -left-3 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here ring-[3px] ring-here/20"
           transition={{ type: "spring", mass: 0.6, stiffness: 380, damping: 26 }}
@@ -159,8 +168,35 @@ function useShellLive(reloadLibs: () => void, reloadTasks: () => void, tasks: { 
   }, []);
 }
 
+// "/" puts the cursor in the search field, as on GitHub or YouTube, unless the
+// key is being typed somewhere (a field, an open dialog) or comes with a
+// modifier. Where the sidebar is hidden (phones), it opens the search screen.
+function useSlashToSearch(form: RefObject<HTMLFormElement | null>) {
+  const navigate = useNavigate();
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "/" || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+      const target = e.target instanceof HTMLElement ? e.target : null;
+      if (target?.closest("input, textarea, select, [contenteditable]:not([contenteditable='false'])")) return;
+      if (document.querySelector('[role="dialog"], [role="alertdialog"]')) return;
+      e.preventDefault();
+      const input = form.current?.querySelector<HTMLInputElement>('input[name="q"]');
+      if (input && input.offsetParent !== null) {
+        input.focus();
+        input.select();
+      } else {
+        navigate("/search");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [form, navigate]);
+}
+
 export function AppSidebar() {
   const navigate = useNavigate();
+  const searchForm = useRef<HTMLFormElement>(null);
+  useSlashToSearch(searchForm);
   const { theme, toggle } = useTheme();
   const { data: libs, reload: reloadLibs } = useApi(() => api.libraries(), []);
   const { data: me } = useApi(() => api.me(), []);
@@ -179,10 +215,11 @@ export function AppSidebar() {
         <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label={t("homeLabel")}>
           <AppMark size={28} className="-ml-1" />
           <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
-            ComiNavi
+            MARS
           </span>
         </Link>
         <form
+          ref={searchForm}
           onSubmit={(e) => {
             e.preventDefault();
             const q = new FormData(e.currentTarget).get("q");

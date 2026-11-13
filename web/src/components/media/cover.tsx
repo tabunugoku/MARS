@@ -69,7 +69,7 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
         />
       )}
       {unread !== undefined && unread > 0 && (
-        <span className="absolute bottom-2 right-1.5 min-w-5 rounded-full bg-brand px-1.5 text-center text-[11px] leading-5 text-brand-foreground tabular-nums">
+        <span className="absolute bottom-2 right-1.5 min-w-5 rounded-full bg-brand-fill px-1.5 text-center text-[11px] leading-5 text-brand-foreground tabular-nums">
           {unread}
         </span>
       )}

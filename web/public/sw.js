@@ -1,4 +1,4 @@
-// ComiNavi service worker: caches the app shell so an installed app opens
+// MARS service worker: caches the app shell so an installed app opens
 // fast. It is not an offline mode. It never touches /api (book data, page
 // images, thumbnails, progress, the /api/v1/events stream), anything
 // cross-origin, or any non-GET.
@@ -18,7 +18,7 @@
 // screen offers a reload.
 const VERSION = "dev";
 const ENTRY = [];
-const PREFIX = "cominavi-shell-";
+const PREFIX = "mars-shell-";
 const CACHE = PREFIX + VERSION;
 const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", ...ENTRY];
 

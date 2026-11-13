@@ -1,21 +1,22 @@
 ---
-name: cominavi-design
-description: ComiNavi's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
+name: mars-design
+description: MARS's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
 ---
 
-# ComiNavi design system
+# MARS design system
 
-ComiNavi (Comic Navigator) is a self-hosted comic server. The direction is
-**a night chart and a compass, printed in screentone dots**: covers are the
+MARS ("MARS: A Reading Server") is a self-hosted comic
+server. Tagline: "Your manga. Your server. Your universe." (always English). The direction is
+**a night chart of Mars, printed in screentone dots**: covers are the
 content, the chrome is flat and dark, and the richness comes from dots and
 motion that answer what the reader does. Dark ("night chart") is the default;
 light ("chart paper") must look equally finished. Surfaces, text and chrome
 are flat: no gradients, blur, glass or coloured shadows. The one exception is
 **light from the chart itself**, all of it in `web/src/styles/glow.css`: the
-cyan "you are here" marks glow like a beacon, the violet route already read
+blue "you are here" marks glow like a beacon, the red route already read
 (`DotTrack`, progress bars, the reader rail) gives off a little light, the
-brand CTA and the logo are lit, and a lifted cover throws violet light below
-it. Those come for free from `bg-here`, `bg-brand`, `BrandAction` and the
+brand CTA has a small halo, and a lifted cover throws red light below
+it. The logo is flat, never lit. Those come for free from `bg-here`, `bg-brand`, `BrandAction` and the
 cards, so never add a glow by hand, and never light anything else (cards,
 panels, headings, icons, secondary buttons).
 
@@ -57,10 +58,16 @@ panels, headings, icons, secondary buttons).
   around it stay in the UI face (`前回の続き · ` + mono `2026.11.09`). No
   `// ` code-comment prefixes or other eyebrows: this is a reading app, not a
   developer tool.
-- **Colours**: `brand` is violet: actions, selection, read progress, the
-  primary call to action (at most one per screen). `here` (cyan, `bg-here`,
+- **Colours**: `brand` is Martian oxide red: actions, selection, read
+  progress, the primary call to action (at most one per screen). Text and
+  marks use `text-brand`/`bg-brand`; anything with white text on it (the CTA,
+  a filled checkbox, a count badge) uses `bg-brand-fill`, a darker red that
+  keeps white text readable in both themes. Errors and destructive actions
+  use `destructive` (crimson), never the brand red. `here` (blue, `bg-here`,
   `text-here`) marks only "you are here": the current reading position in a
-  `DotTrack`, the dot beside the selected nav row, the compass tip. Never use
+  `DotTrack`, the dot beside the selected nav row, the near moon of the
+  sign-in page's planet (`PlanetOrbit`, the only large drawing; app screens keep only the
+  `.tone` ground behind the content). Never use
   `here` for buttons or decoration. Everything else is neutral. No emoji.
 - **Dots (screentone)** are the texture: `.tone` (quiet ground) and
   `.tone-strong` (small areas) from `styles/tokens.css`. Progress is a
@@ -70,7 +77,7 @@ panels, headings, icons, secondary buttons).
   14 in captions, 18 in tabs). If Keyline lacks a glyph, look it up with the
   IconMCP server; never mix in a second icon style. Check the name exists:
   `node -e "console.log(!!require('@keyline-icons/react').Name)"` in `web/`.
-  `KindIcon` is the kind's Keyline glyph on a violet screentone tile, for
+  `KindIcon` is the kind's Keyline glyph on a red-tint tile, for
   library headers and the admin library list.
 - **Buttons with an icon** pass it as `leadingIcon={X as IconComponent}`, never
   as a child: children become one label span, so an icon child stacks above
@@ -83,13 +90,12 @@ panels, headings, icons, secondary buttons).
   `@/lib/springs`, or motion/react spring options); CSS transitions use
   80–300ms with the one glide curve `ease-[cubic-bezier(0.16,1,0.3,1)]`.
   No overshooting curves on hover or press; overshoot belongs only to the
-  springs that model something physical (page turns, the compass needle).
+  springs that model something physical (page turns, the moon settling on the sign-in orbit).
   Animate transform/opacity only. Respect reduced motion. Allowed on load:
   the dots of a `DotTrack` filling in and `CountUp` numbers; nothing flies in.
   No looping motion except loading states. Already built in, so don't
-  re-implement: card hover lift with the violet dot spotlight
-  (`SeriesCard`/`BookCard`), the compass backdrop that turns per route, the
-  gliding cyan dot on the active nav row, dot-wave skeletons, the screentone
+  re-implement: card hover lift with the red dot spotlight
+  (`SeriesCard`/`BookCard`), the gliding blue dot on the active nav row, dot-wave skeletons, the screentone
   wipe on theme switch (call `toggle(buttonEl)` from `useTheme`).
 - **Toasts**: `toast.success(...)` (an object, not a function) from `@yusufceng1z/ding-react` for confirmations
   ("既読にしました", "スキャンを開始しました"). One short sentence.

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 #
-# ComiNavi: one static Go binary with the web UI embedded, on distroless.
+# MARS: one static Go binary with the web UI embedded, on distroless.
 # The node and Go stages run on the build host and cross-compile, so a
 # multi-arch build never runs npm or the Go toolchain under emulation.
 
@@ -24,20 +24,20 @@ ARG TARGETOS TARGETARCH
 ARG VERSION=dev
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
     go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
-    -o /out/cominavi ./cmd/cominavi \
+    -o /out/mars ./cmd/mars \
  && mkdir -p /out/data
 
 # --- runtime --------------------------------------------------------------
 FROM gcr.io/distroless/static:nonroot
-COPY --from=server /out/cominavi /usr/local/bin/cominavi
+COPY --from=server /out/mars /usr/local/bin/mars
 # Owned by the image's nonroot user (65532) so a named volume starts writable.
 COPY --from=server --chown=65532:65532 /out/data /data
-ENV COMINAVI_DATA=/data \
-    COMINAVI_PORT=25600
+ENV MARS_DATA=/data \
+    MARS_PORT=25600
 EXPOSE 25600
 VOLUME /data
 USER nonroot:nonroot
 # The image has no shell or curl, so the binary probes itself.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD ["/usr/local/bin/cominavi", "healthcheck"]
-ENTRYPOINT ["/usr/local/bin/cominavi"]
+    CMD ["/usr/local/bin/mars", "healthcheck"]
+ENTRYPOINT ["/usr/local/bin/mars"]

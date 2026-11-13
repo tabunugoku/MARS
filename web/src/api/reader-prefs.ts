@@ -74,7 +74,7 @@ export function loadReaderPrefs(): Promise<void> {
   return loading;
 }
 
-const PROFILE_KEY = "cominavi.readerProfile";
+const PROFILE_KEY = "mars.readerProfile";
 /** This page's choice, so it holds even when storage refuses to keep it. */
 let profileChoice: ReaderProfileChoice | undefined;
 

@@ -1,6 +1,6 @@
 # OPDS and the Komga-compatible API
 
-ComiNavi speaks two protocols that other apps already know:
+MARS speaks two protocols that other apps already know:
 
 - **OPDS 1.2** with OPDS-PSE page streaming, for reader apps such as Panels,
   Chunky and KyBook. Catalog address: `http://HOST:25600/opds/v1.2/catalog`.
@@ -13,7 +13,7 @@ answers 404.
 
 ## Shared rules (`server/internal/httpapi/compat.go`)
 
-- `NewCompat(deps)` serves `/opds/` and `/komga/`; `cmd/cominavi` mounts it at
+- `NewCompat(deps)` serves `/opds/` and `/komga/`; `cmd/mars` mounts it at
   those two prefixes without stripping them. Routes are registered with full
   paths (`GET /opds/v1.2/catalog`, `GET /komga/api/v1/series`).
 - Authentication: HTTP Basic (user name or email + password, or any name with

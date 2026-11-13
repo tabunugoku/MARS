@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 // scopeLog records the requests of a watcher's onQuiet.

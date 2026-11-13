@@ -24,7 +24,7 @@ const m = defineMessages({
     general: "一般",
     port: "ポート",
     restartNote: "変更はサーバーを再起動すると反映されます",
-    portNote: "変更はサーバーを再起動すると反映されます。環境変数 COMINAVI_PORT があるときは、そちらが使われます（Docker イメージでは 25600 に決まっています）",
+    portNote: "変更はサーバーを再起動すると反映されます。環境変数 MARS_PORT があるときは、そちらが使われます（Docker イメージでは 25600 に決まっています）",
     taskThreads: "タスクの同時実行数",
     thumbnails: "サムネイル",
     thumbSize: "サイズ",
@@ -33,15 +33,16 @@ const m = defineMessages({
     sizeLarge: "大",
     sizeXlarge: "特大",
     thumbFormat: "形式",
-    webpLater: "WebP と AVIF は後で対応します",
     thumbNote: "新しく作るサムネイルから反映されます。今あるものは、シリーズやライブラリの「表紙を作り直す」で作り直せます。",
     auth: "認証",
     rememberDays: "ログイン保持の日数",
     loginScreen: "ログイン画面",
-    backdropCompass: "羅針盤",
-    backdropCovers: "表紙の壁",
-    backdropCompassNote: "ログイン前の画面には ComiNavi の羅針盤だけが表示されます",
+    backdropPlanet: "惑星",
+    backdropCovers: "シリーズの表紙",
+    backdropPlanetNote: "ログイン前の画面には MARS の惑星と軌道だけが表示されます",
     backdropCoversNote: "最近追加したシリーズの表紙を並べます。ログインしていない人にも表紙が見えます",
+    backdropBookCovers: "巻の表紙",
+    backdropBookCoversNote: "最近追加した巻の表紙を並べます。ログインしていない人にも表紙が見えます",
     integrations: "連携",
     apiKeys: "API キー",
     noApiKeys: "APIキーはまだありません",
@@ -59,13 +60,14 @@ const m = defineMessages({
     keyCopied: "APIキーをコピーしました",
     copyFailed: "コピーできませんでした",
     opds: "OPDS",
-    opdsNote: "Panels、Chunky、KyBook などの電子書籍アプリは、次のアドレスに接続します。サインインには ComiNavi のユーザー名とパスワード、または API キーを使います",
+    opdsNote: "Panels、Chunky、KyBook などの電子書籍アプリは、次のアドレスに接続します。サインインには MARS のユーザー名とパスワード、または API キーを使います",
     komga: "Komga 互換 API（Mihon）",
-    komgaNote: "Mihon の Komga 拡張とトラッカーは、次のアドレスに接続します。サインインには ComiNavi のユーザー名とパスワード、または API キーを使います",
+    komgaNote: "Mihon の Komga 拡張とトラッカーは、次のアドレスに接続します。サインインには MARS のユーザー名とパスワード、または API キーを使います",
     addressCopied: "アドレスをコピーしました",
     settingsSaved: "設定を保存しました",
     collections: "コレクション",
     autoDeleteCollections: "空のコレクションを自動で削除する",
+    autoDeleteCollectionsNote: "ゴミ箱を空にしたときやライブラリを削除したときに、シリーズがひとつも残らなかったコレクションを削除します",
     deleteKeyTitle: "APIキーを削除しますか",
     deleteKeyBody: "「{name}」を使っているアプリは接続できなくなります。",
   },
@@ -74,7 +76,7 @@ const m = defineMessages({
     general: "General",
     port: "Port",
     restartNote: "Changes take effect after the server restarts",
-    portNote: "Changes take effect after the server restarts. If the COMINAVI_PORT environment variable is set, it is used instead (the Docker image uses 25600)",
+    portNote: "Changes take effect after the server restarts. If the MARS_PORT environment variable is set, it is used instead (the Docker image uses 25600)",
     taskThreads: "Concurrent tasks",
     thumbnails: "Thumbnails",
     thumbSize: "Size",
@@ -83,15 +85,16 @@ const m = defineMessages({
     sizeLarge: "Large",
     sizeXlarge: "Extra large",
     thumbFormat: "Format",
-    webpLater: "WebP and AVIF will come later",
     thumbNote: "Applies to newly made thumbnails. To remake existing ones, use Regenerate covers on a series or library.",
     auth: "Authentication",
     rememberDays: "Days to stay signed in",
     loginScreen: "Sign-in screen",
-    backdropCompass: "Compass",
-    backdropCovers: "Cover wall",
-    backdropCompassNote: "Only the ComiNavi compass is shown before sign-in",
+    backdropPlanet: "Planet",
+    backdropCovers: "Series covers",
+    backdropPlanetNote: "Only the MARS planet and its orbit are shown before sign-in",
     backdropCoversNote: "Shows covers of recently added series. People who are not signed in can see them too.",
+    backdropBookCovers: "Book covers",
+    backdropBookCoversNote: "Shows covers of recently added books. People who are not signed in can see them too.",
     integrations: "Integrations",
     apiKeys: "API keys",
     noApiKeys: "No API keys yet",
@@ -109,13 +112,14 @@ const m = defineMessages({
     keyCopied: "API key copied",
     copyFailed: "Could not copy",
     opds: "OPDS",
-    opdsNote: "Reader apps such as Panels, Chunky and KyBook connect to this address. They sign in with a ComiNavi user name and password, or an API key.",
+    opdsNote: "Reader apps such as Panels, Chunky and KyBook connect to this address. They sign in with a MARS user name and password, or an API key.",
     komga: "Komga-compatible API (Mihon)",
-    komgaNote: "The Komga extension and tracker in Mihon connect to this address. They sign in with a ComiNavi user name and password, or an API key.",
+    komgaNote: "The Komga extension and tracker in Mihon connect to this address. They sign in with a MARS user name and password, or an API key.",
     addressCopied: "Address copied",
     settingsSaved: "Settings saved",
     collections: "Collections",
     autoDeleteCollections: "Delete empty collections automatically",
+    autoDeleteCollectionsNote: "When emptying the trash or deleting a library leaves a collection with no series, the collection is deleted too",
     deleteKeyTitle: "Delete this API key?",
     deleteKeyBody: "Apps using \"{name}\" will no longer be able to connect.",
   },
@@ -126,7 +130,7 @@ const m = defineMessages({
 function AddressRow({ url, copyLabel, onCopy }: { url: string; copyLabel: string; onCopy: (url: string) => void }) {
   return (
     <div className="flex items-center gap-1 rounded-lg bg-card py-1 pl-3 pr-1">
-      <code className="min-w-0 flex-1 select-all break-all font-mono text-foreground">{url}</code>
+      <code className={cn(typeClass("body"), "min-w-0 flex-1 select-all break-all font-mono text-foreground")}>{url}</code>
       <IconAction label={copyLabel} icon={Copy} onClick={() => onCopy(url)} />
     </div>
   );
@@ -140,8 +144,16 @@ export default function Screen() {
     large: t("sizeLarge"),
     xlarge: t("sizeXlarge"),
   };
-  const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompass"), covers: t("backdropCovers") };
-  const backdropNote: Record<ServerSettings["loginBackdrop"], string> = { compass: t("backdropCompassNote"), covers: t("backdropCoversNote") };
+  const backdropLabel: Record<ServerSettings["loginBackdrop"], string> = {
+    planet: t("backdropPlanet"),
+    covers: t("backdropCovers"),
+    bookCovers: t("backdropBookCovers"),
+  };
+  const backdropNote: Record<ServerSettings["loginBackdrop"], string> = {
+    planet: t("backdropPlanetNote"),
+    covers: t("backdropCoversNote"),
+    bookCovers: t("backdropBookCoversNote"),
+  };
   const { data, error, reload } = useApi(() => api.settings(), []);
   const keys = useApi(() => api.apiKeys(), []);
   // The last copy the server returned; drafts are compared against it.
@@ -298,15 +310,11 @@ export default function Screen() {
               <FieldDescription>{t("thumbNote")}</FieldDescription>
             </Field>
             <Field>
+              {/* JPEG is the only format the server writes, so it is shown, not offered. */}
               <FieldLabel id="set-thumb-format">{t("thumbFormat")}</FieldLabel>
-              <RadioGroup
-                aria-labelledby="set-thumb-format"
-                value={cur.thumbnailFormat}
-                onValueChange={(v) => patch({ thumbnailFormat: v as ServerSettings["thumbnailFormat"] })}
-              >
-                <RadioItem index={0} value="jpeg" label="JPEG" />
-              </RadioGroup>
-              <FieldDescription>{t("webpLater")}</FieldDescription>
+              <p aria-labelledby="set-thumb-format" className={cn(typeClass("body"), "text-foreground")}>
+                JPEG
+              </p>
             </Field>
           </FieldGroup>
         </section>
@@ -426,7 +434,7 @@ export default function Screen() {
                     {t("keyNote", { name: createdKey.name })}
                   </p>
                   <div className="flex items-center gap-1">
-                    <code className="min-w-0 flex-1 break-all font-mono text-foreground">{createdKey.key}</code>
+                    <code className={cn(typeClass("body"), "min-w-0 flex-1 break-all font-mono text-foreground")}>{createdKey.key}</code>
                     <IconAction label={t("copy")} icon={Copy} onClick={() => void copyText(createdKey.key, t("keyCopied"))} />
                   </div>
                   <Button variant="ghost" onClick={() => setCreatedKey(null)}>
@@ -440,11 +448,14 @@ export default function Screen() {
 
         <section>
           <SectionTitle>{t("collections")}</SectionTitle>
-          <Switch
-            label={t("autoDeleteCollections")}
-            checked={cur.deleteEmptyCollections}
-            onToggle={() => patch({ deleteEmptyCollections: !cur.deleteEmptyCollections })}
-          />
+          <Field>
+            <Switch
+              label={t("autoDeleteCollections")}
+              checked={cur.deleteEmptyCollections}
+              onToggle={() => patch({ deleteEmptyCollections: !cur.deleteEmptyCollections })}
+            />
+            <FieldDescription>{t("autoDeleteCollectionsNote")}</FieldDescription>
+          </Field>
         </section>
       </div>
 

@@ -65,7 +65,7 @@ export function SelectTile({
             aria-hidden
             className={cn(
               "pointer-events-none absolute left-2 top-2 z-20 flex size-6 items-center justify-center rounded-full border-2 transition-colors duration-160",
-              selected ? "border-brand bg-brand text-brand-foreground" : "border-foreground/60 bg-background/80",
+              selected ? "border-brand-fill bg-brand-fill text-brand-foreground" : "border-foreground/60 bg-background/80",
             )}
           >
             {selected && <Check size={14} strokeWidth={2.5} />}
@@ -114,7 +114,7 @@ export function SelectionBar({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 12, transition: spring.moderate.exit }}
         transition={spring.moderate}
-        className="pointer-events-auto flex max-w-full items-center gap-2 rounded-xl border border-border bg-popover py-2 pl-4 pr-2 text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.24)]"
+        className="pointer-events-auto flex max-w-full items-center gap-2 rounded-[12px] border border-border bg-popover py-2 pl-4 pr-2 text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.24)]"
       >
         <p className={cn(typeClass("body"), "mr-1 shrink-0 tabular-nums")}>{t("count", { n: count })}</p>
 

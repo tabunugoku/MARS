@@ -164,7 +164,15 @@ export const mockApi: Api = {
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
             .slice(0, 36)
             .map((s) => ({ thumbnailUrl: coverArt(s.coverSeed, s.title), title: s.title }))
-        : [];
+        : backdrop === "bookCovers"
+          ? [...db.books]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .slice(0, 36)
+              .map((b) => {
+                const bk = book(b);
+                return { thumbnailUrl: bk.thumbnailUrl, title: `${bk.seriesTitle} ${bk.title}` };
+              })
+          : [];
     return delay({ backdrop, covers, needsSetup: false });
   },
   login: () => delay(me()),

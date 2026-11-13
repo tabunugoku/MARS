@@ -18,7 +18,7 @@ const m = defineMessages({
 });
 import { Cover } from "./cover";
 
-/** Spotlight (Aimran "spotlight card"): violet screentone pressed onto the
+/** Spotlight (Aimran "spotlight card"): red screentone pressed onto the
  *  cover around the pointer, like a tone sheet. Pure CSS from two
  *  custom properties the card writes on pointer move — no re-render. */
 function trackPointer(e: React.PointerEvent<HTMLElement>) {

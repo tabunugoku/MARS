@@ -45,7 +45,8 @@ import { defineMessages, useT } from "@/i18n";
 const m = defineMessages({
   ja: {
     title: "リーダー設定",
-    meta: "すべての作品に使う表示設定です。PC 用とモバイル用があり、端末ごとにどちらを使うか選べます。シリーズや巻ごとの設定は、リーダーの表示設定で選べ、どちらの端末にも効きます。",
+    meta: "すべての作品に使う表示設定です。PC 用とモバイル用があり、端末ごとにどちらを使うか選べます。",
+    metaPerBook: "シリーズや巻ごとの設定は、リーダーの表示設定で選べ、どちらの端末にも効きます。",
     followSeries: "作品の指定に従う",
     thisDevice: "この端末",
     deviceSettings: "この端末で使う設定",
@@ -71,21 +72,22 @@ const m = defineMessages({
   },
   en: {
     title: "Reader settings",
-    meta: "The display settings for every work. There is a PC set and a mobile set, and each device can choose which one it uses. Series and volume settings are chosen in the reader's display settings and apply on both devices.",
+    meta: "The display settings for every work. There is a PC set and a mobile set, and each device can choose which one it uses.",
+    metaPerBook: "Series and volume settings are chosen in the reader's display settings and apply on both devices.",
     followSeries: "Follow the series",
     thisDevice: "This device",
     deviceSettings: "Settings for this device",
-    deviceHint: "Saved only in this browser.",
+    deviceHint: "Saved only in this browser",
     auto: "Auto ({profile})",
     display: "Display",
     editing: "Settings to edit",
     direction: "Reading direction",
-    directionHint: "Follow the series opens manga right to left and webtoons with vertical scrolling.",
+    directionHint: "Follow the series opens manga right to left and webtoons with vertical scrolling",
     spread: "Spread",
     pageSize: "Page size",
     background: "Background",
     splitWide: "On portrait screens, split wide pages into 2 pages",
-    splitWideHint: "Shows pages scanned as spreads one half at a time, in reading order.",
+    splitWideHint: "Shows pages scanned as spreads one half at a time, in reading order",
     resetAll: "Reset all",
     customSection: "Series and volumes with their own settings",
     noneCustom: "None. Every work opens with these settings.",
@@ -101,7 +103,18 @@ type Target = { kind: "series" | "book"; id: string };
 
 function Header() {
   const t = useT(m);
-  return <PageHeader title={t("title")} meta={t("meta")} />;
+  return (
+    <PageHeader
+      title={t("title")}
+      meta={
+        <>
+          {t("meta")}
+          <br />
+          {t("metaPerBook")}
+        </>
+      }
+    />
+  );
 }
 
 const profileOptions = () => Object.entries(profileLabel()) as [ReaderProfile, string][];
@@ -275,7 +288,7 @@ function SettingsForm({ books, titles }: { books: Book[]; titles: Map<string, st
           {rows.length === 0 ? (
             <p className={cn(typeClass("body"), "text-muted-foreground")}>{t("noneCustom")}</p>
           ) : (
-            <ul className="divide-y divide-border rounded-xl border border-border bg-card">
+            <ul className="divide-y divide-border rounded-[12px] border border-border bg-card">
               {rows.map((r) => (
                 <li key={r.key} className="flex items-center gap-3 px-4 py-2">
                   <Link to={r.to} className={cn(typeClass("body"), "min-w-0 flex-1 truncate text-foreground hover:underline")}>

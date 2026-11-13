@@ -23,6 +23,7 @@ const m = defineMessages({
 // Every screen is its own chunk; only the shell ships in the first load.
 const Login = lazy(() => import("@/routes/login"));
 const Dashboard = lazy(() => import("@/routes/dashboard"));
+const LibrariesView = lazy(() => import("@/routes/libraries"));
 const LibraryView = lazy(() => import("@/routes/library"));
 const SeriesView = lazy(() => import("@/routes/series"));
 const BookView = lazy(() => import("@/routes/book"));
@@ -48,6 +49,7 @@ const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { index: true, element: <Dashboard /> },
+      { path: "libraries", element: <LibrariesView /> },
       { path: "libraries/:libraryId", element: <LibraryView /> },
       { path: "series/:seriesId", element: <SeriesView /> },
       { path: "books/:bookId", element: <BookView /> },

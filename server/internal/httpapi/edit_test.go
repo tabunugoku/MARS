@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/auth"
 )
 
 func contains(list []string, v string) bool { return slices.Contains(list, v) }
@@ -158,7 +158,7 @@ func TestSettings(t *testing.T) {
 	e.admin.json("GET", "/api/v1/settings", nil, 200, &s)
 	want := ServerSettings{Port: 25600, TaskThreads: 2, ThumbnailSize: ServerSettingsThumbnailSizeMedium,
 		ThumbnailFormat: ServerSettingsThumbnailFormatJpeg, RememberMeDays: 30, DeleteEmptyCollections: true,
-		LoginBackdrop: Compass}
+		LoginBackdrop: Planet}
 	if s != want {
 		t.Fatalf("defaults %+v", s)
 	}

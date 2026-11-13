@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, errorMessage, safeNext, useApi, type LoginScreen } from "@/api";
 import { AppMark } from "@/components/brand/app-mark";
-import { CompassRose } from "@/components/brand/compass-rose";
+import { PlanetOrbit } from "@/components/brand/planet-orbit";
 import { Cover } from "@/components/media/cover";
 import { Block } from "@/components/media/skeletons";
 import { LoadError } from "@/components/shell/load-error";
@@ -17,6 +17,8 @@ import { SetupForm } from "./login-setup";
 
 const m = defineMessages({
   ja: {
+    // The tagline stays in English in both languages.
+    tagline: "Your manga. Your server. Your universe.",
     signIn: "ログイン",
     username: "ユーザー名またはメールアドレス",
     password: "パスワード",
@@ -24,6 +26,7 @@ const m = defineMessages({
     keepSignedIn: "ログイン状態を保持する",
   },
   en: {
+    tagline: "Your manga. Your server. Your universe.",
     signIn: "Sign in",
     username: "Username or email",
     password: "Password",
@@ -59,7 +62,7 @@ export default function Screen() {
         )}
 
         <p className={cn(typeClass("caption"), "absolute bottom-6 text-muted-foreground")}>
-          {health && `ComiNavi ${health.version}`}
+          {health && `MARS ${health.version}`}
         </p>
       </main>
     </div>
@@ -99,8 +102,11 @@ function SignInForm() {
     <form onSubmit={submit} noValidate className="flex w-full max-w-[360px] flex-col gap-6">
       <div className="flex items-center gap-2">
         <AppMark size={40} className="-ml-1" />
-        <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-          ComiNavi
+        <span className="flex flex-col">
+          <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
+            MARS
+          </span>
+          <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("tagline")}</span>
         </span>
       </div>
 
@@ -156,7 +162,7 @@ function SignInForm() {
         disabled={sending}
         aria-busy={sending || undefined}
         className={cn(
-          "inline-flex h-9 pointer-coarse:h-11 w-full items-center justify-center rounded-lg bg-brand px-4 text-brand-foreground",
+          "inline-flex h-9 pointer-coarse:h-11 w-full items-center justify-center rounded-lg bg-brand-fill px-4 text-brand-foreground",
           "transition-[filter,transform,opacity] duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:brightness-110 active:scale-[0.96] active:brightness-95 motion-reduce:transform-none",
           "outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)] focus-visible:ring-offset-2 focus-visible:ring-offset-background",
           "disabled:pointer-events-none disabled:opacity-60",
@@ -179,7 +185,7 @@ const WALL_SIZE = 72;
 // Until the choice arrives the panel stays plain, so neither flashes.
 function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
   if (!screen) return null;
-  if (screen.backdrop === "covers") {
+  if (screen.backdrop === "covers" || screen.backdrop === "bookCovers") {
     // A small library repeats its covers so the wall still fills the panel.
     const wall = screen.covers.length ? Array.from({ length: WALL_SIZE }, (_, i) => screen.covers[i % screen.covers.length]) : [];
     return (
@@ -196,16 +202,12 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
       </>
     );
   }
-  // The night chart: the same rose as behind every screen. Its needle swings
-  // in once to the mark's own 35° heading.
+  // The night sky: the logo's planet and orbit, large, printed in dots. The
+  // near moon travels into place once.
   return (
     <>
       <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />
-      <CompassRose
-        deg={35}
-        from={-90}
-        className="absolute left-1/2 top-1/2 size-[min(88%,680px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.16] dark:opacity-[0.2]"
-      />
+      <PlanetOrbit className="absolute left-1/2 top-1/2 size-[min(92%,720px)] -translate-x-1/2 -translate-y-1/2" />
     </>
   );
 }

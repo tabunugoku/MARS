@@ -7,7 +7,7 @@ type Author struct {
 	Role string `json:"role"`
 }
 
-// ComicInfo holds the ComicInfo.xml fields ComiNavi uses (Anansi schema
+// ComicInfo holds the ComicInfo.xml fields MARS uses (Anansi schema
 // v2.0; unknown elements are ignored). Empty strings and zero numbers mean
 // "not given".
 type ComicInfo struct {

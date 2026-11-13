@@ -12,7 +12,7 @@ base=http://localhost:$port
 api=$base/api/v1
 work=$(mktemp -d)
 jar=$work/cookies
-name=cominavi-smoke
+name=mars-smoke
 
 cleanup() {
   docker logs "$name" >"$work/server.log" 2>&1 || true
@@ -32,7 +32,7 @@ for _ in $(seq 60); do
 done
 curl -fsS "$api/healthz"; echo
 # The image's own health probe: the binary checks itself (no shell, no curl).
-docker exec "$name" /usr/local/bin/cominavi healthcheck
+docker exec "$name" /usr/local/bin/mars healthcheck
 echo "healthcheck subcommand: ok"
 
 token=$(docker logs "$name" 2>&1 | grep -o 'token=[A-Za-z0-9_-]*' | head -1 | cut -d= -f2 || true)

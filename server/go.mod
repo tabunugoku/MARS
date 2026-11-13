@@ -1,4 +1,4 @@
-module github.com/tabunugoku/cominavi/server
+module github.com/tabunugoku/mars/server
 
 go 1.27.3
 

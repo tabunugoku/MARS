@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/config"
+	"github.com/tabunugoku/mars/server/internal/config"
 )
 
-// healthTarget picks the address to probe. Without COMINAVI_PORT the port is
+// healthTarget picks the address to probe. Without MARS_PORT the port is
 // the stored setting, so the running server records the address it listens
 // on in DATA/listen-addr. The file is read only, never created here. Without
 // it, the probe uses cfg.Addr.
@@ -29,7 +29,7 @@ func healthTarget(cfg config.Config) string {
 }
 
 // healthcheck asks a running server for /api/v1/healthz and fails unless it
-// answers 200. It is the image's health probe ("cominavi healthcheck"): the
+// answers 200. It is the image's health probe ("mars healthcheck"): the
 // image has no shell or curl, so the binary checks itself. It opens neither
 // the data directory nor the database.
 func healthcheck(ctx context.Context, addr string) error {

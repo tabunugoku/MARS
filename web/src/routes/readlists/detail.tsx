@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { DotTrack } from "@/components/media/dot-track";
 import { Link, useNavigate, useParams } from "react-router";
-import { ArrowDown, ArrowUp, ListMinus, MoreHorizontal, Play, SquarePen } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, MoreHorizontal, Play, SquarePen, X } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, ApiError, errorMessage, useApi, type Book, type ReadList } from "@/api";
 import { BrandAction } from "@/components/media/brand-action";
@@ -53,7 +53,7 @@ const m = defineMessages({
     readFromStart: "Read from start",
     notFound: "Read list not found",
     emptyTitle: "No books",
-    emptyAdmin: "Add books from a book's More menu, with Add to read list.",
+    emptyAdmin: "Add books from a book's More menu, with Add to read list",
     renamed: "Name changed",
     deleted: "Deleted",
     conflict: "Changed on another screen. Reloading",
@@ -222,7 +222,7 @@ export default function Screen() {
                     </DropdownTrigger>
                   </span>
                 </Tooltip>
-                <DropdownContent align="end">
+                <DropdownContent align="end" className="w-56">
                   <MenuItem index={0} label={t("rename")} icon={SquarePen} onSelect={() => openDialog("rename")} />
                   <MenuItem index={1} label={t("delete")} onSelect={() => openDialog("delete")} />
                 </DropdownContent>
@@ -365,7 +365,7 @@ function BookRow({
             <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("read")}</span>
           ) : p ? (
             <div className="space-y-1">
-              <DotTrack total={10} value={Math.round(pct / 10)} label={t("progress")} size="sm" className="justify-end" />
+              <DotTrack percent={pct} max={10} label={t("progress")} size="sm" className="justify-end" />
               <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                 {t("pages", { page: p.page, pageCount: book.pageCount })}
               </p>
@@ -410,7 +410,7 @@ function BookRow({
               disabled={busy}
               onClick={() => onRemove(book.id)}
             >
-              <ListMinus size={16} />
+              <X size={16} />
             </Button>
           </Tooltip>
         </div>

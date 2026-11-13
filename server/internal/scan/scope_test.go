@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 // openLibrary opens a database holding one library "L" over root.

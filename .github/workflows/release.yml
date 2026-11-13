@@ -1,6 +1,6 @@
 name: release
 
-# Push a tag like v0.1.0 to publish ghcr.io/<owner>/cominavi for amd64 and arm64.
+# Push a tag like v0.1.0 to publish ghcr.io/<owner>/mars for amd64 and arm64.
 on:
   push:
     tags: ["v*"]
@@ -25,7 +25,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           # GHCR names must be lower case.
-          images: ghcr.io/${{ github.repository_owner }}/cominavi
+          images: ghcr.io/${{ github.repository_owner }}/mars
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

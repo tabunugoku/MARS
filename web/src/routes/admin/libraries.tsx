@@ -66,7 +66,6 @@ const m = defineMessages({
     scanStarted: "スキャンを開始しました",
     deepScanStarted: "詳細スキャンを開始しました",
     regenerateStarted: "表紙の作り直しを開始しました",
-    watchFailed: "ファイルの監視を開始できませんでした: {error}",
     notScanned: "未スキャン",
     scan: "スキャン",
     edit: "編集",
@@ -120,7 +119,6 @@ const m = defineMessages({
     scanStarted: "Scan started",
     deepScanStarted: "Deep scan started",
     regenerateStarted: "Cover regeneration started",
-    watchFailed: "Could not start watching files: {error}",
     notScanned: "Not scanned",
     scan: "Scan",
     edit: "Edit",
@@ -184,7 +182,7 @@ export default function Screen() {
     daily: t("intervalDaily"),
     weekly: t("intervalWeekly"),
   };
-  // right: the numeric and action columns are right-aligned.
+  // right: the numeric columns are right-aligned.
   const heads = [
     { label: t("colName"), right: false },
     { label: t("colRoot"), right: false },
@@ -192,7 +190,7 @@ export default function Screen() {
     { label: t("colBooks"), right: true },
     { label: t("colSize"), right: true },
     { label: t("colLastScan"), right: false },
-    { label: t("colActions"), right: true },
+    { label: t("colActions"), right: false },
   ];
   const { data: libs, error, reload } = useApi(() => api.libraries(), []);
   const [dlg, setDlg] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
@@ -312,12 +310,12 @@ export default function Screen() {
       )}
 
       {libs && libs.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-hidden">
           <Table>
             <TableHeader>
               <TableRow>
                 {heads.map((h) => (
-                  <TableHead key={h.label} className={h.right ? "text-right" : undefined}>
+                  <TableHead key={h.label} className={cn("whitespace-nowrap", h.right && "text-right")}>
                     {h.label}
                   </TableHead>
                 ))}
@@ -336,8 +334,8 @@ export default function Screen() {
                         </span>
                       </div>
                       {l.watchError && (
-                        <p className={cn(typeClass("caption"), "mt-1 max-w-[260px] text-muted-foreground")}>
-                          {t("watchFailed", { error: l.watchError })}
+                        <p className={cn(typeClass("caption"), "mt-1 min-w-[200px] max-w-[260px] text-muted-foreground")}>
+                          {l.watchError /* the server sends the whole sentence, in the request's language */}
                         </p>
                       )}
                     </TableCell>
@@ -347,7 +345,7 @@ export default function Screen() {
                     <TableCell className="text-right tabular-nums whitespace-nowrap">{formatBytes(l.sizeBytes)}</TableCell>
                     <TableCell className="whitespace-nowrap">{l.lastScan ? relTime(l.lastScan) : t("notScanned")}</TableCell>
                     <TableCell>
-                      <div className="flex justify-end gap-1">
+                      <div className="flex gap-1">
                         <IconAction label={t("scan")} icon={RefreshCw} onClick={() => !busy && scan(l)} />
                         <IconAction label={t("edit")} icon={SquarePen} onClick={() => !busy && openEdit(l)} />
                         <IconAction

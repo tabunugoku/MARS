@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
+import { ChevronLeft, ChevronRight, CircleCheck, MoreHorizontal, Play } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, bookFileUrl, bookInlineUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -23,6 +23,9 @@ import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
+
+/** A secondary action that is a 36 px icon square on a phone. */
+const phoneIcon = "max-sm:shrink-0 max-sm:px-2.5";
 
 const m = defineMessages({
   ja: {
@@ -121,7 +124,7 @@ const m = defineMessages({
     pageOf: "{page} / {total} pages",
     progress: "Reading progress",
     openInBrowser: "Open in browser",
-    continueReading: "Continue reading",
+    continueReading: "Resume",
     startReading: "Read",
     readFromStart: "Read from start",
     markUnread: "Mark as unread",
@@ -132,7 +135,7 @@ const m = defineMessages({
     thumbTooLarge: "Images must be 20 MB or smaller",
     thumbUploaded: "Thumbnail replaced",
     regenerateTitle: "Regenerate the thumbnail?",
-    regenerateUploadedBody: "This replaces the uploaded image with a thumbnail made from a page.",
+    regenerateUploadedBody: "This replaces the uploaded image with a thumbnail made from a page",
     analysisPending: "Analysis is not finished yet",
     releaseDate: "Release date",
     notSet: "Not set",
@@ -248,7 +251,6 @@ function BookPage({ id }: { id: string }) {
   const completed = !!book.progress?.completed;
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
-  const dots = Math.min(book.pageCount, 60);
   const shownPages = allPages ? data.pages.length : Math.min(PREVIEW_PAGES, data.pages.length);
   const authors = book.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
   // Marking read needs the page count and a readable archive.
@@ -418,12 +420,16 @@ function BookPage({ id }: { id: string }) {
                 <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                   {t("pageOf", { page, total: book.pageCount })}
                 </p>
-                <DotTrack total={dots} value={Math.round((pct / 100) * dots)} label={t("progress")} />
+                <DotTrack percent={pct} max={book.pageCount} label={t("progress")} />
               </>
             ) : null}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* One row on a phone: there Mark as read and More show their icon
+              only (the label stays for screen readers), Read from start keeps
+              its text with 12 px padding, and the main action takes the rest
+              of the row (about 320 of 327 px at 375 px, in ja and en). */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
             {pdfInBrowser ? (
               canStream && (
                 <Button variant="primary" asChild>
@@ -434,20 +440,28 @@ function BookPage({ id }: { id: string }) {
               )
             ) : (
               <>
-                <BrandAction to={`/read/${book.id}`} icon={Play}>
+                <BrandAction to={`/read/${book.id}`} icon={Play} className="max-sm:flex-1">
                   {book.progress && !completed ? t("continueReading") : t("startReading")}
                 </BrandAction>
-                <Button variant="secondary" asChild>
+                <Button variant="secondary" asChild className="max-sm:shrink-0 max-sm:px-3">
                   <Link to={`/read/${book.id}?page=1`}>{t("readFromStart")}</Link>
                 </Button>
               </>
             )}
-            <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead}>
-              {completed ? t("markUnread") : t("markRead")}
+            <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead} aria-pressed={completed} className={phoneIcon}>
+              <CircleCheck size={16} className={cn("sm:hidden", completed && "text-brand")} />
+              <span className="max-sm:sr-only">{completed ? t("markUnread") : t("markRead")}</span>
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
-              <DropdownContent align="start" sideOffset={4}>
+              <DropdownTrigger
+                render={
+                  <Button variant="secondary" className={phoneIcon}>
+                    <MoreHorizontal size={16} className="sm:hidden" />
+                    <span className="max-sm:sr-only">{t("more")}</span>
+                  </Button>
+                }
+              />
+              <DropdownContent align="start" sideOffset={4} className="w-56">
                 {menu.map((item, i) => (
                   <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
                 ))}

@@ -112,7 +112,7 @@ export default function Screen() {
               {entry.rows.length === 0 ? (
                 <EmptyState title={t("noProblems")} />
               ) : (
-                <div className="overflow-x-auto">
+                <div className="overflow-x-auto overflow-y-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>

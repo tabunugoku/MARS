@@ -1,78 +1,86 @@
-/* ComiNavi design tokens — loaded after index.css (shadcn + Fluid).
- * Direction: a night chart and a compass, printed in screentone dots.
+/* MARS design tokens — loaded after index.css (shadcn + Fluid).
+ * Direction: a night chart of Mars, printed in screentone dots.
  * Flat everywhere: no gradients, glows or coloured shadows. Neutrals carry a
- * hair of violet; the one accent is violet; cyan marks only "you are here"
- * (reading position, the selected nav row, the compass needle tip).
- * See .claude/skills/cominavi-design for the rules. */
+ * hair of warm dust; the one accent is Martian oxide red; blue (a Martian
+ * sunset is blue) marks only "you are here" (reading position, the selected
+ * nav row, the moon on the logo's orbit).
+ * --brand is the red for marks and text (dots, progress, links); --brand-fill
+ * is the darker red that buttons are filled with, so white text on it stays
+ * readable in both themes.
+ * See .claude/skills/mars-design for the rules. */
 
 /* Tailwind @theme mappings for these tokens live in index.css (bottom). */
 
 /* Light: chart paper. */
 :root {
-  --brand: oklch(0.53 0.25 293);          /* violet — actions, selection, progress */
+  --brand: oklch(0.55 0.19 33);           /* oxide red ≈ #C83314 — actions, selection, progress */
+  --brand-fill: oklch(0.55 0.19 33);      /* button fill under white text (5.3:1) */
   --brand-foreground: oklch(0.99 0 0);
-  --brand-soft: oklch(0.53 0.25 293 / 10%);
-  --here: oklch(0.6 0.15 237);            /* cyan — "you are here" only */
-  --fluid-accent: oklch(0.53 0.25 293);
-  --dot: oklch(0.3 0.04 290 / 11%);       /* screentone on surfaces */
-  --dot-strong: oklch(0.3 0.04 290 / 22%);
-  --background: oklch(0.975 0.005 290);
-  --foreground: oklch(0.2 0.02 290);
-  --sidebar: oklch(0.96 0.007 290);
-  --card: oklch(0.955 0.008 290);
-  --popover: oklch(0.99 0.003 290);
-  --muted: oklch(0.93 0.01 290);
+  --brand-soft: oklch(0.55 0.19 33 / 10%);
+  --here: oklch(0.56 0.15 250);           /* sunset blue ≈ #1577C8 — "you are here" only */
+  --fluid-accent: oklch(0.55 0.19 33);
+  --destructive: oklch(0.52 0.21 15);     /* crimson, kept apart from the oxide brand */
+  --dot: oklch(0.3 0.028 40 / 11%);       /* screentone on surfaces */
+  --dot-strong: oklch(0.3 0.028 40 / 22%);
+  --background: oklch(0.975 0.0035 40);
+  --foreground: oklch(0.2 0.014 40);
+  --sidebar: oklch(0.96 0.0049 40);
+  --card: oklch(0.955 0.0056 40);
+  --popover: oklch(0.99 0.0021 40);
+  --muted: oklch(0.93 0.007 40);
   /* Secondary button fill (Fluid reads --tint). Opaque, so screentone and
      the backdrop never show through a button; one step off the card. */
-  --tint: oklch(0.895 0.014 290);
-  --tint-hover: oklch(0.915 0.012 290);
-  --secondary: oklch(0.93 0.01 290);
-  --accent: oklch(0.93 0.01 290);
-  --muted-foreground: oklch(0.5 0.025 290);
-  --selected: oklch(0.86 0.02 290);
-  --surface-1: oklch(0.98 0.004 290);
-  --surface-2: oklch(0.99 0.003 290);
+  --tint: oklch(0.895 0.0098 40);
+  --tint-hover: oklch(0.915 0.0084 40);
+  --secondary: oklch(0.93 0.007 40);
+  --accent: oklch(0.93 0.007 40);
+  --muted-foreground: oklch(0.5 0.0175 40);
+  --selected: oklch(0.86 0.014 40);
+  --surface-1: oklch(0.98 0.0028 40);
+  --surface-2: oklch(0.99 0.0021 40);
   --surface-3: oklch(1 0 0);
-  --reader-bg: oklch(0.2 0.01 290);
-  --cover-shadow: 0 1px 2px rgb(20 10 40 / 0.08), 0 4px 12px -4px rgb(20 10 40 / 0.14);
+  --reader-bg: oklch(0.2 0.007 40);
+  --cover-shadow: 0 1px 2px rgb(40 16 10 / 0.08), 0 4px 12px -4px rgb(40 16 10 / 0.14);
   --font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
 }
 
-/* Dark (default): night chart. #0C0B12 ground, #13111C panel, #1B1826 card. */
+/* Dark (default): night chart. Warm near-black ground, panel and card. */
 .dark {
-  --brand: oklch(0.6 0.24 295);           /* ≈ #8B47FF */
+  --brand: oklch(0.64 0.19 35);           /* ≈ #E8542F — marks and text on the night chart */
+  --brand-fill: oklch(0.55 0.19 33);      /* ≈ #C83314 — button fill, white text 5.3:1 */
   --brand-foreground: oklch(0.99 0 0);
-  --brand-soft: oklch(0.6 0.24 295 / 16%);
-  --here: oklch(0.76 0.14 235);           /* ≈ #47BFFF */
-  --fluid-accent: oklch(0.68 0.2 295);
+  --brand-soft: oklch(0.64 0.19 35 / 16%);
+  --here: oklch(0.74 0.13 245);           /* ≈ #5DB2F7 */
+  --fluid-accent: oklch(0.64 0.19 35);
+  --destructive: oklch(0.66 0.2 12);      /* crimson, kept apart from the oxide brand */
   --dot: oklch(1 0 0 / 7%);
   --dot-strong: oklch(1 0 0 / 14%);
-  --background: oklch(0.14 0.012 290);
-  --foreground: oklch(0.95 0.008 290);
-  --sidebar: oklch(0.14 0.012 290);
-  --card: oklch(0.215 0.02 290);
-  --card-foreground: oklch(0.95 0.008 290);
-  --popover: oklch(0.23 0.02 290);
-  --popover-foreground: oklch(0.95 0.008 290);
-  --muted: oklch(0.26 0.018 290);
-  --tint: oklch(0.305 0.022 290);
-  --tint-hover: oklch(0.275 0.02 290);
-  --secondary: oklch(0.26 0.018 290);
-  --accent: oklch(0.26 0.018 290);
-  --muted-foreground: oklch(0.7 0.022 290);
+  --background: oklch(0.14 0.0084 40);
+  --foreground: oklch(0.95 0.0056 40);
+  --sidebar: oklch(0.14 0.0084 40);
+  --card: oklch(0.215 0.014 40);
+  --card-foreground: oklch(0.95 0.0056 40);
+  --popover: oklch(0.23 0.014 40);
+  --popover-foreground: oklch(0.95 0.0056 40);
+  --muted: oklch(0.26 0.0126 40);
+  --tint: oklch(0.305 0.0154 40);
+  --tint-hover: oklch(0.275 0.014 40);
+  --secondary: oklch(0.26 0.0126 40);
+  --accent: oklch(0.26 0.0126 40);
+  --muted-foreground: oklch(0.7 0.0154 40);
   --border: oklch(1 0 0 / 8%);
   --input: oklch(1 0 0 / 12%);
   --sidebar-border: oklch(1 0 0 / 7%);
-  --selected: oklch(0.32 0.02 290);
-  --surface-1: oklch(0.165 0.014 290);
-  --surface-2: oklch(0.18 0.016 290);
-  --surface-3: oklch(0.2 0.017 290);
-  --surface-4: oklch(0.22 0.018 290);
-  --surface-5: oklch(0.24 0.018 290);
-  --surface-6: oklch(0.26 0.018 290);
-  --surface-7: oklch(0.28 0.018 290);
-  --surface-8: oklch(0.3 0.018 290);
-  --reader-bg: oklch(0.09 0.008 290);
+  --selected: oklch(0.32 0.014 40);
+  --surface-1: oklch(0.165 0.0098 40);
+  --surface-2: oklch(0.18 0.0112 40);
+  --surface-3: oklch(0.2 0.0119 40);
+  --surface-4: oklch(0.22 0.0126 40);
+  --surface-5: oklch(0.24 0.0126 40);
+  --surface-6: oklch(0.26 0.0126 40);
+  --surface-7: oklch(0.28 0.0126 40);
+  --surface-8: oklch(0.3 0.0126 40);
+  --reader-bg: oklch(0.09 0.0056 40);
   --cover-shadow: 0 0 0 1px rgb(255 255 255 / 0.05), 0 6px 16px -6px rgb(0 0 0 / 0.6);
 }
 

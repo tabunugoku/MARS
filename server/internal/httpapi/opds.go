@@ -257,7 +257,7 @@ func opdsNavEntry(id, title, href, typ string) opdsEntry {
 func opdsSeriesEntry(x Series) opdsEntry {
 	base := "/opds/v1.2/series/" + x.Id
 	return opdsEntry{
-		ID:      "urn:cominavi:series:" + x.Id,
+		ID:      "urn:mars:series:" + x.Id,
 		Title:   x.Title,
 		Updated: atomTime(x.UpdatedAt),
 		Authors: opdsPeople(x.Authors),
@@ -292,7 +292,7 @@ func bookMediaType(f BookFormat) string {
 func opdsBookEntry(ctx context.Context, b Book) opdsEntry {
 	base := "/opds/v1.2/books/" + b.Id
 	e := opdsEntry{
-		ID:      "urn:cominavi:book:" + b.Id,
+		ID:      "urn:mars:book:" + b.Id,
 		Title:   b.Title,
 		Updated: atomTime(b.CreatedAt),
 		Authors: opdsPeople(b.Authors),
@@ -345,14 +345,14 @@ func opdsSeriesEntries(xs []Series) []opdsEntry {
 func (s *server) opdsCatalog(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	entries := []opdsEntry{
-		opdsNavEntry("urn:cominavi:feed:keep-reading", msg(ctx, "opds.keep_reading"), "/opds/v1.2/keep-reading", opdsAcqType),
-		opdsNavEntry("urn:cominavi:feed:series-latest", msg(ctx, "opds.latest_series"), "/opds/v1.2/series/latest", opdsNavType),
-		opdsNavEntry("urn:cominavi:feed:books-latest", msg(ctx, "opds.latest_books"), "/opds/v1.2/books/latest", opdsAcqType),
-		opdsNavEntry("urn:cominavi:feed:libraries", msg(ctx, "opds.libraries"), "/opds/v1.2/libraries", opdsNavType),
-		opdsNavEntry("urn:cominavi:feed:collections", msg(ctx, "opds.collections"), "/opds/v1.2/collections", opdsNavType),
-		opdsNavEntry("urn:cominavi:feed:readlists", msg(ctx, "opds.readlists"), "/opds/v1.2/readlists", opdsNavType),
+		opdsNavEntry("urn:mars:feed:keep-reading", msg(ctx, "opds.keep_reading"), "/opds/v1.2/keep-reading", opdsAcqType),
+		opdsNavEntry("urn:mars:feed:series-latest", msg(ctx, "opds.latest_series"), "/opds/v1.2/series/latest", opdsNavType),
+		opdsNavEntry("urn:mars:feed:books-latest", msg(ctx, "opds.latest_books"), "/opds/v1.2/books/latest", opdsAcqType),
+		opdsNavEntry("urn:mars:feed:libraries", msg(ctx, "opds.libraries"), "/opds/v1.2/libraries", opdsNavType),
+		opdsNavEntry("urn:mars:feed:collections", msg(ctx, "opds.collections"), "/opds/v1.2/collections", opdsNavType),
+		opdsNavEntry("urn:mars:feed:readlists", msg(ctx, "opds.readlists"), "/opds/v1.2/readlists", opdsNavType),
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:catalog", title: msg(ctx, "opds.catalog_title"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:catalog", title: msg(ctx, "opds.catalog_title"),
 		kind: "navigation", path: opdsCatalogPath}, entries)
 }
 
@@ -363,7 +363,7 @@ func (s *server) opdsKeepReading(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:keep-reading", title: msg(ctx, "opds.keep_reading"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:keep-reading", title: msg(ctx, "opds.keep_reading"),
 		kind: "acquisition", path: "/opds/v1.2/keep-reading", page: opdsPageOf(r), more: more},
 		opdsBookEntries(ctx, books))
 }
@@ -375,7 +375,7 @@ func (s *server) opdsLatestSeries(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:series-latest", title: msg(ctx, "opds.latest_series"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:series-latest", title: msg(ctx, "opds.latest_series"),
 		kind: "navigation", path: "/opds/v1.2/series/latest", page: opdsPageOf(r), more: more},
 		opdsSeriesEntries(xs))
 }
@@ -387,7 +387,7 @@ func (s *server) opdsLatestBooks(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:books-latest", title: msg(ctx, "opds.latest_books"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:books-latest", title: msg(ctx, "opds.latest_books"),
 		kind: "acquisition", path: "/opds/v1.2/books/latest", page: opdsPageOf(r), more: more},
 		opdsBookEntries(ctx, books))
 }
@@ -408,13 +408,13 @@ func (s *server) opdsLibraries(w http.ResponseWriter, r *http.Request) {
 			writeError(ctx, w, http.StatusInternalServerError, "server.error")
 			return
 		}
-		entries = append(entries, opdsNavEntry("urn:cominavi:library:"+l.Id, l.Name, "/opds/v1.2/libraries/"+l.Id, opdsNavType))
+		entries = append(entries, opdsNavEntry("urn:mars:library:"+l.Id, l.Name, "/opds/v1.2/libraries/"+l.Id, opdsNavType))
 	}
 	if rows.Err() != nil {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:libraries", title: msg(ctx, "opds.libraries"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:libraries", title: msg(ctx, "opds.libraries"),
 		kind: "navigation", path: "/opds/v1.2/libraries"}, entries)
 }
 
@@ -435,7 +435,7 @@ func (s *server) opdsLibrary(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:library:" + id, title: l.Name,
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:library:" + id, title: l.Name,
 		kind: "navigation", path: "/opds/v1.2/libraries/" + id, page: opdsPageOf(r), more: more},
 		opdsSeriesEntries(xs))
 }
@@ -449,9 +449,9 @@ func (s *server) opdsCollections(w http.ResponseWriter, r *http.Request) {
 	}
 	entries := make([]opdsEntry, 0, len(cs))
 	for _, c := range cs {
-		entries = append(entries, opdsNavEntry("urn:cominavi:collection:"+c.Id, c.Name, "/opds/v1.2/collections/"+c.Id, opdsNavType))
+		entries = append(entries, opdsNavEntry("urn:mars:collection:"+c.Id, c.Name, "/opds/v1.2/collections/"+c.Id, opdsNavType))
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:collections", title: msg(ctx, "opds.collections"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:collections", title: msg(ctx, "opds.collections"),
 		kind: "navigation", path: "/opds/v1.2/collections"}, entries)
 }
 
@@ -481,7 +481,7 @@ func (s *server) opdsCollection(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:collection:" + id, title: c.Name,
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:collection:" + id, title: c.Name,
 		kind: "navigation", path: "/opds/v1.2/collections/" + id, page: opdsPageOf(r), more: more},
 		opdsSeriesEntries(xs))
 }
@@ -495,9 +495,9 @@ func (s *server) opdsReadLists(w http.ResponseWriter, r *http.Request) {
 	}
 	entries := make([]opdsEntry, 0, len(ls))
 	for _, l := range ls {
-		entries = append(entries, opdsNavEntry("urn:cominavi:readlist:"+l.Id, l.Name, "/opds/v1.2/readlists/"+l.Id, opdsAcqType))
+		entries = append(entries, opdsNavEntry("urn:mars:readlist:"+l.Id, l.Name, "/opds/v1.2/readlists/"+l.Id, opdsAcqType))
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:feed:readlists", title: msg(ctx, "opds.readlists"),
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:feed:readlists", title: msg(ctx, "opds.readlists"),
 		kind: "navigation", path: "/opds/v1.2/readlists"}, entries)
 }
 
@@ -521,7 +521,7 @@ func (s *server) opdsReadList(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:readlist:" + id, title: ls[0].Name,
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:readlist:" + id, title: ls[0].Name,
 		kind: "acquisition", path: "/opds/v1.2/readlists/" + id, page: opdsPageOf(r), more: more},
 		opdsBookEntries(ctx, books))
 }
@@ -543,14 +543,14 @@ func (s *server) opdsSeries(w http.ResponseWriter, r *http.Request) {
 		writeError(ctx, w, http.StatusInternalServerError, "server.error")
 		return
 	}
-	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:cominavi:series:" + id, title: x.Title,
+	s.writeFeed(ctx, w, opdsFeedSpec{id: "urn:mars:series:" + id, title: x.Title,
 		kind: "acquisition", path: "/opds/v1.2/series/" + id, page: opdsPageOf(r), more: more},
 		opdsBookEntries(ctx, books))
 }
 
 func (s *server) opdsSearchDoc(w http.ResponseWriter, r *http.Request) {
 	doc := opdsSearchDoc{
-		ShortName:      "ComiNavi",
+		ShortName:      "MARS",
 		Description:    msg(r.Context(), "opds.search_description"),
 		InputEncoding:  "UTF-8",
 		OutputEncoding: "UTF-8",
@@ -580,7 +580,7 @@ func opdsSeriesMatch(q string) (string, any) {
 func (s *server) opdsSearch(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	spec := opdsFeedSpec{id: "urn:cominavi:feed:search", title: msg(ctx, "opds.search_results", q),
+	spec := opdsFeedSpec{id: "urn:mars:feed:search", title: msg(ctx, "opds.search_results", q),
 		kind: "navigation", path: "/opds/v1.2/search", query: url.Values{"q": {q}}, page: opdsPageOf(r)}
 	if q == "" {
 		s.writeFeed(ctx, w, spec, []opdsEntry{})

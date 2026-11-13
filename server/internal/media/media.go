@@ -9,7 +9,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/archive"
 )
 
 // Limits that keep a hostile or broken file from exhausting the server.

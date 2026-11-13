@@ -10,7 +10,6 @@ import { LoadError } from "@/components/shell/load-error";
 import { SeriesCard } from "@/components/media/cards";
 import { CountUp } from "@/components/media/count-up";
 import { CoverGrid, EmptyState, Page, PageHeader } from "@/components/media/layout";
-import { KindIcon } from "@/components/media/kind-icon";
 import { SelectionBar, SelectTile, type BarAction } from "@/components/media/selection";
 import { BULK_LIMIT, inChunks, useBulkRun, useSelection } from "@/components/media/selection-state";
 import { CoverSkeleton, GridSkeleton } from "@/components/media/skeletons";
@@ -437,7 +436,6 @@ export default function Screen() {
 
   const header = (
     <PageHeader
-      icon={library ? <KindIcon kind={library.kind} size={52} /> : undefined}
       title={title}
       meta={meta}
       actions={
@@ -448,7 +446,7 @@ export default function Screen() {
                 <DropdownTrigger render={<Button variant="ghost" size="icon" aria-label={t("moreActions")}><MoreHorizontal size={16} /></Button>} />
               </span>
             </Tooltip>
-            <DropdownContent align="end">
+            <DropdownContent align="end" className="w-56">
               {menuItems.map((item, i) => (
                 <MenuItem key={item.label} index={i} label={item.label} icon={item.icon} disabled={item.disabled} onSelect={item.run} />
               ))}
@@ -496,7 +494,7 @@ export default function Screen() {
     label?: (value: string) => string,
   ) =>
     options.length > 0 && (
-      <FilterGroup title={title}>
+      <FilterGroup title={title} count={selected.length}>
         <CheckList
           options={options}
           selected={selected}
@@ -513,19 +511,32 @@ export default function Screen() {
       {header}
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
-        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
-        <div className="flex items-center gap-2">
-          {!sel.active && series.length > 0 && (
+        {filterCount > 0 && (
+          <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
+        )}
+        {/* One row on a phone too: there Select and Filters show their icon
+            only (the label stays for screen readers), plus the filter count. */}
+        <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
+          {/* Stays in place while selecting, pressed, so the controls beside
+              it do not shift; pressing it again ends selection, like the
+              bar's close button. */}
+          {(sel.active || series.length > 0) && (
             <Button
-              variant="secondary"
+              variant={sel.active ? "primary" : "secondary"}
+              aria-pressed={sel.active}
+              className="max-sm:gap-0 max-sm:px-2.5"
               onClick={() => {
+                if (sel.active) {
+                  sel.exit();
+                  return;
+                }
                 // A load left over from an earlier selection must not select everything now.
                 setLoadAllFor(null);
                 sel.enter();
               }}
               leadingIcon={ListChecks as IconComponent}
             >
-              {t("select")}
+              <span className="max-sm:sr-only">{t("select")}</span>
             </Button>
           )}
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
@@ -553,20 +564,26 @@ export default function Screen() {
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((o) => !o)}
             leadingIcon={SlidersHorizontal as IconComponent}
+            className="max-sm:gap-0 max-sm:px-2.5"
           >
-            {filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}
+            <span className="max-sm:sr-only">{filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}</span>
+            {filterCount > 0 && (
+              <span aria-hidden className="ml-1 font-mono tabular-nums sm:hidden">
+                {filterCount}
+              </span>
+            )}
           </Button>
         </div>
       </div>
 
       {panelOpen && (
         <div className="mb-4 grid gap-4 rounded-[12px] bg-card p-4 md:grid-cols-3">
-          <FilterGroup title={t("readState")}>
+          <FilterGroup title={t("readState")} count={read.length}>
             {READ_STATES.map((o) => (
               <CheckRow key={o.value} label={t(o.label)} checked={read.includes(o.value)} onChange={() => toggle("read", read, o.value)} />
             ))}
           </FilterGroup>
-          <FilterGroup title={t("status")}>
+          <FilterGroup title={t("status")} count={status.length}>
             {STATUSES.map((v) => (
               <CheckRow key={v} label={statusLabel()[v]} checked={status.includes(v)} onChange={() => toggle("status", status, v)} />
             ))}
@@ -577,7 +594,7 @@ export default function Screen() {
           {listGroup(t("languages"), languages, language, "language", languageName)}
           {listGroup(t("authors"), authors, author, "author")}
           {ageRatings.length > 0 && (
-            <FilterGroup title={t("ageRating")}>
+            <FilterGroup title={t("ageRating")} count={age === undefined ? 0 : 1}>
               <Select value={age === undefined ? "any" : String(age)} onValueChange={(v) => update({ age: v === "any" ? null : v })}>
                 <SelectTrigger aria-label={t("ageRating")} />
                 <SelectContent>
@@ -593,7 +610,7 @@ export default function Screen() {
               </Select>
             </FilterGroup>
           )}
-          <FilterGroup title={t("completion")}>
+          <FilterGroup title={t("completion")} count={complete === undefined ? 0 : 1}>
             <Select
               value={complete === undefined ? "any" : complete ? "yes" : "no"}
               onValueChange={(v) => update({ complete: v === "yes" ? "1" : v === "no" ? "0" : null })}

@@ -127,7 +127,7 @@ const m = defineMessages({
     coverSourceBook: "Thumbnail of the cover book",
     coverSourceUpload: "Uploaded image",
     coverSourceLocal: "Cover file in the folder",
-    coverCaption: "An uploaded image comes first, then the cover file in the folder, then the thumbnail of the cover book.",
+    coverCaption: "An uploaded image comes first, then the cover file in the folder, then the thumbnail of the cover book",
     coverBook: "Cover book",
     firstBook: "First book",
     bookOption: "Vol. {n} {title}",

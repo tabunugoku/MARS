@@ -19,10 +19,10 @@ type Config struct {
 	Addr string
 	// Dev serves no embedded UI (the Vite dev server proxies /api instead).
 	Dev bool
-	// TrustedProxies are reverse proxies (COMINAVI_TRUSTED_PROXIES, comma-
+	// TrustedProxies are reverse proxies (MARS_TRUSTED_PROXIES, comma-
 	// separated IPs or CIDRs) whose X-Forwarded-For names the real client.
 	TrustedProxies []netip.Prefix
-	// PortSet reports whether COMINAVI_PORT chose the port. When false the
+	// PortSet reports whether MARS_PORT chose the port. When false the
 	// port comes from the stored server setting (see AddrWithPort).
 	PortSet bool
 
@@ -36,9 +36,9 @@ func (c Config) AddrWithPort(port int) string {
 
 const defaultPort = 25600
 
-// Load reads COMINAVI_DATA, COMINAVI_HOST, COMINAVI_PORT, COMINAVI_DEV and COMINAVI_TRUSTED_PROXIES.
+// Load reads MARS_DATA, MARS_HOST, MARS_PORT, MARS_DEV and MARS_TRUSTED_PROXIES.
 func Load() (Config, error) {
-	c := Config{DataDir: os.Getenv("COMINAVI_DATA"), Dev: os.Getenv("COMINAVI_DEV") == "1"}
+	c := Config{DataDir: os.Getenv("MARS_DATA"), Dev: os.Getenv("MARS_DEV") == "1"}
 	if c.DataDir == "" {
 		c.DataDir = "data"
 	}
@@ -49,19 +49,19 @@ func Load() (Config, error) {
 	c.DataDir = abs
 
 	port := defaultPort
-	if p := os.Getenv("COMINAVI_PORT"); p != "" {
+	if p := os.Getenv("MARS_PORT"); p != "" {
 		n, err := strconv.Atoi(p)
 		if err != nil || n < 1 || n > 65535 {
-			return c, fmt.Errorf("COMINAVI_PORT %q is not a port number", p)
+			return c, fmt.Errorf("MARS_PORT %q is not a port number", p)
 		}
 		port = n
 		c.PortSet = true
 	}
-	// Listen on all interfaces unless COMINAVI_HOST narrows it; every API
+	// Listen on all interfaces unless MARS_HOST narrows it; every API
 	// route except sign-in, setup and the login screen needs a session.
-	c.host = os.Getenv("COMINAVI_HOST") // "" means all interfaces; sign-in protects the API
+	c.host = os.Getenv("MARS_HOST") // "" means all interfaces; sign-in protects the API
 	c.Addr = c.AddrWithPort(port)
-	for _, f := range strings.Split(os.Getenv("COMINAVI_TRUSTED_PROXIES"), ",") {
+	for _, f := range strings.Split(os.Getenv("MARS_TRUSTED_PROXIES"), ",") {
 		if f = strings.TrimSpace(f); f == "" {
 			continue
 		}
@@ -69,7 +69,7 @@ func Load() (Config, error) {
 		if err != nil {
 			a, aerr := netip.ParseAddr(f)
 			if aerr != nil {
-				return c, fmt.Errorf("COMINAVI_TRUSTED_PROXIES: %q is not an IP or CIDR", f)
+				return c, fmt.Errorf("MARS_TRUSTED_PROXIES: %q is not an IP or CIDR", f)
 			}
 			p = netip.PrefixFrom(a.Unmap(), a.Unmap().BitLen())
 		}
@@ -78,7 +78,7 @@ func Load() (Config, error) {
 	return c, nil
 }
 
-func (c Config) DBPath() string       { return filepath.Join(c.DataDir, "cominavi.db") }
+func (c Config) DBPath() string       { return filepath.Join(c.DataDir, "mars.db") }
 func (c Config) ThumbnailDir() string { return filepath.Join(c.DataDir, "thumbnails") }
 func (c Config) PageCacheDir() string { return filepath.Join(c.DataDir, "cache", "pages") }
 func (c Config) PageThumbDir() string { return filepath.Join(c.DataDir, "cache", "page-thumbs") }

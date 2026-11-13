@@ -12,15 +12,15 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
-	"github.com/tabunugoku/cominavi/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/auth"
 	"log/slog"
 	"net/http"
 	"net/netip"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 type Deps struct {

@@ -29,7 +29,7 @@ const daysAgo = (d: number) => new Date(Date.UTC(2026, 10, 10) - d * 86400000).t
 
 export const libraries: Library[] = [
   { id: "lib-manga", name: "マンガ", root: "/comics/manga", kind: "manga", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(0.1), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: true, exclude: ["@eaDir", "#recycle"] },
-  { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, watchError: "監視を開始できませんでした（inotify の上限に達しています）", importComicInfo: true, importLocalArtwork: false, exclude: [] },
+  { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, watchError: "ファイルの監視を始められませんでした（監視できるフォルダ数の上限）。定期スキャンを使ってください", importComicInfo: true, importLocalArtwork: false, exclude: [] },
   { id: "lib-comics", name: "海外コミック", root: "/comics/western", kind: "comics", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(6), scanInterval: "weekly", watch: false, importComicInfo: true, importLocalArtwork: true, exclude: [] },
 ];
 
@@ -189,7 +189,7 @@ export const settings: ServerSettings = {
   opdsEnabled: true,
   komgaApiEnabled: false,
   koboSyncEnabled: false,
-  loginBackdrop: "compass",
+  loginBackdrop: "planet",
 };
 
 export const currentUser = users[0];

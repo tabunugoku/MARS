@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/auth"
 )
 
 // The compat handler serves what other apps speak, outside /api/v1:
@@ -167,7 +167,7 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 
 // compatChallenge answers 401 with the Basic challenge.
 func (s *server) compatChallenge(w http.ResponseWriter, r *http.Request) (auth.User, bool) {
-	w.Header().Set("WWW-Authenticate", `Basic realm="ComiNavi", charset="UTF-8"`)
+	w.Header().Set("WWW-Authenticate", `Basic realm="MARS", charset="UTF-8"`)
 	writeError(r.Context(), w, http.StatusUnauthorized, "unauthorized.sign_in")
 	return auth.User{}, false
 }

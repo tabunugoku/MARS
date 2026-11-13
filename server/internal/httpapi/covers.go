@@ -10,7 +10,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/library"
 	_ "golang.org/x/image/webp" // decoder registration for DecodeConfig
 )
 

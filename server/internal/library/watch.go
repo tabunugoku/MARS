@@ -16,8 +16,8 @@ import (
 
 	"github.com/fsnotify/fsnotify"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
-	"github.com/tabunugoku/cominavi/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/scan"
 )
 
 // watchDelay is how long a library must stay quiet after its last relevant

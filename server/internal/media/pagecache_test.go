@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/archive"
 )
 
 // bookFixture writes a sample zip and returns its path, pages and the bytes

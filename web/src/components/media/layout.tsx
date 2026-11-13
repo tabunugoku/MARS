@@ -25,7 +25,10 @@ export function Page({ children, className }: { children: ReactNode; className?:
   return <div className={cn("mx-auto w-full max-w-[1400px] px-4 pb-12 pt-2 md:px-8", className)}>{children}</div>;
 }
 
-export function PageHeader({ title, meta, actions, back, icon }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; back?: { to: string; label: string }; icon?: ReactNode }) {
+/** stackActions puts the actions on their own row under the title on phones,
+ *  so pages that share a view switch keep their buttons in one place whether
+ *  or not they fit beside the title. */
+export function PageHeader({ title, meta, actions, back, icon, stackActions }: { title: ReactNode; meta?: ReactNode; actions?: ReactNode; back?: { to: string; label: string }; icon?: ReactNode; stackActions?: boolean }) {
   return (
     <header className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div className="flex min-w-0 items-center gap-3">
@@ -43,7 +46,7 @@ export function PageHeader({ title, meta, actions, back, icon }: { title: ReactN
         {meta && <p className={cn(typeClass("body"), "text-muted-foreground")}>{meta}</p>}
       </div>
       </div>
-      {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+      {actions && <div className={cn("flex shrink-0 items-center gap-2", stackActions && "max-sm:basis-full")}>{actions}</div>}
     </header>
   );
 }
@@ -112,7 +115,7 @@ export function ShelfItem({ children }: { children: ReactNode }) {
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-border px-6 py-16 text-center">
       <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
         {title}
       </p>

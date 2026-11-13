@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/events"
 )
 
 func testPNG(t *testing.T) []byte {

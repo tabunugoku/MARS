@@ -12,7 +12,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/library"
 )
 
 // ─── Downloads ───────────────────────────────────────────────────────────────

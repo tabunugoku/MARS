@@ -25,7 +25,7 @@ const m = defineMessages({
   },
   en: {
     title: "Add to collection",
-    empty: "No collections yet.",
+    empty: "No collections yet",
     newCollection: "New collection",
     name: "Name",
     create: "Create",

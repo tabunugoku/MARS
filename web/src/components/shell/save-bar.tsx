@@ -37,7 +37,7 @@ export function SaveBar({ open, onDiscard, onSave }: { open: boolean; onDiscard:
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 12, transition: spring.moderate.exit }}
             transition={spring.moderate}
-            className="pointer-events-auto flex items-center gap-2 rounded-xl border border-border bg-popover py-2 pl-4 pr-2 text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.24)]"
+            className="pointer-events-auto flex items-center gap-2 rounded-[12px] border border-border bg-popover py-2 pl-4 pr-2 text-popover-foreground shadow-[0_8px_24px_rgb(0_0_0/0.24)]"
           >
             <p className={cn(typeClass("body"), "mr-2 text-muted-foreground")}>{t("unsaved")}</p>
             <Button variant="ghost" onClick={onDiscard}>

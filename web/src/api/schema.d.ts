@@ -946,11 +946,15 @@ export interface paths {
             query?: never;
             header?: never;
             path: {
+                /** @description A series id while loginBackdrop is covers; a book id while it is bookCovers. */
                 seriesId: string;
             };
             cookie?: never;
         };
-        /** A cover on the sign-in page's cover wall (only while loginBackdrop is covers, and only those covers) */
+        /**
+         * A cover on the sign-in page's cover wall (only while loginBackdrop is covers or bookCovers, and only those covers)
+         * @description The id is a series id while loginBackdrop is covers, and a book id while it is bookCovers.
+         */
         get: operations["getPublicCover"];
         put?: never;
         post?: never;
@@ -1462,13 +1466,16 @@ export interface components {
             status: "ok";
             version: string;
         };
-        /** @enum {string} */
-        LoginBackdrop: "compass" | "covers";
+        /**
+         * @description planet: the default artwork (the planet and its orbit). covers: covers of series. bookCovers: covers of books (volumes).
+         * @enum {string}
+         */
+        LoginBackdrop: "planet" | "covers" | "bookCovers";
         LoginScreen: {
             /** @description No user exists yet: show the first-run setup form */
             needsSetup: boolean;
             backdrop: components["schemas"]["LoginBackdrop"];
-            /** @description Filled only when backdrop is "covers". */
+            /** @description Filled only when backdrop is "covers" or "bookCovers". */
             covers: components["schemas"]["LoginCover"][];
         };
         LoginCover: {
@@ -3632,6 +3639,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
+                /** @description A series id while loginBackdrop is covers; a book id while it is bookCovers. */
                 seriesId: string;
             };
             cookie?: never;

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/ids"
+	"github.com/tabunugoku/mars/server/internal/ids"
 )
 
 // Collections and read lists share one visibility rule. An administrator
