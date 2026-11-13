@@ -1,6 +1,6 @@
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router";
-import { ChevronLeft, ChevronRight, Play } from "@keyline-icons/react";
+import { ChevronLeft, ChevronRight, CircleCheck, MoreHorizontal, Play, RotateCcw } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, bookFileUrl, bookInlineUrl, errorMessage, formatBytes, formatDate, startDownload, useApi, type Author, type MediaStatus } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -23,6 +23,9 @@ import { typeClass } from "@/lib/type-scale";
 import { fontWeights } from "@/lib/font-weight";
 import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
+
+/** A secondary action that is a 36 px icon square on a phone. */
+const phoneIcon = "max-sm:shrink-0 max-sm:px-2.5";
 
 const m = defineMessages({
   ja: {
@@ -423,7 +426,10 @@ function BookPage({ id }: { id: string }) {
             ) : null}
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* One row on a phone: there the secondary actions show their icon
+              only (the label stays for screen readers) and the main action
+              takes the rest of the row. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
             {pdfInBrowser ? (
               canStream && (
                 <Button variant="primary" asChild>
@@ -434,19 +440,30 @@ function BookPage({ id }: { id: string }) {
               )
             ) : (
               <>
-                <BrandAction to={`/read/${book.id}`} icon={Play}>
+                <BrandAction to={`/read/${book.id}`} icon={Play} className="max-sm:flex-1">
                   {book.progress && !completed ? t("continueReading") : t("startReading")}
                 </BrandAction>
-                <Button variant="secondary" asChild>
-                  <Link to={`/read/${book.id}?page=1`}>{t("readFromStart")}</Link>
+                <Button variant="secondary" asChild className={phoneIcon}>
+                  <Link to={`/read/${book.id}?page=1`}>
+                    <RotateCcw size={16} className="sm:hidden" />
+                    <span className="max-sm:sr-only">{t("readFromStart")}</span>
+                  </Link>
                 </Button>
               </>
             )}
-            <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead}>
-              {completed ? t("markUnread") : t("markRead")}
+            <Button variant="secondary" disabled={busy || !canMarkRead} onClick={toggleRead} aria-pressed={completed} className={phoneIcon}>
+              <CircleCheck size={16} className={cn("sm:hidden", completed && "text-brand")} />
+              <span className="max-sm:sr-only">{completed ? t("markUnread") : t("markRead")}</span>
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
+              <DropdownTrigger
+                render={
+                  <Button variant="secondary" className={phoneIcon}>
+                    <MoreHorizontal size={16} className="sm:hidden" />
+                    <span className="max-sm:sr-only">{t("more")}</span>
+                  </Button>
+                }
+              />
               <DropdownContent align="start" sideOffset={4} className="w-56">
                 {menu.map((item, i) => (
                   <MenuItem key={item.label} index={i} label={item.label} onSelect={item.onSelect} />
