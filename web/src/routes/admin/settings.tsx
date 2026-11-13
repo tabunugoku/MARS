@@ -1,11 +1,10 @@
-import { useRef, useState } from "react";
-import { Bin, Copy } from "@keyline-icons/react";
-import { api, errorMessage, formatDate, useApi, type ApiKey, type ApiKeyCreated, type ServerSettings } from "@/api";
+import { useState } from "react";
+import { Copy } from "@keyline-icons/react";
+import { api, errorMessage, useApi, type ServerSettings } from "@/api";
 import { LoadError } from "@/components/shell/load-error";
 import { Block } from "@/components/media/skeletons";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
 import { SaveBar } from "@/components/shell/save-bar";
-import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioItem } from "@/components/ui/radio-group";
@@ -16,7 +15,7 @@ import { toast } from "@yusufceng1z/ding-react";
 import { typeClass } from "@/lib/type-scale";
 import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
-import { ConfirmDialog, IconAction, relTime } from "./_parts";
+import { IconAction } from "./_parts";
 
 const m = defineMessages({
   ja: {
@@ -45,20 +44,7 @@ const m = defineMessages({
     backdropBookCovers: "巻の表紙",
     backdropBookCoversNote: "最近追加した巻の表紙を並べます。ログインしていない人にも表紙が見えます",
     integrations: "連携",
-    apiKeys: "API キー",
-    noApiKeys: "APIキーはまだありません",
-    keyCreated: "作成",
-    keyLastUsed: "最終使用",
-    keyNever: "なし",
-    delete: "削除",
-    keyNameLabel: "APIキーの名前",
-    name: "名前",
-    create: "作成",
-    keyNote: "「{name}」のキー。この画面を閉じると、キーは二度と表示されません",
-    close: "閉じる",
     copy: "コピー",
-    keyDeleted: "APIキーを削除しました",
-    keyCopied: "APIキーをコピーしました",
     copyFailed: "コピーできませんでした",
     opds: "OPDS",
     opdsNote: "Panels、Chunky、KyBook などの電子書籍アプリは、次のアドレスに接続します。サインインには MARS のユーザー名とパスワード、または API キーを使います",
@@ -69,8 +55,6 @@ const m = defineMessages({
     collections: "コレクション",
     autoDeleteCollections: "空のコレクションを自動で削除する",
     autoDeleteCollectionsNote: "ゴミ箱を空にしたときやライブラリを削除したときに、シリーズがひとつも残らなかったコレクションを削除します",
-    deleteKeyTitle: "APIキーを削除しますか",
-    deleteKeyBody: "「{name}」を使っているアプリは接続できなくなります。",
   },
   en: {
     title: "Server settings",
@@ -98,20 +82,7 @@ const m = defineMessages({
     backdropBookCovers: "Book covers",
     backdropBookCoversNote: "Shows covers of recently added books. People who are not signed in can see them too.",
     integrations: "Integrations",
-    apiKeys: "API keys",
-    noApiKeys: "No API keys yet",
-    keyCreated: "Created",
-    keyLastUsed: "Last used",
-    keyNever: "Never",
-    delete: "Delete",
-    keyNameLabel: "API key name",
-    name: "Name",
-    create: "Create",
-    keyNote: "Key for \"{name}\". It is not shown again after you close this screen",
-    close: "Close",
     copy: "Copy",
-    keyDeleted: "API key deleted",
-    keyCopied: "API key copied",
     copyFailed: "Could not copy",
     opds: "OPDS",
     opdsNote: "Reader apps such as Panels, Chunky and KyBook connect to this address. They sign in with a MARS user name and password, or an API key.",
@@ -122,8 +93,6 @@ const m = defineMessages({
     collections: "Collections",
     autoDeleteCollections: "Delete empty collections automatically",
     autoDeleteCollectionsNote: "When emptying the trash or deleting a library leaves a collection with no series, the collection is deleted too",
-    deleteKeyTitle: "Delete this API key?",
-    deleteKeyBody: "Apps using \"{name}\" will no longer be able to connect.",
   },
 });
 
@@ -162,20 +131,10 @@ export default function Screen() {
     bookCovers: t("backdropBookCoversNote"),
   };
   const { data, error, reload } = useApi(() => api.settings(), []);
-  const keys = useApi(() => api.apiKeys(), []);
   // The last copy the server returned; drafts are compared against it.
   const [saved, setSaved] = useState<ServerSettings | null>(null);
   const [draft, setDraft] = useState<ServerSettings | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const [keyName, setKeyName] = useState("");
-  const [creatingKey, setCreatingKey] = useState(false);
-  // A second Enter before the first answer would create a second live key.
-  const keyInFlight = useRef(false);
-  const [createdKey, setCreatedKey] = useState<ApiKeyCreated | null>(null);
-  const [removingKey, setRemovingKey] = useState<ApiKey | null>(null);
-  const [removeKeyOpen, setRemoveKeyOpen] = useState(false);
-  const [keyBusyId, setKeyBusyId] = useState<string | null>(null);
 
   const base = saved ?? data;
   const cur = draft ?? base;
@@ -219,38 +178,6 @@ export default function Screen() {
       toast.error(errorMessage(err));
     } finally {
       setSaving(false);
-    }
-  };
-
-  const createKey = async () => {
-    const name = keyName.trim();
-    if (!name || keyInFlight.current) return;
-    keyInFlight.current = true;
-    setCreatingKey(true);
-    try {
-      const created = await api.createApiKey(name);
-      setCreatedKey(created);
-      setKeyName("");
-      keys.reload();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      keyInFlight.current = false;
-      setCreatingKey(false);
-    }
-  };
-
-  const removeKey = async (k: ApiKey) => {
-    setKeyBusyId(k.id);
-    try {
-      await api.deleteApiKey(k.id);
-      toast.success(t("keyDeleted"));
-      if (createdKey?.id === k.id) setCreatedKey(null);
-      keys.reload();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setKeyBusyId(null);
     }
   };
 
@@ -397,66 +324,6 @@ export default function Screen() {
                 />
               )}
             </Field>
-            <Field>
-              <FieldLabel id="set-api-keys">{t("apiKeys")}</FieldLabel>
-              {keys.error && !keys.data && <LoadError message={keys.error} onRetry={keys.reload} />}
-              {keys.data && keys.data.length === 0 && (
-                <p className={cn(typeClass("caption"), "text-muted-foreground")}>{t("noApiKeys")}</p>
-              )}
-              {keys.data && keys.data.length > 0 && (
-                <ul aria-labelledby="set-api-keys" className="flex flex-col gap-1">
-                  {keys.data.map((k) => (
-                    <li key={k.id} className="flex items-center gap-2 rounded-lg bg-card py-2 pl-3 pr-1">
-                      <div className="min-w-0 flex-1">
-                        <p className={cn(typeClass("body"), "truncate text-foreground")}>{k.name}</p>
-                        <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                          {t("keyCreated")} <span className="font-mono">{formatDate(k.createdAt)}</span> · {t("keyLastUsed")}{" "}
-                          {k.lastUsed ? relTime(k.lastUsed) : t("keyNever")}
-                        </p>
-                      </div>
-                      <IconAction
-                        label={t("delete")}
-                        icon={Bin}
-                        onClick={() => {
-                          if (keyBusyId) return;
-                          setRemovingKey(k);
-                          setRemoveKeyOpen(true);
-                        }}
-                      />
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="flex gap-2">
-                <Input
-                  aria-label={t("keyNameLabel")}
-                  placeholder={t("name")}
-                  value={keyName}
-                  disabled={creatingKey}
-                  onChange={(e) => setKeyName(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void createKey();
-                  }}
-                />
-                <Button variant="secondary" disabled={creatingKey || !keyName.trim()} onClick={() => void createKey()}>
-                  {t("create")}
-                </Button>
-              </div>
-              {createdKey && (
-                <div className="space-y-2 rounded-lg bg-card p-3">
-                  <p className={cn(typeClass("caption"), "text-muted-foreground")}>
-                    {t("keyNote", { name: createdKey.name })}
-                  </p>
-                  <div className="flex items-center gap-1">
-                    <code className={cn(typeClass("body"), "min-w-0 flex-1 break-all font-mono text-foreground")}>{createdKey.key}</code>
-                    <IconAction label={t("copy")} icon={Copy} onClick={() => void copyText(createdKey.key, t("keyCopied"))} />
-                  </div>
-                  <Button variant="ghost" onClick={() => setCreatedKey(null)}>
-                    {t("close")}
-                  </Button>
-                </div>
-              )}
-            </Field>
           </FieldGroup>
         </section>
 
@@ -474,17 +341,6 @@ export default function Screen() {
       </div>
 
       <SaveBar open={dirty && !saving} onDiscard={() => setDraft(null)} onSave={save} />
-
-      <ConfirmDialog
-        open={removeKeyOpen}
-        onOpenChange={setRemoveKeyOpen}
-        title={t("deleteKeyTitle")}
-        body={t("deleteKeyBody", { name: removingKey?.name ?? "" })}
-        confirmLabel={t("delete")}
-        onConfirm={() => {
-          if (removingKey) void removeKey(removingKey);
-        }}
-      />
     </Page>
   );
 }

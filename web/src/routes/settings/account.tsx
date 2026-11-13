@@ -2,6 +2,7 @@ import { useState } from "react";
 import { api, errorMessage, useApi, type User } from "@/api";
 import { applyUserLocale, defineMessages, useT, type Locale } from "@/i18n";
 import { Page, PageHeader, SectionTitle } from "@/components/media/layout";
+import { ApiKeys } from "@/components/settings/api-keys";
 import { Block } from "@/components/media/skeletons";
 import { LoadError } from "@/components/shell/load-error";
 import { Button } from "@/components/ui/button";
@@ -243,6 +244,8 @@ export default function Screen() {
             </div>
           </FieldGroup>
         </section>
+
+        <ApiKeys />
       </div>
     </Page>
   );
