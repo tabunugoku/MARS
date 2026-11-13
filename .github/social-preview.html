@@ -1,0 +1,59 @@
+<!doctype html>
+<!-- Source of .github/social-preview.png (1280x640), the image GitHub shows
+     when the repository link is shared. Render it at 1280x640 with device
+     scale 2, scale the capture down to 1280x640 (GitHub's limit is 1 MB),
+     then upload the PNG under Settings > General > Social preview. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MARS social preview</title>
+<style>
+  @font-face { font-family: "Geist"; src: url("../site/assets/fonts/geist.woff2") format("woff2"); font-weight: 100 900; }
+  :root {
+    --bg: oklch(0.14 0.0084 40);
+    --fg: oklch(0.95 0.0056 40);
+    --muted: oklch(0.7 0.0154 40);
+    --line: oklch(1 0 0 / 9%);
+    --dot: oklch(1 0 0 / 7%);
+    --brand: oklch(0.64 0.19 35);
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1280px; height: 640px; overflow: hidden; }
+  body {
+    background: var(--bg);
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 16px 16px;
+    color: var(--fg);
+    font-family: "Geist", system-ui, sans-serif;
+    position: relative;
+  }
+  .text { position: absolute; left: 80px; top: 0; bottom: 0; width: 520px; display: flex; flex-direction: column; justify-content: center; }
+  .brand { display: flex; align-items: center; gap: 16px; margin-bottom: 40px; }
+  .brand img { width: 64px; height: 64px; border-radius: 16px; }
+  .brand b { font-size: 44px; font-weight: 600; letter-spacing: -0.02em; }
+  .brand span { display: block; font-size: 20px; color: var(--muted); font-weight: 400; margin-top: 2px; }
+  h1 { font-size: 52px; line-height: 1.08; font-weight: 600; letter-spacing: -0.03em; }
+  p { margin-top: 24px; font-size: 22px; line-height: 1.45; color: var(--muted); }
+  .chips { margin-top: 32px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips span { font-size: 16px; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+  .shot {
+    position: absolute; left: 650px; top: 96px; width: 900px;
+    border-radius: 16px; overflow: hidden;
+    box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 32px 64px -24px rgb(0 0 0 / 0.8);
+  }
+  .shot img { display: block; width: 100%; }
+</style>
+</head>
+<body>
+  <div class="text">
+    <div class="brand">
+      <img src="../site/assets/logo.svg" alt="">
+      <div><b>MARS</b><span>A Reading Server</span></div>
+    </div>
+    <h1>Your manga.<br>Your server.<br>Your universe.</h1>
+    <p>A self-hosted manga and comic server. Read your library in any browser, on your phone, or in Mihon and OPDS apps.</p>
+    <div class="chips"><span>CBZ · CBR · CB7 · PDF</span><span>Docker</span><span>amd64 · arm64</span></div>
+  </div>
+  <div class="shot"><img src="../site/assets/shots/en-home.webp" alt=""></div>
+</body>
+</html>
