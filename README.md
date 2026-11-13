@@ -8,7 +8,7 @@ English | [日本語](README.ja.md)
 
 ![MARS home screen](docs/screenshots/desktop-home.webp)
 
-MARS is a lightweight, self-hosted comic and manga server. A single static Go binary includes SQLite and the web UI. It scans your folders, builds series and books, and lets you read them in the reader from any browser. It needs neither Java nor an external database.
+MARS is a lightweight, self-hosted comic and manga server. A single static Go binary includes SQLite and the web UI. It scans your folders, builds series and books, and lets you read them in the reader from any browser. It needs no external database.
 
 ## Key features
 

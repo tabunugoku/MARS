@@ -55,8 +55,8 @@ The first public release.
 
 ### Running it
 
-- One static Go binary with SQLite and the web app inside. No Java, no
-  external database.
+- One static Go binary with SQLite and the web app inside. No external
+  database.
 - Docker images for `linux/amd64` and `linux/arm64` on distroless, with a
   built-in health check.
 - Installable web app (PWA) on phones and tablets over HTTPS.
