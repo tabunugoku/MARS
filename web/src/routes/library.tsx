@@ -522,7 +522,7 @@ export default function Screen() {
             <Button
               variant={sel.active ? "primary" : "secondary"}
               aria-pressed={sel.active}
-              className="max-sm:px-2.5"
+              className="max-sm:gap-0 max-sm:px-2.5"
               onClick={() => {
                 if (sel.active) {
                   sel.exit();
@@ -562,11 +562,11 @@ export default function Screen() {
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((o) => !o)}
             leadingIcon={SlidersHorizontal as IconComponent}
-            className="max-sm:px-2.5"
+            className="max-sm:gap-0 max-sm:px-2.5"
           >
             <span className="max-sm:sr-only">{filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}</span>
             {filterCount > 0 && (
-              <span aria-hidden className="font-mono tabular-nums sm:hidden">
+              <span aria-hidden className="ml-1 font-mono tabular-nums sm:hidden">
                 {filterCount}
               </span>
             )}
