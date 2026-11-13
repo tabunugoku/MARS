@@ -40,7 +40,7 @@ const m = defineMessages({
     halfLeftAlt: "{page}ページ（左半分）",
     page: "ページ",
     finished: "{title}を読み終わりました",
-    readNext: "次の巻を読む（{title}）",
+    readNext: "次の巻を読む",
     latestVolume: "このシリーズの最新巻です。",
     backToSeries: "シリーズに戻る",
     jumpTo: "{page}ページへ",
@@ -65,7 +65,7 @@ const m = defineMessages({
     halfLeftAlt: "Page {page}, left half",
     page: "Page",
     finished: "You finished {title}",
-    readNext: "Read next volume ({title})",
+    readNext: "Read next volume",
     latestVolume: "This is the latest volume in the series",
     backToSeries: "Back to series",
     jumpTo: "Go to page {page}",
@@ -692,13 +692,19 @@ function EndCard({ book, next, seriesId, incognito }: { book: Book; next: Book |
   const t = useT(m);
   return (
     <div className="flex max-w-sm flex-col items-center gap-4 px-6 text-center" onPointerDown={(e) => e.stopPropagation()}>
-      <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
+      <p className={cn(typeClass("title"), "line-clamp-3 break-words")} style={{ fontVariationSettings: fontWeights.semibold }} title={book.title}>
         {t("finished", { title: book.title })}
       </p>
       {next ? (
         <>
-          <img src={next.thumbnailUrl} alt="" className="w-32 rounded-md shadow-lg" />
-          <BrandAction to={`/read/${next.id}?page=1${incognito ? "&incognito=1" : ""}`}>{t("readNext", { title: next.title })}</BrandAction>
+          <div className="flex flex-col items-center gap-2">
+            <img src={next.thumbnailUrl} alt="" className="w-32 rounded-md shadow-lg" />
+            {/* A long title would not fit in the button, so it sits under the cover. */}
+            <p className={cn(typeClass("caption"), "line-clamp-2 break-words opacity-70")} title={next.title}>
+              {next.title}
+            </p>
+          </div>
+          <BrandAction to={`/read/${next.id}?page=1${incognito ? "&incognito=1" : ""}`}>{t("readNext")}</BrandAction>
         </>
       ) : (
         <p className={cn(typeClass("body"), "opacity-70")}>{t("latestVolume")}</p>
