@@ -689,8 +689,10 @@ func (pa *pdfArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error
 	for i := range pa.pages {
 		pg := &pa.pages[i]
 		var r io.Reader
+		var lazy *lazyRender
 		if pg.rendered {
-			r = &lazyRender{c: b.ctx, pa: pa, pg: pg}
+			lazy = &lazyRender{c: b.ctx, pa: pa, pg: pg}
+			r = lazy
 		} else {
 			var err error
 			if r, err = pa.render(b.ctx, pg); err != nil {
@@ -698,6 +700,12 @@ func (pa *pdfArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error
 			}
 		}
 		err := fn(pg.entry, b.reader(r))
+		if lazy != nil && lazy.err != nil {
+			// A drawn page that failed to draw: its own error, not what fn
+			// made of the failed read (an image decoder reports "unknown
+			// format" for any read error).
+			return lazy.err
+		}
 		if errors.Is(err, SkipRest) {
 			return nil
 		}

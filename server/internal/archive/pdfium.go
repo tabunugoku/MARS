@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/klippa-app/go-pdfium"
+	"github.com/klippa-app/go-pdfium/enums"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
@@ -41,6 +42,12 @@ const pdfiumMemoryPages = 16384
 // pdfRenderTimeout bounds one use of an instance (opening the document and
 // drawing or measuring), whatever the caller's own deadline.
 var pdfRenderTimeout = time.Minute
+
+// ErrRendererBusy is returned when no PDF renderer could be had: the caller's
+// context ended while every instance was in use, or the renderer could not
+// start. It says nothing about the file, so a book must not be marked
+// unsupported for it; trying again later can succeed.
+var ErrRendererBusy = errors.New("archive: PDF renderer unavailable")
 
 // pdfiumRenders counts the page renders done, for tests.
 var pdfiumRenders atomic.Int64
@@ -89,14 +96,20 @@ func withPDFDocument(c context.Context, r io.ReaderAt, size int64,
 	}()
 	pool, err := pdfiumGet()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrRendererBusy, err)
 	}
-	c, cancel := context.WithTimeout(c, pdfRenderTimeout)
-	defer cancel()
+	// Waiting for a free instance is bounded by the caller only; a wait that
+	// ends is not the PDF's fault, so it is reported as ErrRendererBusy.
 	inst, err := pool.GetInstanceWithContext(c)
 	if err != nil {
-		return err
+		if cerr := c.Err(); cerr != nil {
+			err = cerr // the pool's own message hides that the caller gave up
+		}
+		return fmt.Errorf("%w: %w", ErrRendererBusy, err)
 	}
+	// The time limit applies to the work itself, from here on.
+	c, cancel := context.WithTimeout(c, pdfRenderTimeout)
+	defer cancel()
 	// When c ends mid-call, Kill interrupts the running WebAssembly and drops
 	// the instance; the pool starts a fresh one when it is next needed.
 	stop := context.AfterFunc(c, func() { _ = inst.Kill() })
@@ -148,10 +161,13 @@ func pdfPageSize(inst pdfium.Pdfium, doc references.FPDF_DOCUMENT, page int) (wP
 	return sz.Width, sz.Height, nil
 }
 
-// pdfRenderFailure is the error for a failed render of page. A context error
-// passes through unchanged, an unsupported error is kept, and anything else
-// makes the page unrenderable.
+// pdfRenderFailure is the error for a failed render of page. A busy renderer
+// and a context error pass through unchanged, an unsupported error is kept,
+// and anything else makes the page unrenderable.
 func pdfRenderFailure(c context.Context, err error, page int) error {
+	if errors.Is(err, ErrRendererBusy) {
+		return err
+	}
 	if cerr := c.Err(); cerr != nil {
 		return cerr
 	}
@@ -180,6 +196,9 @@ func renderPDFPagePNG(c context.Context, r io.ReaderAt, size int64, page int) ([
 		}
 		req := &requests.RenderPageInPixels{
 			Page: requests.Page{ByIndex: &requests.PageByIndex{Document: doc, Index: page - 1}},
+			// Annotations with an appearance (stamps, free text, ink) are
+			// part of what the page shows; pdfium leaves them out otherwise.
+			RenderFlags: enums.FPDF_RENDER_FLAG_ANNOT,
 		}
 		// Only the long side is asked for; pdfium derives the other from the
 		// page's aspect ratio, the same way pdfRenderDims does.

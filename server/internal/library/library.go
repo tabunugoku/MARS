@@ -390,6 +390,11 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	}
 	a, err := media.AnalyzeCover(ctx, full, coverPage)
 	switch {
+	case errors.Is(err, archive.ErrRendererBusy):
+		// Not the file's fault: leave the book as it is (outdated), so a
+		// later analysis tries it again.
+		slog.Warn("analyze: PDF renderer unavailable, book left for a later analysis", "book", bookID, "err", err)
+		return seriesID, nil, nil
 	case errors.Is(err, archive.ErrUnsupported):
 		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "unsupported", err.Error())
 	case err != nil:
