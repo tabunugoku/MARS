@@ -1,6 +1,6 @@
 import { Suspense, type ReactNode } from "react";
 import { Link, Outlet, useLocation } from "react-router";
-import { SidebarInset, SidebarProvider, useSidebar } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { SidebarInsetTopbar } from "@/components/sidebar-app/inset-topbar";
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -92,7 +92,7 @@ function ThemeGlyph({ dark }: { dark: boolean }) {
   );
 }
 
-function Tab({ to, label, icon, active, onClick }: { to?: string; label: string; icon: ReactNode; active: boolean; onClick?: () => void }) {
+function Tab({ to, label, icon, active }: { to: string; label: string; icon: ReactNode; active: boolean }) {
   const cls = cn(
     "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 transition-colors duration-80",
     typeClass("micro"),
@@ -104,20 +104,15 @@ function Tab({ to, label, icon, active, onClick }: { to?: string; label: string;
       {label}
     </>
   );
-  return to ? (
+  return (
     <Link to={to} className={cls} aria-current={active ? "page" : undefined}>
       {body}
     </Link>
-  ) : (
-    <button type="button" className={cls} onClick={onClick}>
-      {body}
-    </button>
   );
 }
 
 function BottomTabs() {
   const { pathname } = useLocation();
-  const { setOpenMobile } = useSidebar();
   const t = useT(m);
   return (
     <nav
@@ -125,7 +120,7 @@ function BottomTabs() {
       className="fixed inset-x-0 bottom-0 z-[var(--z-sticky)] flex border-t border-border bg-background pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
     >
       <Tab to="/" label={t("home")} icon={<House size={18} />} active={pathname === "/"} />
-      <Tab label={t("library")} icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} onClick={() => setOpenMobile(true)} />
+      <Tab to="/libraries" label={t("library")} icon={<LibraryBig size={18} />} active={pathname.startsWith("/libraries")} />
       <Tab to="/search" label={t("search")} icon={<Search size={18} />} active={pathname.startsWith("/search")} />
       <Tab to="/collections" label={t("collections")} icon={<Grid2x2 size={18} />} active={pathname.startsWith("/collections") || pathname.startsWith("/readlists")} />
     </nav>
