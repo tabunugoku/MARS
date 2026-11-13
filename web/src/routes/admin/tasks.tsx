@@ -25,7 +25,6 @@ const m = defineMessages({
     kindScan: "スキャン",
     kindAnalyze: "解析",
     kindThumbnail: "サムネイル",
-    kindHash: "ハッシュ",
     kindTrash: "ゴミ箱",
     colKind: "種別",
     colLabel: "ラベル",
@@ -59,7 +58,6 @@ const m = defineMessages({
     kindScan: "Scan",
     kindAnalyze: "Analyze",
     kindThumbnail: "Thumbnail",
-    kindHash: "Hash",
     kindTrash: "Trash",
     colKind: "Kind",
     colLabel: "Label",
@@ -97,7 +95,6 @@ export default function Screen() {
     scan: t("kindScan"),
     analyze: t("kindAnalyze"),
     thumbnail: t("kindThumbnail"),
-    hash: t("kindHash"),
     trash: t("kindTrash"),
   };
   const historyHeads = [t("colKind"), t("colLabel"), t("colState"), t("colStarted")];

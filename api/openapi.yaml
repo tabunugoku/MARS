@@ -1399,7 +1399,7 @@ components:
         thumbnailUrl: { type: string, description: "A small JPEG of the page, for page lists" }
     TaskKind:
       type: string
-      enum: [scan, analyze, thumbnail, hash, trash]
+      enum: [scan, analyze, thumbnail, trash]
     TaskState:
       type: string
       enum: [running, queued, done, failed, cancelled]
@@ -1543,7 +1543,7 @@ components:
       required: [bookId, kind, detail]
       properties:
         bookId: { type: string }
-        kind: { type: string, enum: [error, missing, duplicate, unsupported] }
+        kind: { type: string, enum: [error, missing, unsupported] }
         detail: { type: string }
     Health:
       type: object
@@ -1813,7 +1813,7 @@ components:
         books: { type: object, additionalProperties: { $ref: "#/components/schemas/ReaderPrefs" }, description: "By book id" }
     ServerSettings:
       type: object
-      required: [port, taskThreads, thumbnailSize, thumbnailFormat, rememberMeDays, deleteEmptyCollections, opdsEnabled, komgaApiEnabled, koboSyncEnabled, loginBackdrop]
+      required: [port, taskThreads, thumbnailSize, thumbnailFormat, rememberMeDays, deleteEmptyCollections, opdsEnabled, komgaApiEnabled, loginBackdrop]
       properties:
         port: { type: integer, description: "Takes effect after a restart" }
         taskThreads: { type: integer }
@@ -1823,7 +1823,6 @@ components:
         deleteEmptyCollections: { type: boolean }
         opdsEnabled: { type: boolean, description: "Serves the OPDS 1.2 catalog at /opds/v1.2/catalog" }
         komgaApiEnabled: { type: boolean, description: "Serves a Komga-compatible API at /komga (for the Mihon/Tachiyomi Komga extension)" }
-        koboSyncEnabled: { type: boolean }
         loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
     ServerSettingsUpdate:
       type: object
@@ -1836,7 +1835,6 @@ components:
         deleteEmptyCollections: { type: boolean }
         opdsEnabled: { type: boolean }
         komgaApiEnabled: { type: boolean }
-        koboSyncEnabled: { type: boolean }
         loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
     TrashResult:
       type: object

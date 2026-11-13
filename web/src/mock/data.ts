@@ -170,12 +170,11 @@ export const tasks: Task[] = [
   { id: "t-2", kind: "thumbnail", label: "サムネイルを生成（214件）", libraryId: "lib-manga", state: "queued", progress: 0, startedAt: null, error: "" },
   { id: "t-3", kind: "analyze", label: "メディアを解析（38件）", libraryId: "lib-webtoon", state: "queued", progress: 0, startedAt: null, error: "" },
   { id: "t-4", kind: "scan", label: "海外コミック をスキャン", libraryId: "lib-comics", state: "done", progress: 1, startedAt: daysAgo(0.3), error: "" },
-  { id: "t-5", kind: "hash", label: "ファイルハッシュを計算", libraryId: null, state: "failed", progress: 0.4, startedAt: daysAgo(1), error: "" },
+  { id: "t-5", kind: "analyze", label: "メディアを解析", libraryId: null, state: "failed", progress: 0.4, startedAt: daysAgo(1), error: "" },
 ];
 
 export const mediaIssues: MediaIssue[] = [
   ...books.filter((b) => b.mediaStatus === "error").map((b) => ({ bookId: b.id, kind: "error" as const, detail: "アーカイブを開けません（CRC エラー）" })),
-  { bookId: books[3].id, kind: "duplicate", detail: "同じハッシュのファイルが別のフォルダにあります" },
   { bookId: books[12].id, kind: "missing", detail: "スキャン時にファイルが見つかりませんでした（ゴミ箱に移動済み）" },
 ];
 
@@ -188,7 +187,6 @@ export const settings: ServerSettings = {
   deleteEmptyCollections: true,
   opdsEnabled: true,
   komgaApiEnabled: false,
-  koboSyncEnabled: false,
   loginBackdrop: "planet",
 };
 

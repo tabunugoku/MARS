@@ -23,5 +23,5 @@
 - 0件のタブは `EmptyState`「問題のあるファイルはありません」。
 
 ## サーバー設定 /admin/settings
-- 1カラムのフォーム（最大幅 640px）を見出し付きセクションで: 一般（ポート Input、タスクの同時実行数 Slider 1〜8）、サムネイル（サイズ Select、形式 RadioGroup: WebP／JPEG／AVIF、tertiary「サムネイルを再生成」）、認証（ログイン保持の日数）、連携（OPDS を有効にする Switch と URL `http://<host>:25600/opds/v1.2/catalog` の表示、Kobo 同期 Switch、API キー: 伏せ字表示 + コピー + 再発行）、コレクション（空のコレクションを自動で削除 Switch）。
+- 1カラムのフォーム（最大幅 640px）を見出し付きセクションで: 一般（ポート Input、タスクの同時実行数 Slider 1〜8）、サムネイル（サイズ Select、形式 RadioGroup: WebP／JPEG／AVIF、tertiary「サムネイルを再生成」）、認証（ログイン保持の日数）、連携（OPDS を有効にする Switch と URL `http://<host>:25600/opds/v1.2/catalog` の表示、API キー: 伏せ字表示 + コピー + 再発行）、コレクション（空のコレクションを自動で削除 Switch）。
 - 画面下に sticky の保存バー（変更があるときだけ表示、「変更を破棄」「保存」）→ toast「設定を保存しました」。
