@@ -179,10 +179,12 @@ export function ListCard({ to, name, count, covers }: { to: string; name: string
   );
 }
 
+// Two cards a row on a phone; wider screens fit as many 200 px cards as they can.
 export function ListGrid({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-x-4 gap-y-8">{children}</div>;
+  return <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-x-4 gap-y-8 sm:grid-cols-[repeat(auto-fill,minmax(200px,1fr))]">{children}</div>;
 }
 
+// Two cards a row on a phone; wider screens fit as many 200 px cards as they can.
 export function ListGridSkeleton() {
   return (
     <ListGrid>
