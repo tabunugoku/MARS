@@ -105,7 +105,7 @@
     <div class="wrap split flip">
       <div class="split-copy">
         <h2 id="library-title" class="h2">Point it at a folder, get series and books</h2>
-        <p class="lead">A folder of archives becomes a series. MARS also reads cover images and <code>ComicInfo.xml</code>.</p>
+        <p class="lead">A folder of archives becomes a series. MARS also reads cover images and <code translate="no">ComicInfo.xml</code>.</p>
         <ul class="points">
           <li>CBZ / ZIP, CBR / RAR (including RAR5), CB7 / 7z, and PDF.</li>
           <li>Watches your files for changes and scans by itself. Scheduled scans and scans at startup too.</li>
@@ -162,7 +162,7 @@
     <div class="wrap start-grid">
       <div class="split-copy">
         <h2 id="start-title" class="h2">Start it with Docker, then three steps</h2>
-        <p class="lead">You need Docker and a folder of comics, on <code>linux/amd64</code> or <code>linux/arm64</code>.</p>
+        <p class="lead">You need Docker and a folder of comics, on <code translate="no">linux/amd64</code> or <code translate="no">linux/arm64</code>.</p>
       </div>
       <div>
         <ol class="steps">
@@ -170,9 +170,9 @@
             <span class="step-dot" aria-hidden="true">1</span>
             <div class="step-body">
               <h3>Run it</h3>
-              <p>Run this command. Replace <code>/path/to/comics</code> with your comics folder.</p>
+              <p>Run this command. Replace <code translate="no">/path/to/comics</code> with your comics folder.</p>
               <div class="cmd">
-                <pre id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
+                <pre translate="no" id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
                 <button class="copy" type="button" data-copy="cmd-run" data-idle="Copy" data-done="Copied" aria-label="Copy the docker run command">
                   <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
                   <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
@@ -187,7 +187,7 @@
               <h3>Create the administrator</h3>
               <p>Open <span class="mono">http://localhost:25600</span>, enter the setup token, and create the administrator account. This command shows the token:</p>
               <div class="cmd">
-                <pre id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
+                <pre translate="no" id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
                 <button class="copy" type="button" data-copy="cmd-token" data-idle="Copy" data-done="Copied" aria-label="Copy the command that shows the setup token">
                   <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
                   <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
@@ -200,7 +200,7 @@
             <span class="step-dot" aria-hidden="true">3</span>
             <div class="step-body">
               <h3>Add a library</h3>
-              <p>Go to Admin &gt; Libraries, select <strong>Add library</strong>, enter <code>/comics</code> as the folder, and save.</p>
+              <p>Go to Admin &gt; Libraries, select <strong>Add library</strong>, enter <code translate="no">/comics</code> as the folder, and save.</p>
             </div>
           </li>
         </ol>

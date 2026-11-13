@@ -106,7 +106,7 @@
     <div class="wrap split flip">
       <div class="split-copy">
         <h2 id="library-title" class="h2">フォルダを指定すれば、シリーズと巻にまとまる</h2>
-        <p class="lead">アーカイブを入れたフォルダが、シリーズになります。表紙の画像と <code>ComicInfo.xml</code> も読み込みます。</p>
+        <p class="lead">アーカイブを入れたフォルダが、シリーズになります。表紙の画像と <code translate="no">ComicInfo.xml</code> も読み込みます。</p>
         <ul class="points">
           <li>CBZ / ZIP、CBR / RAR（RAR5 を含む）、CB7 / 7z、PDF に対応しています。</li>
           <li>ファイルの変更を監視して、自動でスキャンします。定期スキャンと起動時のスキャンもできます。</li>
@@ -163,7 +163,7 @@
     <div class="wrap start-grid">
       <div class="split-copy">
         <h2 id="start-title" class="h2">Docker で起動して、3 つの手順で使い始める</h2>
-        <p class="lead">Docker と、マンガを置いたフォルダを用意します。環境は <code>linux/amd64</code> か <code>linux/arm64</code> です。</p>
+        <p class="lead">Docker と、マンガを置いたフォルダを用意します。環境は <code translate="no">linux/amd64</code> か <code translate="no">linux/arm64</code> です。</p>
       </div>
       <div>
         <ol class="steps">
@@ -171,9 +171,9 @@
             <span class="step-dot" aria-hidden="true">1</span>
             <div class="step-body">
               <h3>起動する</h3>
-              <p>次のコマンドを実行します。<code>/path/to/comics</code> は、マンガのフォルダに置き換えてください。</p>
+              <p>次のコマンドを実行します。<code translate="no">/path/to/comics</code> は、マンガのフォルダに置き換えてください。</p>
               <div class="cmd">
-                <pre id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
+                <pre translate="no" id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
                 <button class="copy" type="button" data-copy="cmd-run" data-idle="コピー" data-done="コピーしました" aria-label="docker run のコマンドをコピー">
                   <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
                   <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
@@ -188,7 +188,7 @@
               <h3>管理者を作る</h3>
               <p>ブラウザで <span class="mono">http://localhost:25600</span> を開き、セットアップトークンを入力して管理者を作ります。トークンは次のコマンドで確認できます。</p>
               <div class="cmd">
-                <pre id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
+                <pre translate="no" id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
                 <button class="copy" type="button" data-copy="cmd-token" data-idle="コピー" data-done="コピーしました" aria-label="セットアップトークンを表示するコマンドをコピー">
                   <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
                   <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
@@ -201,7 +201,7 @@
             <span class="step-dot" aria-hidden="true">3</span>
             <div class="step-body">
               <h3>ライブラリを追加する</h3>
-              <p>管理 &gt; ライブラリ設定 で<strong>ライブラリを追加</strong>を選び、フォルダに <code>/comics</code> を指定して保存します。</p>
+              <p>管理 &gt; ライブラリ設定 で<strong>ライブラリを追加</strong>を選び、フォルダに <code translate="no">/comics</code> を指定して保存します。</p>
             </div>
           </li>
         </ol>
