@@ -364,10 +364,10 @@ func (s *server) GetBook(ctx context.Context, req GetBookRequestObject) (GetBook
 
 func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObject) (ListBookPagesResponseObject, error) {
 	var size int64
-	var mtime, status string
+	var mtime, status, format string
 	cond, args := libScope(ctx, "b.library_id")
-	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime, media_status FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
-		append([]any{req.BookId}, args...)...).Scan(&size, &mtime, &status); errors.Is(err, sql.ErrNoRows) {
+	if err := s.DB.QueryRowContext(ctx, `SELECT size_bytes, mtime, media_status, format FROM books b WHERE b.id = ? AND b.deleted_at IS NULL AND `+cond,
+		append([]any{req.BookId}, args...)...).Scan(&size, &mtime, &status, &format); errors.Is(err, sql.ErrNoRows) {
 		return ListBookPages404JSONResponse{notFound(ctx, "not_found.book")}, nil
 	} else if err != nil {
 		return nil, err
@@ -375,7 +375,7 @@ func (s *server) ListBookPages(ctx context.Context, req ListBookPagesRequestObje
 	if status != "ready" { // pages of a failed or outdated analysis are stale
 		return ListBookPages200JSONResponse{}, nil
 	}
-	v := library.Version(size, mtime)
+	v := library.Version(size, mtime, format)
 	rows, err := s.DB.QueryContext(ctx, `SELECT number, width, height, media_type FROM pages WHERE book_id = ? ORDER BY number`, req.BookId)
 	if err != nil {
 		return nil, err

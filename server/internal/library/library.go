@@ -390,6 +390,11 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	}
 	a, err := media.AnalyzeCover(ctx, full, coverPage)
 	switch {
+	case errors.Is(err, archive.ErrRendererBusy):
+		// Not the file's fault: leave the book as it is (outdated), so a
+		// later analysis tries it again.
+		slog.Warn("analyze: PDF renderer unavailable, book left for a later analysis", "book", bookID, "err", err)
+		return seriesID, nil, nil
 	case errors.Is(err, archive.ErrUnsupported):
 		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "unsupported", err.Error())
 	case err != nil:
@@ -654,10 +659,21 @@ type Page struct {
 	Close     func() error
 }
 
+// pdfRenderRevision is part of every PDF's version. Bump it when the way PDF
+// pages are served changes (which pages are drawn, or how), so pages cached
+// by browsers, page thumbnails and the page cache are not reused for the
+// same file. Revision 2: pages that are not one image are drawn by pdfium.
+const pdfRenderRevision = "2"
+
 // Version is the token page URLs carry (?v=) so a replaced file gets new
-// URLs and old cached responses are never reused for it.
-func Version(size int64, mtime string) string {
-	return fmt.Sprintf("%x", hash(fmt.Sprintf("%d-%s", size, mtime)))
+// URLs and old cached responses are never reused for it. format is the
+// book's format (books.format).
+func Version(size int64, mtime, format string) string {
+	s := fmt.Sprintf("%d-%s", size, mtime)
+	if archive.Format(format) == archive.PDF {
+		s += "-pdf" + pdfRenderRevision
+	}
+	return fmt.Sprintf("%x", hash(s))
 }
 
 // OpenPage resolves page n (1-based) of a ready book. Zip pages stream
@@ -681,7 +697,7 @@ func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, err
 	if err != nil {
 		return Page{}, err
 	}
-	v := Version(size, mtime)
+	v := Version(size, mtime, format)
 	etag := fmt.Sprintf(`"%s-%d-%s"`, bookID, n, v)
 
 	if archive.Format(format) == archive.CBZ {
@@ -776,6 +792,9 @@ var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time
 // Schedule scans every library once at startup, then each library again
 // when its scan interval has passed. It returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
+	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
+		slog.Error("reanalyse PDFs", "err", err)
+	}
 	tick := func(startup bool) {
 		rows, err := s.DB.QueryContext(ctx, `SELECT id, scan_interval, last_scan FROM libraries`)
 		if err != nil {

@@ -79,6 +79,29 @@ func TestPageCacheExtractAndHit(t *testing.T) {
 	}
 }
 
+func TestPageCacheNewPageListReextracts(t *testing.T) {
+	// A new analysis of the same file version (same key) can change what a
+	// page number holds; the cached page must not be served for it.
+	ctx := context.Background()
+	path, pages, want := bookFixture(t)
+	if len(pages) < 2 {
+		t.Fatal("fixture needs two pages")
+	}
+	c := &PageCache{Dir: t.TempDir(), MaxBytes: 1 << 30}
+	if _, err := readPage(ctx, c, "book1", "v1", path, pages, 1); err != nil {
+		t.Fatal(err)
+	}
+	swapped := append([]Page(nil), pages...)
+	swapped[0].Entry, swapped[1].Entry = pages[1].Entry, pages[0].Entry
+	got, err := readPage(ctx, c, "book1", "v1", path, swapped, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want[2]) {
+		t.Error("page 1 still holds the old page list's entry")
+	}
+}
+
 func TestPageCacheRejectsBadInput(t *testing.T) {
 	ctx := context.Background()
 	path, pages, _ := bookFixture(t)

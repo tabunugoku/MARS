@@ -210,6 +210,7 @@ var pdfPageReasons = map[string]string{
 	"image is too large":                 "media.pdf_too_large",
 	"cannot be read":                     "media.pdf_unreadable",
 	"cannot be decoded":                  "media.pdf_undecodable",
+	"cannot be rendered":                 "media.pdf_unrenderable",
 	"has no image data":                  "media.pdf_no_image",
 	"uses CMYK colour":                   "media.pdf_cmyk",
 	"uses an image mask":                 "media.pdf_mask",

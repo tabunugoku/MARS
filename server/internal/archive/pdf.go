@@ -8,6 +8,8 @@ import (
 	"image/jpeg"
 	"io"
 	"os"
+	"strconv"
+	"sync"
 
 	"github.com/pdfcpu/pdfcpu/pkg/api"
 	"github.com/pdfcpu/pdfcpu/pkg/filter"
@@ -39,14 +41,17 @@ var (
 	errPDFUnreadable = fmt.Errorf("%w: not a readable PDF", ErrUnsupported)
 )
 
-// pdfPage is one page of the book, served as one image entry.
+// pdfPage is one page of the book, served as one entry. A page that is one
+// browser-servable image is served as that image; any other page is drawn by
+// pdfium (rendered is true) and the image fields are unused.
 type pdfPage struct {
-	entry   Entry
-	page    int    // 1-based page number
-	objNr   int    // the page's only image object
-	resName string // resource name of the image on the page
-	ext     string // "jpg" or "png", the entry's extension
-	raw     bool   // serve sd.Raw unchanged (a single DCTDecode filter)
+	entry    Entry
+	page     int    // 1-based page number
+	rendered bool   // drawn by pdfium to a PNG (see pdfium.go)
+	objNr    int    // the page's only image object
+	resName  string // resource name of the image on the page
+	ext      string // "jpg" or "png", the entry's extension
+	raw      bool   // serve sd.Raw unchanged (a single DCTDecode filter)
 	// decodeLen is the number of decoded bytes to inflate before pdfcpu
 	// renders the image, bounded by maxPDFImageBytes. Zero means no bounded
 	// decode happens here (raw JPEG, and CMYK JPEG, which is checked by size).
@@ -54,16 +59,21 @@ type pdfPage struct {
 	sd        *types.StreamDict
 }
 
-// pdfArchive exposes each page's single image. The parsed PDF stays in
-// memory; pdfcpu decodes images into it, so access is serialised by busy, a
-// one-slot semaphore. A waiter gives up when its context ends.
+// pdfArchive exposes each page of the book as one entry. The parsed PDF stays
+// in memory; pdfcpu decodes images into it, and pdfium reads the file, so
+// access is serialised by busy, a one-slot semaphore. A waiter gives up when
+// its context ends.
 type pdfArchive struct {
 	file   *os.File
+	size   int64
 	ctx    *model.Context
 	pages  []pdfPage
 	byName map[string]int
 	busy   chan struct{} // holds one token while a render or Close runs
 	closed bool          // guarded by busy
+
+	drawnMu sync.Mutex
+	drawn   map[int][2]int // pixel sizes of the drawn pages, once measured
 }
 
 // lock takes the archive's render slot, or returns c's error if c ends first.
@@ -90,7 +100,7 @@ func openPDF(c context.Context, file *os.File, size int64) (Archive, error) {
 		file.Close()
 		return nil, fmt.Errorf("%w: PDF over %d MB", ErrUnsupported, maxPDFBytes>>20)
 	}
-	pa := &pdfArchive{file: file, busy: make(chan struct{}, 1)}
+	pa := &pdfArchive{file: file, size: size, busy: make(chan struct{}, 1)}
 	if err := pa.load(c, file); err != nil {
 		file.Close()
 		return nil, err
@@ -127,8 +137,10 @@ func (pa *pdfArchive) load(c context.Context, file *os.File) (err error) {
 	return pa.index(c)
 }
 
-// index picks the image of every page. It uses pdfcpu's metadata-only
-// extraction, so no pixels are decoded here.
+// index lists the entries of every page. It uses pdfcpu's metadata-only
+// extraction, so no pixels are decoded here. A page that is not one image the
+// browser can show as it is becomes a drawn page, so a book is only refused
+// as a whole when the file itself is not a PDF we can read.
 func (pa *pdfArchive) index(c context.Context) error {
 	ctx := pa.ctx
 	pa.byName = make(map[string]int, ctx.PageCount)
@@ -136,82 +148,92 @@ func (pa *pdfArchive) index(c context.Context) error {
 		if err := c.Err(); err != nil {
 			return err
 		}
-		stubs, err := pdfcpu.ExtractPageImages(c, ctx, p, true)
+		pg, err := pa.indexImagePage(c, p)
 		if err != nil {
 			if cerr := c.Err(); cerr != nil {
 				return cerr
 			}
-			return pdfUnsupported(p, "cannot be read")
+			pg = pdfPage{entry: Entry{Name: renderedPDFName(p), Size: -1}, page: p, rendered: true}
 		}
-		var (
-			n    int
-			stub model.Image
-			objN int
-		)
-		for objNr, st := range stubs {
-			if st.Thumb {
-				continue // the page thumbnail is not a page image
-			}
-			n++
-			stub, objN = st, objNr
-		}
-		if n != 1 {
-			return pdfUnsupported(p, "is not a single image")
-		}
-		imgObj := ctx.Optimize.ImageObjects[objN]
-		if imgObj == nil || imgObj.ImageDict == nil {
-			return pdfUnsupported(p, "cannot be read")
-		}
-		sd := imgObj.ImageDict
-
-		images, draws, inline, err := pageUse(c, ctx, p)
-		if err != nil {
-			if cerr := c.Err(); cerr != nil {
-				return cerr
-			}
-			return pdfUnsupported(p, "cannot be read")
-		}
-		if images != 1 || draws != 1 || inline {
-			return pdfUnsupported(p, "is not a single image")
-		}
-
-		ext, raw, err := pdfImageKind(p, stub, sd)
-		if err != nil {
-			return err
-		}
-		size := int64(-1)
-		var decodeLen int64
-		switch {
-		case raw:
-			if len(sd.Raw) == 0 {
-				return pdfUnsupported(p, "has no image data")
-			}
-			size = int64(len(sd.Raw))
-		case pdfLastFilter(sd) == filter.DCT:
-			// pdfcpu decodes a CMYK JPEG in full, so its real size is checked first.
-			if err := checkPDFJPEG(p, sd.Raw); err != nil {
-				return err
-			}
-		default:
-			decodeLen, err = pdfDecodedSize(p, stub, sd)
-			if err != nil {
-				return err
-			}
-		}
-		name := fmt.Sprintf("%04d.%s", p, ext)
-		pa.byName[name] = len(pa.pages)
-		pa.pages = append(pa.pages, pdfPage{
-			entry:     Entry{Name: name, Size: size},
-			page:      p,
-			objNr:     objN,
-			resName:   stub.Name,
-			ext:       ext,
-			raw:       raw,
-			decodeLen: decodeLen,
-			sd:        sd,
-		})
+		pa.byName[pg.entry.Name] = len(pa.pages)
+		pa.pages = append(pa.pages, pg)
 	}
 	return nil
+}
+
+// indexImagePage returns the entry that serves page p as its own image. Any
+// error means the page must be drawn instead; index decides that.
+func (pa *pdfArchive) indexImagePage(c context.Context, p int) (pdfPage, error) {
+	ctx := pa.ctx
+	stubs, err := pdfcpu.ExtractPageImages(c, ctx, p, true)
+	if err != nil {
+		return pdfPage{}, pdfUnsupported(p, "cannot be read")
+	}
+	var (
+		n    int
+		stub model.Image
+		objN int
+	)
+	for objNr, st := range stubs {
+		if st.Thumb {
+			continue // the page thumbnail is not a page image
+		}
+		n++
+		stub, objN = st, objNr
+	}
+	if n != 1 {
+		return pdfPage{}, pdfUnsupported(p, "is not a single image")
+	}
+	imgObj := ctx.Optimize.ImageObjects[objN]
+	if imgObj == nil || imgObj.ImageDict == nil {
+		return pdfPage{}, pdfUnsupported(p, "cannot be read")
+	}
+	sd := imgObj.ImageDict
+
+	// Visible text over the image would be lost if the image were served
+	// alone, so such a page is drawn. Invisible text (an OCR layer on a scan)
+	// does not count: the scan keeps its own image.
+	images, draws, inline, text, err := pageUse(c, ctx, p)
+	if err != nil {
+		return pdfPage{}, pdfUnsupported(p, "cannot be read")
+	}
+	if images != 1 || draws != 1 || inline || text {
+		return pdfPage{}, pdfUnsupported(p, "is not a single image")
+	}
+
+	ext, raw, err := pdfImageKind(p, stub, sd)
+	if err != nil {
+		return pdfPage{}, err
+	}
+	size := int64(-1)
+	var decodeLen int64
+	switch {
+	case raw:
+		if len(sd.Raw) == 0 {
+			return pdfPage{}, pdfUnsupported(p, "has no image data")
+		}
+		size = int64(len(sd.Raw))
+	case pdfLastFilter(sd) == filter.DCT:
+		// pdfcpu decodes a CMYK JPEG in full, so its real size is checked first.
+		if err := checkPDFJPEG(p, sd.Raw); err != nil {
+			return pdfPage{}, err
+		}
+	default:
+		decodeLen, err = pdfDecodedSize(p, stub, sd)
+		if err != nil {
+			return pdfPage{}, err
+		}
+	}
+	return pdfPage{
+		entry:     Entry{Name: fmt.Sprintf("%04d.%s", p, ext), Size: size},
+		page:      p,
+		objNr:     objN,
+		resName:   stub.Name,
+		ext:       ext,
+		raw:       raw,
+		decodeLen: decodeLen,
+		sd:        sd,
+	}, nil
 }
 
 // pdfUnsupported is the error for a page that cannot be served.
@@ -333,26 +355,40 @@ func checkPDFJPEG(page int, raw []byte) error {
 }
 
 // pageUse counts what page p draws: the image XObjects its resources name,
-// the Do operators in its content, and whether that content has an inline
-// image. pdfcpu merges identical image objects, so a page that draws one
+// the Do operators in its content, whether that content has an inline image,
+// and whether it shows visible text. pdfcpu merges identical image objects, so a page that draws one
 // picture twice looks like a single image; counting names and operators
 // catches it.
-func pageUse(c context.Context, ctx *model.Context, p int) (int, int, bool, error) {
+func pageUse(c context.Context, ctx *model.Context, p int) (images, draws int, inline, text bool, err error) {
 	d, _, attrs, err := ctx.PageDict(c, p, true)
 	if err != nil {
-		return 0, 0, false, err
+		return 0, 0, false, false, err
 	}
+	images, err = pageImageCount(ctx, attrs)
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	content, err := ctx.PageContent(d, p)
+	if err != nil {
+		return 0, 0, false, false, err
+	}
+	draws, inline, text = contentOps(content)
+	return images, draws, inline, text, nil
+}
+
+// pageImageCount counts the image XObjects in the resources of a page.
+func pageImageCount(ctx *model.Context, attrs *model.InheritedPageAttrs) (int, error) {
 	images := 0
 	if attrs != nil && attrs.Resources != nil {
 		o, err := ctx.DereferenceDictEntry(attrs.Resources, "XObject")
 		if err != nil {
-			return 0, 0, false, err
+			return 0, err
 		}
 		xobjs, _ := o.(types.Dict)
 		for _, v := range xobjs {
 			o, err := ctx.Dereference(v)
 			if err != nil {
-				return 0, 0, false, err
+				return 0, err
 			}
 			var xd types.Dict
 			switch s := o.(type) {
@@ -368,18 +404,18 @@ func pageUse(c context.Context, ctx *model.Context, p int) (int, int, bool, erro
 			}
 		}
 	}
-	content, err := ctx.PageContent(d, p)
-	if err != nil {
-		return 0, 0, false, err
-	}
-	draws, inline := contentOps(content)
-	return images, draws, inline, nil
+	return images, nil
 }
 
-// contentOps counts the Do operators in a page content stream and reports
-// whether the stream has an inline image (BI). Strings, names, hex strings
-// and comments are skipped, so text that happens to spell Do is not counted.
-func contentOps(b []byte) (draws int, inline bool) {
+// contentOps counts the Do operators in a page content stream, and reports
+// whether the stream has an inline image (BI) and whether it shows visible
+// text. Text drawn in render mode 3 (invisible, as OCR layers are) does not
+// count. Strings, names, hex strings and comments are skipped, so text that
+// happens to spell Do is not counted.
+func contentOps(b []byte) (draws int, inline, text bool) {
+	mode := 0       // text render mode (Tr), part of the graphics state
+	var saved []int // modes saved by q, restored by Q
+	last := ""      // the previous token, the operand of Tr
 	for i := 0; i < len(b); {
 		c := b[i]
 		switch {
@@ -410,15 +446,29 @@ func contentOps(b []byte) (draws int, inline bool) {
 			for i < len(b) && !pdfSpace(b[i]) && !pdfDelim(b[i]) {
 				i++
 			}
-			switch string(b[start:i]) {
+			tok := string(b[start:i])
+			switch tok {
 			case "Do":
 				draws++
 			case "BI":
 				inline = true
+			case "q":
+				saved = append(saved, mode)
+			case "Q":
+				if n := len(saved); n > 0 {
+					mode, saved = saved[n-1], saved[:n-1]
+				}
+			case "Tr":
+				mode, _ = strconv.Atoi(last)
+			case "Tj", "TJ", "'", "\"":
+				if mode != 3 {
+					text = true
+				}
 			}
+			last = tok
 		}
 	}
-	return draws, inline
+	return draws, inline, text
 }
 
 // skipPDFString returns the index just past the literal string that starts
@@ -476,6 +526,9 @@ func (pa *pdfArchive) render(c context.Context, pg *pdfPage) (r io.Reader, err e
 	if err := c.Err(); err != nil {
 		return nil, err
 	}
+	if pg.rendered {
+		return pa.renderDrawn(c, pg)
+	}
 	if pg.raw {
 		return bytes.NewReader(pg.sd.Raw), nil
 	}
@@ -519,6 +572,89 @@ func (pa *pdfArchive) render(c context.Context, pg *pdfPage) (r io.Reader, err e
 	return img.Reader, nil
 }
 
+// renderDrawn returns the PNG of a drawn page. It takes the render slot, since
+// pdfium and the file are used under it, like pdfcpu's extraction.
+func (pa *pdfArchive) renderDrawn(c context.Context, pg *pdfPage) (io.Reader, error) {
+	if err := pa.lock(c); err != nil {
+		return nil, err
+	}
+	defer pa.unlock()
+	if pa.closed {
+		return nil, errors.New("archive: PDF is closed")
+	}
+	b, err := renderPDFPagePNG(c, pa.file, pa.size, pg.page)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.NewReader(b), nil
+}
+
+// lazyRender is the reader of a drawn page during a Walk. The page is drawn on
+// its first Read, so an entry the walk does not read is never drawn.
+type lazyRender struct {
+	c    context.Context
+	pa   *pdfArchive
+	pg   *pdfPage
+	r    io.Reader
+	err  error
+	done bool
+}
+
+func (l *lazyRender) Read(p []byte) (int, error) {
+	if !l.done {
+		l.done = true
+		l.r, l.err = l.pa.render(l.c, l.pg)
+	}
+	if l.err != nil {
+		return 0, l.err
+	}
+	return l.r.Read(p)
+}
+
+// EntrySize reports the pixel size of a drawn page without drawing it. All
+// drawn pages are measured in one pdfium document open, on first use.
+func (pa *pdfArchive) EntrySize(c context.Context, name string) (w, h int, ok bool, err error) {
+	i, found := pa.byName[name]
+	if !found || !pa.pages[i].rendered {
+		return 0, 0, false, nil
+	}
+	sizes, err := pa.drawnSizes(c)
+	if err != nil {
+		return 0, 0, false, err
+	}
+	s, ok := sizes[pa.pages[i].page]
+	return s[0], s[1], ok, nil
+}
+
+// drawnSizes returns the pixel sizes of all drawn pages, measuring them on
+// first use.
+func (pa *pdfArchive) drawnSizes(c context.Context) (map[int][2]int, error) {
+	pa.drawnMu.Lock()
+	defer pa.drawnMu.Unlock()
+	if pa.drawn != nil {
+		return pa.drawn, nil
+	}
+	var pages []int
+	for i := range pa.pages {
+		if pa.pages[i].rendered {
+			pages = append(pages, pa.pages[i].page)
+		}
+	}
+	if err := pa.lock(c); err != nil {
+		return nil, err
+	}
+	defer pa.unlock()
+	if pa.closed {
+		return nil, errors.New("archive: PDF is closed")
+	}
+	sizes, err := pdfRenderedSizes(c, pa.file, pa.size, pages)
+	if err != nil {
+		return nil, err
+	}
+	pa.drawn = sizes
+	return sizes, nil
+}
+
 func (pa *pdfArchive) Entries() []Entry {
 	out := make([]Entry, len(pa.pages))
 	for i := range pa.pages {
@@ -552,11 +688,24 @@ func (pa *pdfArchive) Walk(fn func(e Entry, r io.Reader) error) error {
 func (pa *pdfArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error) error {
 	for i := range pa.pages {
 		pg := &pa.pages[i]
-		r, err := pa.render(b.ctx, pg)
-		if err != nil {
-			return err
+		var r io.Reader
+		var lazy *lazyRender
+		if pg.rendered {
+			lazy = &lazyRender{c: b.ctx, pa: pa, pg: pg}
+			r = lazy
+		} else {
+			var err error
+			if r, err = pa.render(b.ctx, pg); err != nil {
+				return err
+			}
 		}
-		err = fn(pg.entry, b.reader(r))
+		err := fn(pg.entry, b.reader(r))
+		if lazy != nil && lazy.err != nil {
+			// A drawn page that failed to draw: its own error, not what fn
+			// made of the failed read (an image decoder reports "unknown
+			// format" for any read error).
+			return lazy.err
+		}
 		if errors.Is(err, SkipRest) {
 			return nil
 		}

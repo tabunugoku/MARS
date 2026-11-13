@@ -116,6 +116,7 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 	if coverIdx < 0 || coverIdx >= len(names) {
 		coverIdx = 0
 	}
+	sizer, _ := a.(archive.EntrySizer)
 	var (
 		cover    []byte
 		ciBytes  []byte
@@ -142,13 +143,25 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 			return nil
 		}
 		pageSeen[i] = true
+		if i != coverIdx && sizer != nil {
+			// A page drawn by pdfium is sized without being drawn; only the
+			// cover is read, so it is the one page drawn during analysis.
+			w, h, ok, err := sizer.EntrySize(ctx, e.Name)
+			if err != nil {
+				return pageErr(i+1, err)
+			}
+			if ok {
+				pages[i].Width, pages[i].Height = w, h
+				return nil
+			}
+		}
 		var coverBuf *bytes.Buffer
 		if i == coverIdx {
 			coverBuf = &bytes.Buffer{}
 		}
 		w, h, err := readPageConfig(e, r, coverBuf)
 		if err != nil {
-			return fmt.Errorf("page %d: %w", i+1, err)
+			return pageErr(i+1, err)
 		}
 		pages[i].Width, pages[i].Height = w, h
 		if coverBuf != nil {
@@ -262,4 +275,14 @@ func (c ctxReader) Read(p []byte) (int, error) {
 		return 0, err
 	}
 	return c.r.Read(p)
+}
+
+// pageErr names the page an analysis error came from. An archive's own
+// unsupported error ("PDF page N cannot be rendered") already names it and
+// is kept as it is, so the server can translate it.
+func pageErr(n int, err error) error {
+	if errors.Is(err, archive.ErrUnsupported) {
+		return err
+	}
+	return fmt.Errorf("page %d: %w", n, err)
 }
