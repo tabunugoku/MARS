@@ -3,6 +3,7 @@ package media
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"image"
 	"os"
@@ -191,8 +192,8 @@ func TestPageCacheDrawsOnlyRequestedPage(t *testing.T) {
 		t.Errorf("after key change: cache holds %v, want [3 key]", got)
 	}
 	key, err := os.ReadFile(filepath.Join(c.Dir, "book1", "key"))
-	if err != nil || string(key) != "v2" {
-		t.Errorf("key file = %q, %v; want v2", key, err)
+	if err != nil || !strings.HasPrefix(string(key), "v2-") {
+		t.Errorf("key file = %q, %v; want v2 and the page list hash", key, err)
 	}
 }
 
@@ -235,5 +236,35 @@ func TestPageCacheMixedPDFWritesPagesOnDemand(t *testing.T) {
 	}
 	if _, format, err := image.DecodeConfig(bytes.NewReader(p2)); err != nil || format != "png" {
 		t.Errorf("page 2 does not decode as PNG: %v (%s)", err, format)
+	}
+}
+
+func TestPageCacheDrawnPagesKeepBookBudget(t *testing.T) {
+	// Pages kept one at a time count toward MaxExtractedBook like a whole
+	// extraction does. A sparse file stands in for 2 GiB of pages.
+	ctx := context.Background()
+	path := drawnTestPDF(t, []drawnTestPage{{text: "one"}, {text: "two"}})
+	a, err := Analyze(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := &PageCache{Dir: t.TempDir(), MaxBytes: 4 << 30}
+	if _, err := readPage(ctx, c, "book1", "v1", path, a.Pages, 1); err != nil {
+		t.Fatal(err)
+	}
+	f, err := os.Create(filepath.Join(c.Dir, "book1", "filler"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Truncate(MaxExtractedBook); err != nil {
+		f.Close()
+		t.Fatal(err)
+	}
+	f.Close()
+	if _, err := readPage(ctx, c, "book1", "v1", path, a.Pages, 2); !errors.Is(err, ErrCacheTooBig) {
+		t.Fatalf("err = %v, want ErrCacheTooBig", err)
+	}
+	if _, err := os.Stat(filepath.Join(c.Dir, "book1", "2")); !os.IsNotExist(err) {
+		t.Errorf("page 2 was kept over the budget: %v", err)
 	}
 }

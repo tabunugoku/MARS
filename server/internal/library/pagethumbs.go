@@ -106,17 +106,17 @@ func (s *Service) PageThumbnail(ctx context.Context, bookID string, n int) (Page
 // ErrNotFound when the book is not ready or has no such page.
 func (s *Service) pageVersion(ctx context.Context, bookID string, n int) (string, error) {
 	var size int64
-	var mtime string
+	var mtime, format string
 	err := s.DB.QueryRowContext(ctx, `
-		SELECT b.size_bytes, b.mtime FROM books b JOIN pages p ON p.book_id = b.id
-		WHERE b.id = ? AND p.number = ? AND b.deleted_at IS NULL AND b.media_status = 'ready'`, bookID, n).Scan(&size, &mtime)
+		SELECT b.size_bytes, b.mtime, b.format FROM books b JOIN pages p ON p.book_id = b.id
+		WHERE b.id = ? AND p.number = ? AND b.deleted_at IS NULL AND b.media_status = 'ready'`, bookID, n).Scan(&size, &mtime, &format)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", ErrNotFound
 	}
 	if err != nil {
 		return "", err
 	}
-	return Version(size, mtime), nil
+	return Version(size, mtime, format), nil
 }
 
 func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, path string) error {

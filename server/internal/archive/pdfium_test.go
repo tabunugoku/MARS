@@ -2,6 +2,7 @@ package archive
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -129,4 +130,47 @@ func TestPDFRenderMeasure(t *testing.T) {
 			r.name, r.fileMB, r.pages, r.openMS, r.renderMS, r.avgBytes/1024, r.pngKB)
 	}
 	t.Logf("\n%s", sb.String())
+}
+
+// TestPDFRenderTimeoutKillsAndRecovers ends renders through the instance
+// time limit, which kills the instance mid-use, and checks the pool then
+// draws again normally.
+func TestPDFRenderTimeoutKillsAndRecovers(t *testing.T) {
+	data := makePDF([]pdfPageSpec{{lines: 50, box: [2]int{595, 842}}})
+	path := writePDFFile(t, data)
+	if _, err := pdfiumGet(); err != nil {
+		t.Fatal(err)
+	}
+	old := pdfRenderTimeout
+	t.Cleanup(func() { pdfRenderTimeout = old })
+	ctx := context.Background()
+	pdfRenderTimeout = 200 * time.Microsecond
+	failed := 0
+	for i := 0; i < 20; i++ {
+		if _, err := RenderPDFPage(ctx, PathOf(path), 1); err != nil {
+			if !errors.Is(err, ErrUnsupported) {
+				t.Fatalf("timed-out render: err = %v, want ErrUnsupported", err)
+			}
+			failed++
+		}
+	}
+	if failed == 0 {
+		t.Log("no render hit the time limit on this machine")
+	}
+	pdfRenderTimeout = old
+	for i := 0; i < 3; i++ {
+		if _, err := RenderPDFPage(ctx, PathOf(path), 1); err != nil {
+			t.Fatalf("render after timeouts: %v", err)
+		}
+	}
+}
+
+// TestPDFRenderCanceledContext returns the caller's context error.
+func TestPDFRenderCanceledContext(t *testing.T) {
+	path := writePDFFile(t, makePDF([]pdfPageSpec{{text: true}}))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := RenderPDFPage(ctx, PathOf(path), 1); !errors.Is(err, context.Canceled) {
+		t.Fatalf("err = %v, want context.Canceled", err)
+	}
 }

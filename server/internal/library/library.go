@@ -654,10 +654,21 @@ type Page struct {
 	Close     func() error
 }
 
+// pdfRenderRevision is part of every PDF's version. Bump it when the way PDF
+// pages are served changes (which pages are drawn, or how), so pages cached
+// by browsers, page thumbnails and the page cache are not reused for the
+// same file. Revision 2: pages that are not one image are drawn by pdfium.
+const pdfRenderRevision = "2"
+
 // Version is the token page URLs carry (?v=) so a replaced file gets new
-// URLs and old cached responses are never reused for it.
-func Version(size int64, mtime string) string {
-	return fmt.Sprintf("%x", hash(fmt.Sprintf("%d-%s", size, mtime)))
+// URLs and old cached responses are never reused for it. format is the
+// book's format (books.format).
+func Version(size int64, mtime, format string) string {
+	s := fmt.Sprintf("%d-%s", size, mtime)
+	if archive.Format(format) == archive.PDF {
+		s += "-pdf" + pdfRenderRevision
+	}
+	return fmt.Sprintf("%x", hash(s))
 }
 
 // OpenPage resolves page n (1-based) of a ready book. Zip pages stream
@@ -681,7 +692,7 @@ func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, err
 	if err != nil {
 		return Page{}, err
 	}
-	v := Version(size, mtime)
+	v := Version(size, mtime, format)
 	etag := fmt.Sprintf(`"%s-%d-%s"`, bookID, n, v)
 
 	if archive.Format(format) == archive.CBZ {

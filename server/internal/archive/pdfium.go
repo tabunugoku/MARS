@@ -16,12 +16,15 @@ import (
 	"strconv"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/klippa-app/go-pdfium"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/webassembly"
 	"github.com/tetratelabs/wazero"
+	"github.com/tetratelabs/wazero/api"
+	"github.com/tetratelabs/wazero/experimental"
 )
 
 // pdfRenderLongSide is the long side of a drawn page, in pixels.
@@ -30,6 +33,14 @@ const pdfRenderLongSide = 2000
 // pdfRenderSlots bounds how many pages render at once. A pdfium instance is
 // single-threaded, so each slot is one instance in the pool.
 const pdfRenderSlots = 2
+
+// pdfiumMemoryPages caps one instance's WebAssembly memory, in 64 KiB pages:
+// 1 GiB. A page needing more fails to draw instead of growing the process.
+const pdfiumMemoryPages = 16384
+
+// pdfRenderTimeout bounds one use of an instance (opening the document and
+// drawing or measuring), whatever the caller's own deadline.
+var pdfRenderTimeout = time.Minute
 
 // pdfiumRenders counts the page renders done, for tests.
 var pdfiumRenders atomic.Int64
@@ -51,8 +62,16 @@ func pdfiumGet() (pdfium.Pool, error) {
 			MaxTotal: pdfRenderSlots,
 			// Nothing is mounted: pdfium reads the PDF through FileReader only.
 			FSConfig: wazero.NewFSConfig(),
-			Stdout:   io.Discard,
-			Stderr:   io.Discard,
+			// The exception-handling feature is what go-pdfium's default
+			// config enables (its module needs it). CloseOnContextDone lets
+			// Kill stop a running call; the memory limit bounds what one
+			// hostile page can take.
+			RuntimeConfig: wazero.NewRuntimeConfig().
+				WithCoreFeatures(api.CoreFeaturesV2 | experimental.CoreFeaturesExceptionHandling).
+				WithCloseOnContextDone(true).
+				WithMemoryLimitPages(pdfiumMemoryPages),
+			Stdout: io.Discard,
+			Stderr: io.Discard,
 		})
 	})
 	return pdfiumPool, pdfiumErr
@@ -72,11 +91,20 @@ func withPDFDocument(c context.Context, r io.ReaderAt, size int64,
 	if err != nil {
 		return err
 	}
+	c, cancel := context.WithTimeout(c, pdfRenderTimeout)
+	defer cancel()
 	inst, err := pool.GetInstanceWithContext(c)
 	if err != nil {
 		return err
 	}
-	defer inst.Close()
+	// When c ends mid-call, Kill interrupts the running WebAssembly and drops
+	// the instance; the pool starts a fresh one when it is next needed.
+	stop := context.AfterFunc(c, func() { _ = inst.Kill() })
+	defer func() {
+		if stop() { // not killed: give the instance back to the pool
+			_ = inst.Close()
+		}
+	}()
 	doc, err := inst.OpenDocument(&requests.OpenDocument{
 		FileReader:     io.NewSectionReader(r, 0, size),
 		FileReaderSize: size,
@@ -197,6 +225,9 @@ func pdfRenderedSizes(c context.Context, r io.ReaderAt, size int64, pages []int)
 	out := make(map[int][2]int, len(pages))
 	err := withPDFDocument(c, r, size, func(inst pdfium.Pdfium, doc references.FPDF_DOCUMENT) error {
 		for _, p := range pages {
+			if err := c.Err(); err != nil {
+				return err
+			}
 			wPt, hPt, err := pdfPageSize(inst, doc, p)
 			if err == nil {
 				var w, h int
