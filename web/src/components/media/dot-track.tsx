@@ -10,7 +10,8 @@ import { cn } from "@/lib/utils";
 
 const DOT = { sm: 6, md: 8 };
 const GAP = { sm: 4, md: 6 };
-// Room around the row for the current dot's ring, taken back by a negative
+// Room around the row for the current dot's ring (it is not clipped: the dot
+// count already fits the width), taken back by a negative
 // margin so the dots still line up with the text above.
 const PAD = { sm: 2, md: 4 };
 
@@ -53,7 +54,7 @@ export function DotTrack({
       aria-valuemin={0}
       aria-valuemax={100}
       aria-valuenow={Math.round(pct)}
-      className={cn("flex overflow-hidden", n === fit && "justify-between", size === "sm" ? "-mx-0.5 gap-1 p-0.5" : "-mx-1 gap-1.5 p-1", className)}
+      className={cn("flex", n === fit && "justify-between", size === "sm" ? "-mx-0.5 gap-1 p-0.5" : "-mx-1 gap-1.5 p-1", className)}
     >
       {fit > 0 &&
         Array.from({ length: n }, (_, i) => (
