@@ -213,7 +213,7 @@ func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksReque
 // The query starts from the caller's finished books: for each series that
 // has one, it takes that series' first unread book, then checks the rest.
 // Testing every unread book of the library instead cost 5 s at 37,000 books
-// (docs/perf-large-library.md). The caller's user id is bound three times,
+// (docs/dev/perf-large-library.md). The caller's user id is bound three times,
 // then once more in the ORDER BY (see GetDashboard).
 const onDeckWhere = ` AND rp.book_id IS NULL
   AND b.id IN (SELECT (SELECT u.id FROM books u LEFT JOIN read_progress ur ON ur.book_id = u.id AND ur.user_id = ?

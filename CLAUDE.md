@@ -6,11 +6,11 @@ A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
 Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
-Current phase: **MVP complete** (milestones M0–M5 merged into `main`,
-2026-11-12). UI design approved as tag `design/approved-v2`. Distribution:
-`Dockerfile` (distroless/static), CI builds and smoke-tests the image,
-`release.yml` publishes amd64/arm64 images to GHCR on a `v*` tag (see
-README). Next: the 【推奨】 features in `docs/features.md`. Every API operation is classified in
+Current phase: **v1.0.0 released** (public repo and image, 2026-11-13).
+Distribution: `Dockerfile` (distroless/static), CI builds and smoke-tests the
+image, `release.yml` publishes amd64/arm64 images to GHCR on a `v*` tag; the
+site in `site/` deploys to GitHub Pages (`pages.yml`). Next: the phases in
+`docs/roadmap.md`; feature decisions in `docs/dev/features.md`. Every API operation is classified in
 `server/internal/httpapi/access.go` (`opAccess`); an unlisted one is refused,
 and series/books are read only through the builders in `query.go`.
 The server listens on all interfaces (`MARS_HOST` narrows it); a first
@@ -23,7 +23,7 @@ ignores a stale one. `web/` talks to the Go API through
 app shell only and must never touch `/api`. On touch screens every control
 answers to 44 px (`.touch-hit` in `styles/tokens.css`). The invented sample data in `web/src/mock/` loads only
 when `VITE_API=mock` (`npm run dev:mock`) and never ships in a normal build.
-The interface is Japanese and English (`docs/i18n.md`): every UI string lives
+The interface is Japanese and English (`docs/dev/i18n.md`): every UI string lives
 in a `defineMessages` block (ja and en) next to its code, server errors carry
 a `code` and a message in the request's `Accept-Language`, and
 `npm run i18n:check` (CI) fails on Japanese left outside a `ja:` block.
@@ -31,7 +31,7 @@ a `code` and a message in the request's `Accept-Language`, and
 ## Working agreement
 
 - **Opus** (lead session) owns design tokens, shared components, the reader's
-  interaction model, screen specs (`docs/screens/`), integration and review.
+  interaction model, screen specs (`docs/dev/screens/`), integration and review.
 - **Haiku** subagents implement one screen each from its spec. A Haiku task
   edits only the files its spec lists. It reads
   `.claude/skills/mars-design/SKILL.md` first and follows it.
@@ -61,7 +61,12 @@ a `code` and a message in the request's `Accept-Language`, and
 - `web/src/components/media/` — Cover, cards, grids, shelves, skeletons
 - `web/src/routes/` — one file (or folder) per screen, lazy-loaded
 - `web/src/styles/tokens.css` — MARS colour tokens over the Fluid theme
-- `docs/features.md` — Komga feature inventory and adoption decisions
+- `docs/dev/features.md` — Komga feature inventory and adoption decisions
+- `docs/` — user docs: Japanese original `name.ja.md`, English translation
+  `name.md`; change both in the same PR. Japanese public text goes through
+  the `natural-japanese` and `yomiyasu` skills. `docs/dev/` is internal.
+- `site/` — official website (static, en + `ja/`); links to docs on GitHub
+- `promo/` — Remotion promo video (audio and captures are gitignored)
 
 ## Tools
 

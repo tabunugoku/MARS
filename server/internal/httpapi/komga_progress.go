@@ -12,7 +12,7 @@ import (
 )
 
 // komgaProgressRoutes registers the read-progress endpoints Mihon's Komga
-// tracker calls (see docs/opds-komga.md).
+// tracker calls (see docs/dev/opds-komga-spec.md).
 //
 // Reads go through the same visibility as the rest of the compat API: a
 // series or read list the caller cannot see is 404. Writes go through

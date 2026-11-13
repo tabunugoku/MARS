@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest something MARS should do
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check the [roadmap](https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.md) first; the feature may already be planned.
+        日本語で書いても構いません。
+  - type: textarea
+    id: problem
+    attributes:
+      label: What do you want to do?
+      description: The situation and what is missing today
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could MARS help?
+      description: The behaviour you have in mind. Mention other servers or apps that do it well, if any.

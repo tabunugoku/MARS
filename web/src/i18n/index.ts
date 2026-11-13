@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
 
-// The interface language. See docs/i18n.md. Japanese is the source language;
+// The interface language. See docs/dev/i18n.md. Japanese is the source language;
 // each file declares its own messages in both languages with defineMessages,
 // so a lazy screen's strings load with its chunk.
 

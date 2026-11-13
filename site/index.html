@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARS | A self-hosted manga and comic server</title>
+<meta name="description" content="MARS is a manga and comic server you run yourself. It scans your folders, groups them into series and books, and lets you read them in any browser.">
+<link rel="canonical" href="https://tabunugoku.github.io/MARS/">
+<link rel="alternate" hreflang="en" href="https://tabunugoku.github.io/MARS/">
+<link rel="alternate" hreflang="ja" href="https://tabunugoku.github.io/MARS/ja/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="MARS: A Reading Server">
+<meta property="og:description" content="A self-hosted manga and comic server. Your manga. Your server. Your universe.">
+<meta property="og:url" content="https://tabunugoku.github.io/MARS/">
+<meta property="og:image" content="https://tabunugoku.github.io/MARS/assets/og-en.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#120d0b">
+<link rel="icon" href="assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" href="assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  // Set the theme before first paint: a saved choice, else the system's.
+  (function () {
+    var t;
+    try { t = localStorage.getItem("mars-site-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    document.documentElement.dataset.theme = t;
+    if (t === "light") document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f8f5f4");
+  })();
+</script>
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/site.js" defer></script>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="MARS home"><img src="assets/logo.svg" alt="" width="28" height="28">MARS</a>
+    <nav class="nav-links" aria-label="Sections">
+      <a href="#read">Features</a>
+      <a href="#start">Get started</a>
+      <a href="#docs">Docs</a>
+    </nav>
+    <div class="nav-tools">
+      <a href="ja/" hreflang="ja" lang="ja">日本語</a>
+      <button class="icon-btn" type="button" data-theme-toggle data-to-light="Switch to light theme" data-to-dark="Switch to dark theme" aria-label="Switch theme">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 12C16.5 14.4854 14.4854 16.5 12 16.5C9.5147 16.5 7.5 14.4854 7.5 12C7.5 9.5147 9.5147 7.5 12 7.5C14.4854 7.5 16.5 9.5147 16.5 12ZM20.5 12L22 12M18.0104 18.0104L19.0711 19.0711M12 20.5L12 22M5.9896 18.0104L4.9289 19.0711M3.5 12L2 12M5.9896 5.9896L4.9289 4.9289M12 3.5L12 2M18.0104 5.9896L19.0711 4.9289"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12C21 16.9706 16.9706 21 12 21C7.0294 21 3 16.9706 3 12C3 7.0294 7.0294 3 12 3C9.9618 5.5477 10.1652 9.2206 12.4723 11.5277C14.7794 13.8348 18.4523 14.0382 21 12Z"/></svg>
+      </button>
+      <a href="https://github.com/tabunugoku/MARS">GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="hero tone" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy" data-enter>
+        <h1 id="hero-title" class="h1">Your manga folders, ready to read in any browser</h1>
+        <p class="lead">MARS is a manga and comic server you run yourself. It scans your folders, groups them into series and books, and picks up where you left off on any device with a browser.</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#start">See how to start
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H18.0587M12.1229 5L18.8261 11.5875C19.058 11.8153 19.058 12.1847 18.8261 12.4125L12.1229 19"/></svg>
+          </a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS">View on GitHub</a>
+        </div>
+        <p class="fact"><span>Docker image about 8 MiB</span><span>amd64 and arm64</span><span>MIT license</span></p>
+      </div>
+      <div class="hero-shot" data-enter-shot>
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+          <img src="assets/shots/en-home.webp" data-dark="assets/shots/en-home.webp" data-light="assets/shots/en-home-light.webp" width="1600" height="1000" alt="The MARS home screen: the book you were reading with its page progress as a row of dots, and shelves of series in progress" fetchpriority="high">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="read" aria-labelledby="read-title">
+    <div class="wrap split">
+      <div class="split-copy">
+        <h2 id="read-title" class="h2">Open a browser and start reading</h2>
+        <p class="lead">The reader runs in the browser. You don't install an app to read.</p>
+        <ul class="points">
+          <li>Right to left, left to right, and vertical. Continuous vertical scrolling like a webtoon, and two-page spreads.</li>
+          <li>Remembers the page you reached and takes you on to the next book.</li>
+          <li>Incognito mode reads without saving your progress.</li>
+          <li>Choose a black, gray, or white background.</li>
+        </ul>
+      </div>
+      <div class="stack">
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+          <img src="assets/shots/en-reader.webp" width="1600" height="1000" loading="lazy" alt="The reader showing one manga page, with the page number and a dotted progress track at the bottom">
+        </div>
+        <div class="phone">
+          <img src="assets/shots/en-m-reader.webp" width="780" height="1688" loading="lazy" alt="The same page in the reader on a phone">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="library" aria-labelledby="library-title">
+    <div class="wrap split flip">
+      <div class="split-copy">
+        <h2 id="library-title" class="h2">Point it at a folder, get series and books</h2>
+        <p class="lead">A folder of archives becomes a series. MARS also reads cover images and <code translate="no">ComicInfo.xml</code>.</p>
+        <ul class="points">
+          <li>CBZ / ZIP, CBR / RAR (including RAR5), CB7 / 7z, and PDF.</li>
+          <li>Watches your files for changes and scans by itself. Scheduled scans and scans at startup too.</li>
+          <li>Edit metadata on screen. A locked field keeps its value when a scan runs.</li>
+          <li>Collections and read lists group series and books.</li>
+        </ul>
+      </div>
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+        <img src="assets/shots/en-series.webp" width="1600" height="1000" loading="lazy" alt="A series page with its cover, reading status, tags and a grid of its volumes">
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="connect" aria-labelledby="connect-title">
+    <div class="wrap connect-grid">
+      <div class="split-copy">
+        <h2 id="connect-title" class="h2">Separate users, and read from other apps too</h2>
+        <p class="lead">Choose which libraries each user can see.</p>
+        <div class="cards">
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 6H13.5M19 18V6C19 3.79086 17.2091 2 15 2H9C6.79086 2 5 3.79086 5 6V18C5 20.2091 6.79086 22 9 22H15C17.2091 22 19 20.2091 19 18Z"/></svg>Phones and tablets</h3>
+            <p>Add MARS to your home screen and use it like an app (PWA).</p>
+          </div>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7L16 7C17.6569 7 19 8.3431 19 10L19 11C19 14.866 15.866 18 12 18C8.134 18 5 14.866 5 11L5 10C5 8.3431 6.3431 7 8 7ZM9 2L9 7M15 2L15 7M12 18L12 22"/></svg>Mihon</h3>
+            <p>A Komga-compatible API, used by the Komga extension and tracker in Mihon.</p>
+          </div>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4L8 4C10.2091 4 12 5.7909 12 8C12 5.7909 13.7909 4 16 4L20 4C21.1046 4 22 4.8954 22 6L22 15C22 16.1046 21.1046 17 20 17L15 17C13.3431 17 12 18.3431 12 20C12 18.3431 10.6569 17 9 17L4 17C2.8954 17 2 16.1046 2 15L2 6C2 4.8954 2.8954 4 4 4ZM12 8L12 20"/></svg>OPDS 1.2</h3>
+            <p>Read from e-book apps such as Panels, Chunky, and KyBook.</p>
+          </div>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12C10 14.2091 8.2091 16 6 16C3.7909 16 2 14.2091 2 12C2 9.7909 3.7909 8 6 8C8.2091 8 10 9.7909 10 12ZM10 12L22 12M17 12L17 16M21 12L21 16"/></svg>Users and API keys</h3>
+            <p>Separate administrators from regular users. Issue API keys for external apps.</p>
+          </div>
+        </div>
+      </div>
+      <div class="connect-phone">
+        <div class="phone">
+          <img src="assets/shots/en-m-home.webp" width="780" height="1688" loading="lazy" alt="MARS on a phone: the home screen with the book in progress and a tab bar at the bottom">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section tagline" aria-label="Tagline">
+    <div class="wrap">
+      <p lang="en"><span class="line"><span class="w">Your</span> <span class="w">manga.</span></span><span class="line"><span class="w">Your</span> <span class="w">server.</span></span><span class="line"><span class="w">Your</span> <span class="w red">universe.</span></span></p>
+    </div>
+  </section>
+
+  <section class="section" id="start" aria-labelledby="start-title">
+    <div class="wrap start-grid">
+      <div class="split-copy">
+        <h2 id="start-title" class="h2">Start it with Docker, then three steps</h2>
+        <p class="lead">You need Docker and a folder of comics, on <code translate="no">linux/amd64</code> or <code translate="no">linux/arm64</code>.</p>
+      </div>
+      <div>
+        <ol class="steps">
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">1</span>
+            <div class="step-body">
+              <h3>Run it</h3>
+              <p>Run this command. Replace <code translate="no">/path/to/comics</code> with your comics folder.</p>
+              <div class="cmd">
+                <pre translate="no" id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
+                <button class="copy" type="button" data-copy="cmd-run" data-idle="Copy" data-done="Copied" aria-label="Copy the docker run command">
+                  <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
+                  <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
+                  <span class="label">Copy</span>
+                </button>
+              </div>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">2</span>
+            <div class="step-body">
+              <h3>Create the administrator</h3>
+              <p>Open <span class="mono">http://localhost:25600</span>, enter the setup token, and create the administrator account. This command shows the token:</p>
+              <div class="cmd">
+                <pre translate="no" id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
+                <button class="copy" type="button" data-copy="cmd-token" data-idle="Copy" data-done="Copied" aria-label="Copy the command that shows the setup token">
+                  <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
+                  <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
+                  <span class="label">Copy</span>
+                </button>
+              </div>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">3</span>
+            <div class="step-body">
+              <h3>Add a library</h3>
+              <p>Go to Admin &gt; Libraries, select <strong>Add library</strong>, enter <code translate="no">/comics</code> as the folder, and save.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="sr" id="copy-status" role="status" aria-live="polite"></p>
+        <div class="start-links">
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.md">Install with Docker</a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/truenas.md">Install on TrueNAS SCALE</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section fit" id="docs" aria-labelledby="docs-title">
+    <div class="wrap">
+      <h2 id="docs-title" class="h2">What to read next</h2>
+      <div class="docs">
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/README.md">
+          <h3>Documentation index<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>Every guide to installing, using, and running MARS.</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.md">
+          <h3>Install with Docker<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>Volumes and permissions, and starting MARS with docker compose.</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/api.md">
+          <h3>API<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>Authentication, the error format, and examples for the REST API.</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.md">
+          <h3>Roadmap<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>What is planned next, and the features under consideration.</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/releases">
+          <h3>Releases<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>What changed in each version.</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS">
+          <h3>GitHub<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>Source code, issues, and how to contribute.</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="assets/logo.svg" alt="" width="24" height="24">MARS: A Reading Server</a>
+    <nav aria-label="Footer">
+      <a href="https://github.com/tabunugoku/MARS">GitHub</a>
+      <a href="https://github.com/tabunugoku/MARS/releases">Releases</a>
+      <a href="https://github.com/tabunugoku/MARS/blob/main/LICENSE">MIT License</a>
+      <a href="ja/" hreflang="ja" lang="ja">日本語</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
