@@ -23,7 +23,7 @@ type Func func(ctx context.Context, progress func(float64)) error
 // Task is one row of the tasks table.
 type Task struct {
 	ID         string
-	Kind       string // scan | analyze | thumbnail | hash | trash
+	Kind       string // scan | analyze | thumbnail | trash
 	Label      string // final text, or the English text when LabelCode is ""
 	LabelCode  string // catalog code the API renders Label from
 	LabelArg   string
