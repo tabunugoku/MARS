@@ -512,10 +512,13 @@ export default function Screen() {
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
         <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
-        <div className="flex min-w-0 flex-wrap items-center gap-2">
+        {/* One row on a phone too: there Select and Filters show their icon
+            only (the label stays for screen readers), plus the filter count. */}
+        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
           {!sel.active && series.length > 0 && (
             <Button
               variant="secondary"
+              className="max-sm:px-2.5"
               onClick={() => {
                 // A load left over from an earlier selection must not select everything now.
                 setLoadAllFor(null);
@@ -523,7 +526,7 @@ export default function Screen() {
               }}
               leadingIcon={ListChecks as IconComponent}
             >
-              {t("select")}
+              <span className="max-sm:sr-only">{t("select")}</span>
             </Button>
           )}
           <Select value={sort} onValueChange={(v) => update({ sort: v === "title" ? null : v })}>
@@ -551,8 +554,14 @@ export default function Screen() {
             aria-expanded={panelOpen}
             onClick={() => setPanelOpen((o) => !o)}
             leadingIcon={SlidersHorizontal as IconComponent}
+            className="max-sm:px-2.5"
           >
-            {filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}
+            <span className="max-sm:sr-only">{filterCount > 0 ? t("filtersCount", { n: filterCount }) : t("filters")}</span>
+            {filterCount > 0 && (
+              <span aria-hidden className="font-mono tabular-nums sm:hidden">
+                {filterCount}
+              </span>
+            )}
           </Button>
         </div>
       </div>
