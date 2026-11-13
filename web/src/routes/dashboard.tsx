@@ -29,7 +29,7 @@ const m = defineMessages({
     addLibrary: "ライブラリを追加",
     lastRead: "前回の続き",
     readingProgress: "読書の進捗",
-    pagesLeft: ({ total, left }) => `${total} · 残り ${left} ページ`,
+    pagesLeft: ({ left }) => `残り ${left} ページ`,
     resume: "続きから読む",
     bookDetails: "巻の詳細",
   },
@@ -46,7 +46,7 @@ const m = defineMessages({
     addLibrary: "Add library",
     lastRead: "Last read",
     readingProgress: "Reading progress",
-    pagesLeft: ({ total, left }) => `${total} · ${left} pages left`,
+    pagesLeft: ({ left }) => `${left} pages left`,
     resume: "Resume",
     bookDetails: "Book details",
   },
@@ -164,8 +164,13 @@ export default function Screen() {
             <p className={cn(typeClass("body"), "line-clamp-2 text-muted-foreground")}>{hero.title}</p>
             <div className="mt-auto space-y-1.5 pt-3">
               <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label={t("readingProgress")} />
-              <p className={cn(typeClass("caption"), "font-mono text-muted-foreground")}>
-                P.<CountUp value={heroPage} /> / {t("pagesLeft", { total: hero.pageCount, left: hero.pageCount - heroPage })}
+              {/* One line on a phone too: the smaller size there, and if the
+                  numbers are still too long it breaks only at the dot. */}
+              <p className={cn(typeClass("micro"), "font-mono text-muted-foreground sm:text-[length:var(--fs-caption,12px)] sm:leading-[var(--lh-caption,16px)]")}>
+                <span className="whitespace-nowrap">
+                  P.<CountUp value={heroPage} /> / {hero.pageCount} ·
+                </span>{" "}
+                <span className="whitespace-nowrap">{t("pagesLeft", { left: hero.pageCount - heroPage })}</span>
               </p>
             </div>
           </div>
