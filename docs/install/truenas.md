@@ -2,8 +2,6 @@ English | [日本語](truenas.ja.md)
 
 # Install MARS on TrueNAS SCALE
 
-> This guide cannot be used until the next release: the published image `ghcr.io/tabunugoku/mars` has been withdrawn.
-
 This guide covers **TrueNAS SCALE 25.10 (Goldeye)** and its Docker-based Apps. It explains the two datasets MARS needs, the permissions for the `apps` user, and two ways to install the custom app: **Install via YAML** and the **Custom App** form. Choose one. Both methods produce the same app.
 
 The examples use a pool named `tank`. Replace the pool name and paths to match your system.
@@ -70,7 +68,7 @@ Open **Apps > Discover Apps**, open the **⋮** menu, and select **Install via Y
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:1
+    image: ghcr.io/tabunugoku/mars:0.1
     user: "568:568"
     restart: unless-stopped
     ports:
@@ -102,7 +100,7 @@ Open **Apps > Discover Apps** and select **Custom App**. Enter the following.
 | --- | --- | --- |
 | Application Name | Application Name | `mars` |
 | Image Configuration | Repository | `ghcr.io/tabunugoku/mars` |
-| | Tag | `1` |
+| | Tag | `0.1` |
 | | Pull Policy | Only pull image if not present on host (default) |
 | Container Configuration | Timezone | Your time zone |
 | | Restart Policy | Unless Stopped |
@@ -145,8 +143,8 @@ On a library, you can turn on **Watch for file changes and scan automatically**.
 
 ## 7. Updates and backups
 
-- Tag `1` follows every 1.x release. When a new image is published, **Update** appears on the app. You can also use **Pull Image** to get the latest `1`.
-- Change the tag to `2` only when 2.0 is released. During 1.x, keep the `1` tag.
+- Tag `0.1` follows every 0.1.x release. When a new image is published, **Update** appears on the app. You can also use **Pull Image** to get the latest `0.1`.
+- While MARS is 0.x, a new minor version (such as 0.2) may change behavior. To move to it, change the tag to `0.2` yourself.
 - Take regular snapshots of the data dataset. Stop the app before you roll back to a snapshot. If files are rewritten while the database is open, the database can be corrupted.
 
 ## 8. Running behind a reverse proxy

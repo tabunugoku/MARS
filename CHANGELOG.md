@@ -3,9 +3,12 @@
 All notable changes to MARS are listed here. Versions follow
 [Semantic Versioning](https://semver.org/). Docker images are published as
 `ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
-once a release is out.
+(0.x releases get no `X` tag).
 
-## Unreleased
+## 0.1.0 — 2026-11-14
+
+A preview release. It has every feature of the withdrawn 1.0.0 (listed
+below) and these changes on top.
 
 ### Changed
 

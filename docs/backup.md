@@ -69,9 +69,9 @@ When MARS starts, it applies database changes (migrations) automatically. Only t
 
 ### Notes
 
-- Always make a backup before you move to a new major version.
+- Always make a backup before you move to a new version. While MARS is 0.x, a minor version (0.1 to 0.2, for example) can bring large changes.
 - If a migration fails, the server does not start, and the log shows an error. In that case, restore `mars.db` from the backup, then check the log.
-- Docker tags can be a full version number such as `1.0.0`, or `1.0`, `1`, or `latest`. `latest` points to the newest stable release. To pin a tag, use a version number.
+- Docker tags can be a full version number such as `0.1.0`, or `0.1`, or `latest`. `latest` points to the newest stable release. To pin a tag, use a version number.
 
 ### Downgrade
 

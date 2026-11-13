@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-Security fixes go into the latest release. Until a release is published,
-build MARS from the latest `main` branch to get them.
+The supported version is the latest 0.1.x image, `ghcr.io/tabunugoku/mars:0.1`.
+Security fixes go into that image, so run the newest one to get them.
+If you build MARS from source, use the latest `main` branch.
 
 ## Reporting a vulnerability
 

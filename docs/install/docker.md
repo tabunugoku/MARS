@@ -2,25 +2,13 @@ English | [日本語](docker.ja.md)
 
 # Install with Docker
 
-This page explains how to run MARS with Docker. A published image will return with the next release.
+This page explains how to run MARS with Docker. The published image is `ghcr.io/tabunugoku/mars`.
 
 ## Requirements
 
 - Docker (Docker Engine or Docker Desktop), and Docker Compose (optional)
 - A folder that holds your manga or comics
 - A `linux/amd64` or `linux/arm64` system
-
-## Build the image
-
-The published image is withdrawn for now, so build the image from the source code. You need Git and Docker.
-
-```sh
-git clone https://github.com/tabunugoku/MARS.git
-cd MARS
-docker build -t mars .
-```
-
-This creates a local image named `mars`. The examples below use it.
 
 ## Start with docker run
 
@@ -29,7 +17,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  mars
+  ghcr.io/tabunugoku/mars:0.1
 ```
 
 - `-v mars-data:/data` stores the database, thumbnails, and page cache. `mars-data` is a named volume that Docker manages.
@@ -43,7 +31,7 @@ Create a `docker-compose.yml` file.
 ```yaml
 services:
   mars:
-    image: mars
+    image: ghcr.io/tabunugoku/mars:0.1
     container_name: mars
     restart: unless-stopped
     ports:
@@ -108,32 +96,38 @@ While no administrator exists, the login screen shows the first-time setup scree
 
 The image has no shell, so you cannot read files with `docker exec`. Use the log or `docker cp` instead.
 
+## Image tags
+
+| Tag | Meaning |
+| --- | --- |
+| `0.1` | Follows every 0.1.x release. Normally use this tag |
+| `0.1.0` | This version only |
+| `latest` | The newest release. Moves to each new minor and major version |
+
+While MARS is 0.x, a new minor version (such as 0.2) may change behavior. To move to it, change the tag yourself.
+
 ## Upgrade
 
 Back up your data before you upgrade. See [Backup](../backup.md).
 
-If you started MARS with `docker run`, update the source, build the image again, and recreate the container.
+If you started MARS with `docker run`, pull the new image and recreate the container.
 
 ```sh
-cd MARS
-git pull
-docker build -t mars .
+docker pull ghcr.io/tabunugoku/mars:0.1
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  mars
+  ghcr.io/tabunugoku/mars:0.1
 ```
 
 Your data stays in the named volume, so it is not lost when you recreate the container.
 
-If you use docker compose, update the source, build the image again, and recreate the container.
+If you use docker compose, pull the new image and start the containers again.
 
 ```sh
-cd MARS
-git pull
-docker build -t mars .
+docker compose pull
 docker compose up -d
 ```
 
@@ -170,3 +164,17 @@ You can also get a certificate from a reverse proxy such as Caddy, Traefik, or n
 For a full description of environment variables, see [Configuration](../configuration.md).
 
 Once installed, the app loads the newest version from the server each time it starts. It shows the cached screen only when it cannot reach the server.
+
+## Building the image yourself
+
+You can also build the image from the source code instead of using the published image. You need Git and Docker.
+
+```sh
+git clone https://github.com/tabunugoku/MARS.git
+cd MARS
+docker build -t mars .
+```
+
+This creates a local image named `mars`. To use it, replace `ghcr.io/tabunugoku/mars:0.1` in the examples above with `mars`.
+
+To update an image that you built, run `git pull` to update the source, run `docker build -t mars .` again, and recreate the container as described in [Upgrade](#upgrade).

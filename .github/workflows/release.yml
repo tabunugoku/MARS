@@ -1,6 +1,6 @@
 name: release
 
-# Push a tag like v1.0.0 to publish ghcr.io/<owner>/mars for amd64 and arm64.
+# Push a tag like v0.1.0 to publish ghcr.io/<owner>/mars for amd64 and arm64.
 on:
   push:
     tags: ["v*"]
