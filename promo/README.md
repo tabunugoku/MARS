@@ -77,14 +77,16 @@ npm run studio        # preview in the Remotion studio
 
 Remotion downloads a headless Chromium the first time it renders.
 
-Remotion ships its headless Chromium and ffmpeg for x64 only. On a Windows
-arm64 machine, run the x64 binaries under emulation: pass
-`--browser-executable` (an installed Chrome) and `--binaries-directory` (the
-extracted `@remotion/compositor-win32-x64-msvc` package, from
-`npm pack @remotion/compositor-win32-x64-msvc@4.0.543`) to `remotion render`:
+Remotion ships its headless Chromium and ffmpeg for x64 only. On Windows on
+arm64, run this once, then render as usual:
 
 ```sh
-npx remotion render src/index.ts promo-ja out/mars-promo-ja.mp4 \
-  --browser-executable="C:\Program Files\Google\Chrome\Application\chrome.exe" \
-  --binaries-directory=<extracted>/package
+npm run setup:arm64   # downloads the x64 compositor into .x64/ (gitignored)
+npm run render
 ```
+
+`remotion.config.ts` then uses the installed Chrome and the x64 compositor,
+both running under emulation. Set `MARS_PROMO_BROWSER` or
+`MARS_PROMO_BINARIES` to use other paths. Other machines need no setup.
+
+`x-posts.md` holds the X (Twitter) posts for the v1.0.0 release.

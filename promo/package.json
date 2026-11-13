@@ -6,6 +6,7 @@
   "description": "Promo video for MARS, rendered with Remotion",
   "scripts": {
     "audio": "node scripts/audio.mjs",
+    "setup:arm64": "node scripts/setup-arm64.mjs",
     "studio": "remotion studio src/index.ts",
     "render:en": "remotion render src/index.ts promo-en out/mars-promo-en.mp4",
     "render:ja": "remotion render src/index.ts promo-ja out/mars-promo-ja.mp4",
