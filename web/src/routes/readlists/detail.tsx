@@ -365,7 +365,7 @@ function BookRow({
             <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("read")}</span>
           ) : p ? (
             <div className="space-y-1">
-              <DotTrack total={10} value={Math.round(pct / 10)} label={t("progress")} size="sm" className="justify-end" />
+              <DotTrack percent={pct} max={10} label={t("progress")} size="sm" className="justify-end" />
               <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                 {t("pages", { page: p.page, pageCount: book.pageCount })}
               </p>

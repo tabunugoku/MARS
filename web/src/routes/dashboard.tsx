@@ -163,7 +163,7 @@ export default function Screen() {
             </h2>
             <p className={cn(typeClass("body"), "line-clamp-2 text-muted-foreground")}>{hero.title}</p>
             <div className="mt-auto space-y-1.5 pt-3">
-              <DotTrack total={28} value={Math.round((heroPct / 100) * 28)} label={t("readingProgress")} />
+              <DotTrack percent={heroPct} max={hero.pageCount} label={t("readingProgress")} />
               {/* One line on a phone too: the smaller size there, and if the
                   numbers are still too long it breaks only at the dot. */}
               <p className={cn(typeClass("micro"), "font-mono text-muted-foreground sm:text-[length:var(--fs-caption,12px)] sm:leading-[var(--lh-caption,16px)]")}>

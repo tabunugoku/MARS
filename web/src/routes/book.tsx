@@ -251,7 +251,6 @@ function BookPage({ id }: { id: string }) {
   const completed = !!book.progress?.completed;
   const page = book.progress?.page ?? 0;
   const pct = book.pageCount ? Math.min(100, Math.round((page / book.pageCount) * 100)) : 0;
-  const dots = Math.min(book.pageCount, 60);
   const shownPages = allPages ? data.pages.length : Math.min(PREVIEW_PAGES, data.pages.length);
   const authors = book.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
   // Marking read needs the page count and a readable archive.
@@ -421,7 +420,7 @@ function BookPage({ id }: { id: string }) {
                 <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
                   {t("pageOf", { page, total: book.pageCount })}
                 </p>
-                <DotTrack total={dots} value={Math.round((pct / 100) * dots)} label={t("progress")} />
+                <DotTrack percent={pct} max={book.pageCount} label={t("progress")} />
               </>
             ) : null}
           </div>

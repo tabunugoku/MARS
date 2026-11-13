@@ -336,7 +336,7 @@ function SeriesPage({ id }: { id: string }) {
             <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>
               <CountUp value={series.booksRead} /> {t("booksRead", { total })}
             </p>
-            <DotTrack total={series.bookCount} value={series.booksRead} label={t("progress")} />
+            <DotTrack percent={series.bookCount ? (series.booksRead / series.bookCount) * 100 : 0} max={series.bookCount} label={t("progress")} />
           </div>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">

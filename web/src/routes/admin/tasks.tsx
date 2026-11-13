@@ -254,8 +254,7 @@ export default function Screen() {
                         </p>
                         <div className="flex items-center gap-3">
                           <DotTrack
-                            total={24}
-                            value={running ? Math.round((pct / 100) * 24) : 0}
+                            percent={running ? pct : 0}
                             label={task.label}
                             size="sm"
                             className="flex-1"
