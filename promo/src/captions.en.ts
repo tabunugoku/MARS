@@ -1,13 +1,23 @@
-// English subtitles, translated from captions.ja.ts (keep the keys in sync).
-export const captions = {
-  intro: "MARS: A Reading Server",
-  tagline: "Your manga. Your server. Your universe.",
-  folder: "Pick a folder, and your shelf is ready",
-  library: "Series and volumes are sorted for you, so you can pick up where you left off",
-  reader: "Manga turns right to left, just like the printed book",
-  webtoon: "Webtoons scroll top to bottom",
-  phone: "Add it to the home screen of your phone or tablet",
+// English captions, translated from captions.ja.ts (the original).
+import type { Captions } from "./captions";
+
+export const en: Captions = {
+  folders: "MARS reads your manga folders",
+  series: "and sorts them into series and books",
+  reader: "Read them right in the browser",
+  direction: "Right to left, or one long vertical scroll",
+  resume: "Pick up from the page you left",
+  phone: "On a phone, add it to your home screen",
   apps: "Read from Mihon and OPDS apps too",
-  light: "No Java. One binary, for amd64 and arm64",
-  cta: "Your shelf, on your own server",
-} as const;
+  docker: "Start it with one Docker command",
+  ui: {
+    subtitle: "A Reading Server",
+    readingDirection: "Reading direction",
+    modes: ["Right to left", "Left to right", "Vertical", "Vertical scroll"],
+    browser: "Browser",
+    browserNote: "Install as a PWA",
+    mihonNote: "Komga-compatible API",
+    opdsNote: "Panels, Chunky, KyBook",
+    open: "Open in a browser",
+  },
+};
