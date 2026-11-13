@@ -39,21 +39,16 @@ a.bg-brand-fill:not(:focus-visible),
 button.bg-brand-fill:not(:focus-visible) {
   box-shadow:
     0 0 0 1px color-mix(in oklab, var(--brand-fill) 60%, white 0%),
-    0 0 22px -2px var(--glow-brand),
-    0 10px 32px -6px var(--glow-brand);
+    0 0 12px -2px var(--glow-brand),
+    0 6px 18px -6px var(--glow-brand);
   transition-property: filter, transform, box-shadow;
 }
 a.bg-brand-fill:not(:focus-visible):hover,
 button.bg-brand-fill:not(:focus-visible):hover {
   box-shadow:
     0 0 0 1px var(--brand-fill),
-    0 0 28px 2px var(--glow-brand),
-    0 10px 36px -6px var(--glow-brand);
-}
-
-/* The logo tile, lit from within. */
-[data-app-mark] {
-  filter: drop-shadow(0 0 10px var(--glow-brand));
+    0 0 16px 0 var(--glow-brand),
+    0 6px 20px -6px var(--glow-brand);
 }
 
 /* The near moon on the sign-in page's orbit is "you are here" too. */

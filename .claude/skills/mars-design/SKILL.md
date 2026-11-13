@@ -15,8 +15,8 @@ are flat: no gradients, blur, glass or coloured shadows. The one exception is
 **light from the chart itself**, all of it in `web/src/styles/glow.css`: the
 blue "you are here" marks glow like a beacon, the red route already read
 (`DotTrack`, progress bars, the reader rail) gives off a little light, the
-brand CTA and the logo are lit, and a lifted cover throws red light below
-it. Those come for free from `bg-here`, `bg-brand`, `BrandAction` and the
+brand CTA has a small halo, and a lifted cover throws red light below
+it. The logo is flat, never lit. Those come for free from `bg-here`, `bg-brand`, `BrandAction` and the
 cards, so never add a glow by hand, and never light anything else (cards,
 panels, headings, icons, secondary buttons).
 
