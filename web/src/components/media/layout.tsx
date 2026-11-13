@@ -115,7 +115,7 @@ export function ShelfItem({ children }: { children: ReactNode }) {
 
 export function EmptyState({ title, body, action }: { title: string; body?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-6 py-16 text-center">
+    <div className="flex flex-col items-center justify-center gap-2 rounded-[12px] border border-dashed border-border px-6 py-16 text-center">
       <p className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
         {title}
       </p>

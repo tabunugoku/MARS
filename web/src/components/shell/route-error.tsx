@@ -16,8 +16,8 @@ const m = defineMessages({
   en: {
     newVersion: "A new version is available",
     failed: "This page could not be shown",
-    reloadHint: "Reload to get the latest version of the page.",
-    retryHint: "Try again in a moment.",
+    reloadHint: "Reload to get the latest version of the page",
+    retryHint: "Try again in a moment",
     reload: "Reload",
     home: "Go home",
   },

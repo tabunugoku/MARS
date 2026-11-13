@@ -82,7 +82,7 @@ const m = defineMessages({
     emptied: ({ series, books }) =>
       `Emptied the trash: ${series} series, ${books} ${books === 1 ? "book" : "books"}`,
     stopAllTitle: "Stop all tasks?",
-    stopAllBody: "Stops all running and queued tasks.",
+    stopAllBody: "Stops all running and queued tasks",
     emptyTrashTitle: "Empty trash?",
     emptyTrashBody: "Permanently deletes the files in the trash. This cannot be undone.",
     empty: "Empty",
@@ -223,7 +223,7 @@ export default function Screen() {
             {!tasks && (
               <div className="flex flex-col gap-2" aria-hidden>
                 {[0, 1].map((i) => (
-                  <Block key={i} className="h-[88px] w-full rounded-xl" />
+                  <Block key={i} className="h-[88px] w-full rounded-[12px]" />
                 ))}
               </div>
             )}
@@ -244,7 +244,7 @@ export default function Screen() {
                   const pct = Math.round(task.progress * 100);
                   const running = task.state === "running";
                   return (
-                    <li key={task.id} className="flex items-center gap-4 rounded-xl bg-card p-4">
+                    <li key={task.id} className="flex items-center gap-4 rounded-[12px] bg-card p-4">
                       <div className="min-w-0 flex-1 space-y-1.5">
                         <p className={cn(typeClass("subtitle"), "truncate text-foreground")} style={{ fontVariationSettings: fontWeights.semibold }}>
                           {task.label}

@@ -511,10 +511,12 @@ export default function Screen() {
       {header}
 
       <div className="sticky top-0 z-10 mb-4 flex flex-wrap items-center justify-between gap-2 bg-surface-2 py-2">
-        <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
+        {filterCount > 0 && (
+          <p className={cn(typeClass("caption"), "font-mono text-muted-foreground tabular-nums")}>{t("seriesTotal", { n: seriesList.total })}</p>
+        )}
         {/* One row on a phone too: there Select and Filters show their icon
             only (the label stays for screen readers), plus the filter count. */}
-        <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
+        <div className="ml-auto flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
           {/* Stays in place while selecting, pressed, so the controls beside
               it do not shift; pressing it again ends selection, like the
               bar's close button. */}

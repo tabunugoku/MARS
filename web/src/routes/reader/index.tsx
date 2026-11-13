@@ -66,7 +66,7 @@ const m = defineMessages({
     page: "Page",
     finished: "You finished {title}",
     readNext: "Read next volume ({title})",
-    latestVolume: "This is the latest volume in the series.",
+    latestVolume: "This is the latest volume in the series",
     backToSeries: "Back to series",
     jumpTo: "Go to page {page}",
   },

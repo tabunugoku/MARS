@@ -27,7 +27,7 @@ const m = defineMessages({
   },
   en: {
     setupTitle: "First-time setup",
-    setupBody: "This creates the first admin account.",
+    setupBody: "This creates the first admin account",
     token: "Setup token",
     tokenHint: "Shown in the server start-up log and in DATA/setup-token",
     name: "Name",

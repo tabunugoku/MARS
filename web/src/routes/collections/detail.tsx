@@ -68,7 +68,7 @@ const m = defineMessages({
     save: "Save",
     deleteBody: 'Delete "{name}". Series are not deleted.',
     emptyTitle: "No series",
-    emptyAdmin: "Add series from a series' More menu, with Add to collection.",
+    emptyAdmin: "Add series from a series' More menu, with Add to collection",
     emptyUser: "Series added by an admin will show up here",
     up: "Up",
     down: "Down",

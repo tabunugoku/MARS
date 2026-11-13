@@ -12,8 +12,8 @@ export function KindIcon({ kind, size = 32, className }: { kind: Library["kind"]
   return (
     <span
       aria-hidden
-      className={cn("relative grid shrink-0 place-items-center rounded-[10px] bg-brand-soft text-brand", className)}
-      style={{ width: size, height: size, borderRadius: Math.round(size * 0.28) }}
+      className={cn("relative grid shrink-0 place-items-center bg-brand-soft text-brand", className)}
+      style={{ width: size, height: size, borderRadius: Math.round(size * 0.25) }}
     >
       <Glyph size={Math.round(size * 0.5)} strokeWidth={1.75} />
     </span>

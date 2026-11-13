@@ -45,7 +45,7 @@ const m = defineMessages({
     trigger: "Import CBL",
     title: "Import CBL",
     pick: "CBL file",
-    hint: "Create a read list from a ComicRack .cbl file.",
+    hint: "Create a read list from a ComicRack .cbl file",
     tooLarge: "The file must be 5 MB or smaller",
     checking: "Checking the file",
     summary: ({ matched, unmatched }) => `${matched} matched / ${unmatched} unmatched`,

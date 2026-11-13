@@ -399,11 +399,11 @@ function SeriesPage({ id }: { id: string }) {
                   to={`/libraries/${series.libraryId}?genre=${encodeURIComponent(g)}`}
                   className="touch-hit relative rounded-full outline-none focus-visible:ring-2 focus-visible:ring-[var(--focus-ring)]"
                 >
-                  <Badge variant="dot">{g}</Badge>
+                  <Badge variant="solid">{g}</Badge>
                 </Link>
               ))}
               {series.tags.map((tag) => (
-                <Badge key={tag} variant="dot">
+                <Badge key={tag} variant="solid">
                   {tag}
                 </Badge>
               ))}

@@ -135,7 +135,7 @@ const m = defineMessages({
     thumbTooLarge: "Images must be 20 MB or smaller",
     thumbUploaded: "Thumbnail replaced",
     regenerateTitle: "Regenerate the thumbnail?",
-    regenerateUploadedBody: "This replaces the uploaded image with a thumbnail made from a page.",
+    regenerateUploadedBody: "This replaces the uploaded image with a thumbnail made from a page",
     analysisPending: "Analysis is not finished yet",
     releaseDate: "Release date",
     notSet: "Not set",

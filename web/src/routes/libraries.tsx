@@ -73,7 +73,7 @@ export default function Screen() {
             name={t("all")}
             meta={t("counts", total)}
             icon={
-              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-[9px] bg-brand-soft text-brand">
+              <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-[8px] bg-brand-soft text-brand">
                 <LibraryBig size={16} strokeWidth={1.75} />
               </span>
             }

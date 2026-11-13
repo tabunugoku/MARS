@@ -53,7 +53,7 @@ const m = defineMessages({
     readFromStart: "Read from start",
     notFound: "Read list not found",
     emptyTitle: "No books",
-    emptyAdmin: "Add books from a book's More menu, with Add to read list.",
+    emptyAdmin: "Add books from a book's More menu, with Add to read list",
     renamed: "Name changed",
     deleted: "Deleted",
     conflict: "Changed on another screen. Reloading",

@@ -3,9 +3,11 @@ import { useTheme } from "@/components/shell/theme";
 import { CompassRose } from "./compass-rose";
 
 // The chart behind every screen: a screentone dot grid over the content panel
-// and a large compass rose half off the bottom-right corner, drawn in dots and
-// hairlines at low contrast. Its needle turns to a new heading on each route —
-// the app navigating. Switching theme swings it half a turn.
+// and a large compass rose sitting a quarter in the bottom-right corner, drawn
+// in dots and hairlines at low contrast, so its lines stay off the content. It
+// is not drawn on phones (the content fills the width there). Its needle turns
+// to a new heading on each route — the app navigating. Switching theme swings
+// it half a turn.
 // Pointer-transparent and hidden from assistive tech.
 
 /** Stable heading (deg) per route section, so returning to a screen points the
@@ -28,7 +30,7 @@ export function CompassBackdrop() {
       <div className="tone absolute inset-0 [mask-image:linear-gradient(to_bottom,#000,transparent_70%)] opacity-70" />
       <CompassRose
         deg={deg}
-        className="fixed -bottom-[200px] -right-[180px] size-[560px] opacity-[0.11] max-md:-right-[300px] max-md:-bottom-[260px] dark:opacity-[0.13]"
+        className="fixed -bottom-[280px] -right-[280px] size-[560px] opacity-[0.11] max-md:hidden dark:opacity-[0.13]"
       />
     </div>
   );
