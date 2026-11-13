@@ -36,6 +36,7 @@ export default function Screen() {
       <PageHeader
         title={t("title")}
         meta={data ? t("count", { n: data.cols.length }) : undefined}
+        stackActions
         actions={data?.isAdmin ? <NewListDialog kind="collection" /> : undefined}
       />
       <ViewSwitch current="collections" />

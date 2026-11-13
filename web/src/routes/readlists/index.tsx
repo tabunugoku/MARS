@@ -37,11 +37,13 @@ export default function Screen() {
       <PageHeader
         title={t("title")}
         meta={data ? t("count", { n: data.lists.length }) : undefined}
+        stackActions
         actions={
           data?.isAdmin ? (
-            <div className="flex flex-wrap gap-2">
-              <ImportCblDialog />
+            <div className="flex flex-wrap gap-2 sm:flex-row-reverse">
+              {/* "New" where the collections page has it: first on a phone, rightmost when wider. */}
               <NewListDialog kind="readlist" />
+              <ImportCblDialog />
             </div>
           ) : undefined
         }
