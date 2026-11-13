@@ -86,12 +86,25 @@ func InScope(rel string, scope []string) bool {
 	return false
 }
 
+// ResolveRoot follows symlinks in a library root, so a root that is itself a
+// link to a folder is walked and watched as that folder (WalkDir does not
+// follow a symlink at its start). Symlinks below the root are still not
+// followed. A root that cannot be resolved is returned as given, and the walk
+// reports the error.
+func ResolveRoot(root string) string {
+	if r, err := filepath.EvalSymlinks(root); err == nil {
+		return r
+	}
+	return root
+}
+
 // Walk lists the series under root. Hidden files and folders (leading '.')
 // and the system folders above are skipped, as is anything matching an
 // exclude glob (path.Match against the relative path or the base name).
 // Symlinks are not followed. Series come back in natural folder order and
 // books in natural name order.
 func Walk(ctx context.Context, root string, exclude []string) (Listing, error) {
+	root = ResolveRoot(root)
 	w := newWalker(root, exclude)
 	if err := w.walk(ctx, root); err != nil {
 		return Listing{}, err
@@ -106,6 +119,7 @@ func Walk(ctx context.Context, root string, exclude []string) (Listing, error) {
 // rows. Entries that are invalid or skipped are dropped; when none is left
 // ErrNoScope is returned. The root must be readable, as for Walk.
 func WalkScope(ctx context.Context, root string, exclude, scope []string) (Listing, error) {
+	root = ResolveRoot(root)
 	if _, err := os.ReadDir(root); err != nil {
 		return Listing{}, err
 	}

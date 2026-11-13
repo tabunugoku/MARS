@@ -190,3 +190,30 @@ func TestScopedSyncKeepsLastScan(t *testing.T) {
 		t.Fatalf("full sync left last_scan at %q", got)
 	}
 }
+
+// A library root that is a symlink to a folder is walked as that folder.
+func TestWalkSymlinkRoot(t *testing.T) {
+	real := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(real, "Series A"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(real, "Series A", "v01.cbz"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(t.TempDir(), "comics")
+	if err := os.Symlink(real, link); err != nil {
+		t.Skipf("cannot create a symlink here: %v", err)
+	}
+	for name, walk := range map[string]func() (Listing, error){
+		"Walk":      func() (Listing, error) { return Walk(context.Background(), link, nil) },
+		"WalkScope": func() (Listing, error) { return WalkScope(context.Background(), link, nil, []string{"Series A"}) },
+	} {
+		l, err := walk()
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(l.Series) != 1 || len(l.Series[0].Books) != 1 {
+			t.Errorf("%s over a symlinked root: %+v, want one series with one book", name, l.Series)
+		}
+	}
+}

@@ -347,6 +347,7 @@ func watchErrMessage(err error) string {
 // passed to onQuiet first, so the failure does not drop it. A failure to start
 // returns err.
 func watchTree(ctx context.Context, root string, exclude []string, onQuiet func(scope []string, full bool), fail func(error)) (context.CancelFunc, chan struct{}, error) {
+	root = scan.ResolveRoot(root) // event paths are under the resolved folder
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
 		return nil, nil, err
