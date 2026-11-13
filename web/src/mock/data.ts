@@ -29,6 +29,18 @@ const r = rng(20261110);
 const pick = <T,>(xs: readonly T[]) => xs[Math.floor(r() * xs.length)];
 const daysAgo = (d: number) => new Date(Date.UTC(2026, 10, 10) - d * 86400000).toISOString();
 
+// Folders the mock's folder picker can browse: each path lists its child folder
+// names. The unreadable folder is listed but cannot be opened.
+export const folderTree: Record<string, string[]> = {
+  "/": ["comics", "data", "root"],
+  "/comics": ["manga", "webtoon", "western"],
+  "/comics/manga": [],
+  "/comics/webtoon": [],
+  "/comics/western": [],
+  "/data": [],
+};
+export const unreadableFolders: string[] = ["/root"];
+
 export const libraries: Library[] = [
   { id: "lib-manga", name: "マンガ", root: "/comics/manga", kind: "manga", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(0.1), scanInterval: "daily", watch: true, importComicInfo: true, importLocalArtwork: true, exclude: ["@eaDir", "#recycle"] },
   { id: "lib-webtoon", name: "Webtoon", root: "/comics/webtoon", kind: "webtoon", seriesCount: 0, bookCount: 0, sizeBytes: 0, lastScan: daysAgo(1.2), scanInterval: "daily", watch: true, watchError: "ファイルの監視を始められませんでした（監視できるフォルダ数の上限）。定期スキャンを使ってください", importComicInfo: true, importLocalArtwork: false, exclude: [] },

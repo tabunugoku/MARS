@@ -59,6 +59,8 @@ export type BulkResult = S["BulkResult"];
 export type CblEntry = S["CblEntry"];
 export type CblImportResult = S["CblImportResult"];
 export type SeriesThumbnailSource = S["SeriesThumbnailSource"];
+export type DirectoryListing = S["DirectoryListing"];
+export type DirectoryEntry = S["DirectoryEntry"];
 
 export interface SeriesQuery {
   libraryId?: string;
