@@ -6,10 +6,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/auth"
 )
 
-// compatHandler is the /opds/ and /komga/ handler built the way cmd/cominavi
+// compatHandler is the /opds/ and /komga/ handler built the way cmd/mars
 // builds it, on the test environment's database.
 func compatHandler(e *env) http.Handler {
 	return NewCompat(Deps{DB: e.db, Version: "test", Auth: auth.Store{DB: e.db},

@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/media"
 )
 
 // Page thumbnails are small JPEGs of single pages for page lists. A list

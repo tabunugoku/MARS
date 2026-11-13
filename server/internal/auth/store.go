@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/ids"
+	"github.com/tabunugoku/mars/server/internal/ids"
 )
 
 // Store keeps sessions and API keys in the database.

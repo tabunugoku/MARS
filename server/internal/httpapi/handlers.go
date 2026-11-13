@@ -16,9 +16,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/ids"
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/ids"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 // notFound and badRequest build the error bodies of the generated responses:

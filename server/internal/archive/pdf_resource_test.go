@@ -55,8 +55,8 @@ func heapInUse() uint64 {
 // its file size. It logs only; run with -v to see the numbers.
 func TestPDFOpenMemory(t *testing.T) {
 	// It builds PDFs of about 100 MB and takes seconds: run it on request.
-	if os.Getenv("COMINAVI_MEMTEST") == "" {
-		t.Skip("set COMINAVI_MEMTEST=1 to measure PDF memory")
+	if os.Getenv("MARS_MEMTEST") == "" {
+		t.Skip("set MARS_MEMTEST=1 to measure PDF memory")
 	}
 	cases := []struct {
 		name  string

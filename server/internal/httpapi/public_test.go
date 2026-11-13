@@ -22,7 +22,7 @@ func TestCoverWall(t *testing.T) {
 
 	var ls LoginScreen
 	anon.json("GET", "/api/v1/public/login-screen", nil, 200, &ls)
-	if ls.Backdrop != Compass || len(ls.Covers) != 0 {
+	if ls.Backdrop != Planet || len(ls.Covers) != 0 {
 		t.Fatalf("default login screen %+v", ls)
 	}
 	if rec := anon.do("GET", "/api/v1/public/covers/"+id, nil); rec.Code != 404 {

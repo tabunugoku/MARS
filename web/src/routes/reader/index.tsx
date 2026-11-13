@@ -116,7 +116,7 @@ function findView(views: View[], n: number, second = false): number {
 
 /** The server keeps a page number only. Which half of a split page the reader
  *  stopped at is kept in this browser: the page whose second half was showing. */
-const halfKey = (bookId: string) => `cominavi.half.${bookId}`;
+const halfKey = (bookId: string) => `mars.half.${bookId}`;
 function readHalf(bookId: string): number | null {
   try {
     return Number(localStorage.getItem(halfKey(bookId))) || null;

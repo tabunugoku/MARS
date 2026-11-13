@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/events"
 )
 
 // komgaProgressRoutes registers the read-progress endpoints Mihon's Komga

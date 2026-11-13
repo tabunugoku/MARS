@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tabunugoku/cominavi/server/internal/config"
+	"github.com/tabunugoku/mars/server/internal/config"
 )
 
 func TestHealthcheck(t *testing.T) {
@@ -63,7 +63,7 @@ func TestProbeAddr(t *testing.T) {
 	}
 }
 
-// Without COMINAVI_PORT the probe follows the address the server recorded;
+// Without MARS_PORT the probe follows the address the server recorded;
 // with the port fixed, or with no usable record, it uses cfg.Addr.
 func TestHealthTarget(t *testing.T) {
 	dir := t.TempDir()
@@ -93,7 +93,7 @@ func TestHealthTarget(t *testing.T) {
 		t.Fatalf("port set: %q, want the configured address", got)
 	}
 	// The probe only reads: the data folder must not gain anything.
-	if _, err := os.Stat(filepath.Join(dir, "cominavi.db")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(dir, "mars.db")); !os.IsNotExist(err) {
 		t.Fatalf("healthTarget touched the database: %v", err)
 	}
 }

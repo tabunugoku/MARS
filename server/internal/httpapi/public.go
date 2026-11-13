@@ -13,19 +13,19 @@ const coverWallSize = 24
 func (s *server) loginBackdrop(ctx context.Context) LoginBackdrop {
 	var raw string
 	if err := s.DB.QueryRowContext(ctx, `SELECT value FROM settings WHERE key = 'server'`).Scan(&raw); err != nil {
-		return Compass
+		return Planet
 	}
 	var v struct {
 		LoginBackdrop LoginBackdrop `json:"loginBackdrop"`
 	}
 	if json.Unmarshal([]byte(raw), &v) != nil {
-		return Compass
+		return Planet
 	}
 	switch v.LoginBackdrop {
 	case Covers, BookCovers:
 		return v.LoginBackdrop
 	}
-	return Compass
+	return Planet
 }
 
 // coverWall returns the covers shown on the login screen: for Covers the
@@ -73,7 +73,7 @@ func (s *server) GetLoginScreen(ctx context.Context, _ GetLoginScreenRequestObje
 	if err != nil {
 		return nil, err
 	}
-	backdrop := Compass
+	backdrop := Planet
 	if len(covers) > 0 {
 		backdrop = s.loginBackdrop(ctx)
 	}

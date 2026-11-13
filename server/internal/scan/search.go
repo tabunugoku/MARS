@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 // Search text of a series s and of a book b: title plus author names. The

@@ -1467,10 +1467,10 @@ export interface components {
             version: string;
         };
         /**
-         * @description compass: the default artwork. covers: covers of series. bookCovers: covers of books (volumes).
+         * @description planet: the default artwork (the planet and its orbit). covers: covers of series. bookCovers: covers of books (volumes).
          * @enum {string}
          */
-        LoginBackdrop: "compass" | "covers" | "bookCovers";
+        LoginBackdrop: "planet" | "covers" | "bookCovers";
         LoginScreen: {
             /** @description No user exists yet: show the first-run setup form */
             needsSetup: boolean;

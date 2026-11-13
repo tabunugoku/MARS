@@ -13,12 +13,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/media"
 )
 
-// opdsHandler is the /opds/ handler built the way cmd/cominavi builds it, with
+// opdsHandler is the /opds/ handler built the way cmd/mars builds it, with
 // a library service on the test environment's database and folders, so pages,
 // covers and files can be served.
 func opdsHandler(e *env) http.Handler {
@@ -211,7 +211,7 @@ func TestOpdsCatalogAndRedirect(t *testing.T) {
 		t.Fatalf("catalog has %d entries, want 6", got)
 	}
 	for _, id := range []string{"keep-reading", "series-latest", "books-latest", "libraries", "collections", "readlists"} {
-		if _, ok := entryByID(f, "urn:cominavi:feed:"+id); !ok {
+		if _, ok := entryByID(f, "urn:mars:feed:"+id); !ok {
 			t.Fatalf("catalog lacks %s", id)
 		}
 	}
@@ -233,7 +233,7 @@ func TestOpdsLibraryAndSeries(t *testing.T) {
 	h := opdsHandler(e)
 
 	libs := opdsParse(t, opdsGet(h, "/opds/v1.2/libraries", opdsReaderName, opdsReaderPass))
-	if _, ok := entryByID(libs, "urn:cominavi:library:"+lib.Id); !ok {
+	if _, ok := entryByID(libs, "urn:mars:library:"+lib.Id); !ok {
 		t.Fatalf("libraries %+v", libs.Entries)
 	}
 
@@ -242,7 +242,7 @@ func TestOpdsLibraryAndSeries(t *testing.T) {
 		t.Fatalf("library feed has %d series", len(lf.Entries))
 	}
 	yofuke := findSeries(t, e, lib.Id, "Yofuke")
-	if _, ok := entryByID(lf, "urn:cominavi:series:"+yofuke); !ok {
+	if _, ok := entryByID(lf, "urn:mars:series:"+yofuke); !ok {
 		t.Fatalf("library feed lacks Yofuke: %+v", lf.Entries)
 	}
 
@@ -359,7 +359,7 @@ func TestOpdsPageProgress(t *testing.T) {
 	reader.json("PUT", "/api/v1/books/"+three.Id+"/progress", map[string]any{"page": 2}, 200, nil)
 
 	kr := opdsParse(t, opdsGet(h, "/opds/v1.2/keep-reading", opdsReaderName, opdsReaderPass))
-	ent, ok := entryByID(kr, "urn:cominavi:book:"+three.Id)
+	ent, ok := entryByID(kr, "urn:mars:book:"+three.Id)
 	if !ok {
 		t.Fatalf("keep reading lacks the book: %+v", kr.Entries)
 	}
@@ -370,7 +370,7 @@ func TestOpdsPageProgress(t *testing.T) {
 
 	reader.json("PUT", "/api/v1/books/"+three.Id+"/progress", map[string]any{"page": 3}, 200, nil)
 	kr = opdsParse(t, opdsGet(h, "/opds/v1.2/keep-reading", opdsReaderName, opdsReaderPass))
-	if _, ok := entryByID(kr, "urn:cominavi:book:"+three.Id); ok {
+	if _, ok := entryByID(kr, "urn:mars:book:"+three.Id); ok {
 		t.Fatal("completed book still in keep reading")
 	}
 }
@@ -441,7 +441,7 @@ func TestOpdsCollection(t *testing.T) {
 	e.admin.json("POST", "/api/v1/collections", map[string]any{"name": "星", "seriesIds": []string{hoshi}}, 201, &c)
 
 	f := opdsParse(t, opdsGet(h, "/opds/v1.2/collections/"+c.Id, opdsReaderName, opdsReaderPass))
-	if len(f.Entries) != 1 || f.Entries[0].ID != "urn:cominavi:series:"+hoshi {
+	if len(f.Entries) != 1 || f.Entries[0].ID != "urn:mars:series:"+hoshi {
 		t.Fatalf("collection feed %+v", f.Entries)
 	}
 	if rec := opdsGet(h, "/opds/v1.2/collections/nope", opdsReaderName, opdsReaderPass); rec.Code != 404 {

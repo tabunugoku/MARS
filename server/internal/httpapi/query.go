@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tabunugoku/cominavi/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/library"
 )
 
 // Every handler that returns series or books builds its query from

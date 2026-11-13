@@ -1,11 +1,11 @@
 ---
-name: cominavi-design
-description: MARS's (formerly ComiNavi) UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
+name: mars-design
+description: MARS's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
 ---
 
 # MARS design system
 
-MARS ("MARS: A Reading Server", formerly ComiNavi) is a self-hosted comic
+MARS ("MARS: A Reading Server") is a self-hosted comic
 server. Tagline: "Your manga. Your server. Your universe." (always English). The direction is
 **a night chart of Mars, printed in screentone dots**: covers are the
 content, the chrome is flat and dark, and the richness comes from dots and

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/media"
-	"github.com/tabunugoku/cominavi/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/scan"
 )
 
 // SeriesCoverSQL is the SQL expression for the file name of a series' cover

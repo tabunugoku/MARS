@@ -1,4 +1,4 @@
-// Command cominavi runs the MARS server: the REST API under /api/v1 and
+// Command mars runs the MARS server: the REST API under /api/v1 and
 // the embedded web UI everywhere else.
 package main
 
@@ -17,15 +17,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
-	"github.com/tabunugoku/cominavi/server/internal/config"
-	"github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/httpapi"
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/media"
-	"github.com/tabunugoku/cominavi/server/internal/task"
-	"github.com/tabunugoku/cominavi/server/internal/webui"
+	"github.com/tabunugoku/mars/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/config"
+	"github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/httpapi"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/webui"
 )
 
 // version is set at build time: -ldflags "-X main.version=v0.1.0".
@@ -69,7 +69,7 @@ func run() error {
 	defer database.Close()
 
 	// Settings read at startup: the task thread count (restart applies it)
-	// and the port unless COMINAVI_PORT is set.
+	// and the port unless MARS_PORT is set.
 	settings, err := httpapi.ReadServerSettings(ctx, database)
 	if err != nil {
 		slog.Warn("stored server settings could not be read, using defaults", "err", err)

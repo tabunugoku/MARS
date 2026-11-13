@@ -9,7 +9,7 @@ web/dist
 server/internal/webui/dist/*
 !server/internal/webui/dist/.gitkeep
 server/data
-server/cominavi
-server/cominavi.exe
+server/mars
+server/mars.exe
 data
 *.log

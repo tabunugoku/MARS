@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 // defaultHeartbeat keeps proxies and browsers from timing an idle stream

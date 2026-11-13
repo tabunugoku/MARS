@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/events"
 )
 
 const upsertProgress = `INSERT INTO read_progress (user_id, book_id, page, completed, read_at) VALUES (?, ?, ?, ?, ?)

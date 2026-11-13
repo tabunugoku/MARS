@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/ids"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/ids"
 )
 
 // Func is the work. It reports progress in 0..1 and must return promptly

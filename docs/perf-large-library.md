@@ -1,6 +1,6 @@
 # Large-library performance (37,000 books)
 
-How ComiNavi's SQLite usage holds up at the size of a real migrated Komga
+How MARS's SQLite usage holds up at the size of a real migrated Komga
 library: about 37,000 books, 2,500 series, 7.4 million page rows. It records
 what was measured, what broke, what changed, and the numbers before and
 after.

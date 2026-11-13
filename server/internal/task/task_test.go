@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 func newQueue(t *testing.T, workers int) (*Queue, context.Context) {

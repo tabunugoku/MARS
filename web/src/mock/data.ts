@@ -189,7 +189,7 @@ export const settings: ServerSettings = {
   opdsEnabled: true,
   komgaApiEnabled: false,
   koboSyncEnabled: false,
-  loginBackdrop: "compass",
+  loginBackdrop: "planet",
 };
 
 export const currentUser = users[0];

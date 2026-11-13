@@ -15,7 +15,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/archive"
 )
 
 type zipEntry struct {

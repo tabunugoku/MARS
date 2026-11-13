@@ -14,8 +14,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/tabunugoku/cominavi/server/internal/library"
-	"github.com/tabunugoku/cominavi/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/media"
 
 	// Decoders for convert=png: the page formats MARS reads.
 	_ "golang.org/x/image/webp"

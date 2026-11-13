@@ -14,7 +14,7 @@ const API_TARGET = 'http://localhost:25600'
 function stampServiceWorker(): Plugin {
   let outDir = 'dist'
   return {
-    name: 'cominavi-sw-stamp',
+    name: 'mars-sw-stamp',
     apply: 'build',
     configResolved(c) {
       outDir = path.resolve(c.root, c.build.outDir)
@@ -46,7 +46,7 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    // Dev against the Go server: COMINAVI_DEV=1 go run ./cmd/cominavi
+    // Dev against the Go server: MARS_DEV=1 go run ./cmd/mars
     proxy: {
       '/api': {
         target: API_TARGET,

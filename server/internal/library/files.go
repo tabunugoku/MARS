@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/media"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 // ErrNotReady means the book has not been analysed (or its analysis

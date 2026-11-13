@@ -15,7 +15,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/archive"
 )
 
 var bookIDPattern = regexp.MustCompile(`^[0-9A-Za-z]{1,64}$`)

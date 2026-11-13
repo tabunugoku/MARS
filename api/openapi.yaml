@@ -4,7 +4,7 @@ openapi: 3.0.3
 #   web:    npm run api:types            (openapi-typescript -> src/api/schema.d.ts)
 # OpenAPI 3.0.3 because oapi-codegen does not fully support 3.1 yet.
 info:
-  title: ComiNavi API
+  title: MARS API
   version: 0.1.0
   description: Self-hosted comic and manga server.
 servers:
@@ -1553,8 +1553,8 @@ components:
         version: { type: string }
     LoginBackdrop:
       type: string
-      description: "compass: the default artwork. covers: covers of series. bookCovers: covers of books (volumes)."
-      enum: [compass, covers, bookCovers]
+      description: "planet: the default artwork (the planet and its orbit). covers: covers of series. bookCovers: covers of books (volumes)."
+      enum: [planet, covers, bookCovers]
     LoginScreen:
       type: object
       required: [backdrop, covers, needsSetup]

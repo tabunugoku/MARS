@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/events"
 )
 
 // sse is one message read from a stream: an event, or a comment line

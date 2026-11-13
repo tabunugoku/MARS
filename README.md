@@ -4,8 +4,6 @@
 
 *Your manga. Your server. Your universe.*
 
-MARS was called ComiNavi before. The Docker image, environment variables and file names still use `cominavi`, so existing installs keep working.
-
 A lightweight, self-hosted comic and manga server. One static Go binary
 (SQLite inside, web UI embedded) that scans your folders, builds series and
 books from them, and serves a reader to any browser. No Java, no external
@@ -14,17 +12,17 @@ database.
 - **Formats:** CBZ / ZIP, CBR / RAR (including RAR5 and solid archives) and
   CB7 / 7z. A folder of archives is a series; `ComicInfo.xml` is imported
   when present.
-- **Image:** `ghcr.io/tabunugoku/cominavi`, for `linux/amd64` and
+- **Image:** `ghcr.io/tabunugoku/mars`, for `linux/amd64` and
   `linux/arm64`, on distroless (no shell), running as uid 65532.
 
 ## Quick start
 
 ```sh
-docker run -d --name cominavi \
+docker run -d --name mars \
   -p 25600:25600 \
-  -v cominavi-data:/data \
+  -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/cominavi:latest
+  ghcr.io/tabunugoku/mars:latest
 ```
 
 Open http://localhost:25600 and add a library pointing at `/comics`.
@@ -33,9 +31,9 @@ Open http://localhost:25600 and add a library pointing at `/comics`.
 
 ```yaml
 services:
-  cominavi:
-    image: ghcr.io/tabunugoku/cominavi:latest
-    container_name: cominavi
+  mars:
+    image: ghcr.io/tabunugoku/mars:latest
+    container_name: mars
     restart: unless-stopped
     ports:
       - "25600:25600"
@@ -55,7 +53,7 @@ mkdir -p data && sudo chown 65532:65532 data
 
 Comic folders only need to be readable (`:ro` is recommended).
 
-The image has a built-in health check (`cominavi healthcheck`), so `docker ps`
+The image has a built-in health check (`mars healthcheck`), so `docker ps`
 shows the container as healthy once the server answers.
 
 On **TrueNAS SCALE**, see [docs/install/truenas.md](docs/install/truenas.md)
@@ -68,13 +66,13 @@ for a one-time **setup token**. The server prints it on its first start and
 also writes it to `/data/setup-token`:
 
 ```sh
-docker logs cominavi 2>&1 | grep token=
+docker logs mars 2>&1 | grep token=
 # or, with a bind-mounted data folder:
 sudo cat ./data/setup-token
 ```
 
 The image has no shell, so `docker exec … cat` does not work; use the log or
-the host side of the data folder (`docker cp cominavi:/data/setup-token .`
+the host side of the data folder (`docker cp mars:/data/setup-token .`
 also works for a named volume).
 The token is deleted once the administrator has been created.
 
@@ -82,11 +80,11 @@ The token is deleted once the administrator has been created.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `COMINAVI_DATA` | `/data` in the image, `./data` otherwise | Database, thumbnails and page cache |
-| `COMINAVI_PORT` | `25600` | Listen port |
-| `COMINAVI_HOST` | all interfaces | Listen address, e.g. `127.0.0.1` |
-| `COMINAVI_TRUSTED_PROXIES` | none | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For` is trusted |
-| `COMINAVI_DEV` | unset | `1` serves the API only (the Vite dev server serves the UI) |
+| `MARS_DATA` | `/data` in the image, `./data` otherwise | Database, thumbnails and page cache |
+| `MARS_PORT` | `25600` | Listen port |
+| `MARS_HOST` | all interfaces | Listen address, e.g. `127.0.0.1` |
+| `MARS_TRUSTED_PROXIES` | none | Comma-separated IPs/CIDRs of reverse proxies whose `X-Forwarded-For` is trusted |
+| `MARS_DEV` | unset | `1` serves the API only (the Vite dev server serves the UI) |
 
 ## OPDS and Mihon
 
@@ -121,7 +119,7 @@ expected, not an error. To install it, put HTTPS in front:
   drops a non-standard port such as `:8443` and makes sign-in fail) and
   `proxy_set_header X-Forwarded-Proto $scheme;`. For the event stream
   (`/api/v1/events`) turn response buffering off (`proxy_buffering off;`).
-  Set `COMINAVI_TRUSTED_PROXIES` to the proxy's address.
+  Set `MARS_TRUSTED_PROXIES` to the proxy's address.
 
 After an upgrade, the installed app picks up the new version on its next
 launch: page loads always go to the server first, and only a server that
@@ -146,17 +144,17 @@ Needs Node 22 and Go (the version in `server/go.mod`). The binary is pure Go
 
 ```sh
 cd web && npm ci && npm run build:embed   # builds the UI into server/internal/webui/dist
-cd ../server && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cominavi ./cmd/cominavi
-./cominavi
+cd ../server && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mars ./cmd/mars
+./mars
 ```
 
-Or build the image: `docker build -t cominavi .`
+Or build the image: `docker build -t mars .`
 
 ## Development
 
 ```sh
 # terminal 1: API only, data in server/data
-cd server && COMINAVI_DEV=1 go run ./cmd/cominavi
+cd server && MARS_DEV=1 go run ./cmd/mars
 # terminal 2: UI with hot reload on http://localhost:5173, proxying /api to :25600
 cd web && npm run dev
 ```

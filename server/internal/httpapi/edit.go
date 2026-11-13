@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/scan"
 )
 
 // Lock names are the fields the scanner checks in library.go. A locked field
@@ -96,7 +96,7 @@ func defaultSettings() ServerSettings {
 		ThumbnailFormat:        ServerSettingsThumbnailFormatJpeg,
 		RememberMeDays:         30,
 		DeleteEmptyCollections: true,
-		LoginBackdrop:          Compass,
+		LoginBackdrop:          Planet,
 	}
 }
 

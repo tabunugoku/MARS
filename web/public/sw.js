@@ -18,7 +18,7 @@
 // screen offers a reload.
 const VERSION = "dev";
 const ENTRY = [];
-const PREFIX = "cominavi-shell-";
+const PREFIX = "mars-shell-";
 const CACHE = PREFIX + VERSION;
 const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icon-192.png", ...ENTRY];
 

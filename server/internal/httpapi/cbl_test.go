@@ -10,7 +10,7 @@ import (
 	"testing"
 	"unicode/utf16"
 
-	"github.com/tabunugoku/cominavi/server/internal/auth"
+	"github.com/tabunugoku/mars/server/internal/auth"
 )
 
 // cblDocXML is a ReadingList document with the given Books children.

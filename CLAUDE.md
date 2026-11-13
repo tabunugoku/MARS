@@ -1,11 +1,8 @@
-# MARS (formerly ComiNavi)
+# MARS
 
 A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
 "MARS: A Reading Server" — tagline "Your manga. Your server. Your universe."
-(English in both languages). Only the displayed name changed: the Go module,
-`cmd/cominavi`, `COMINAVI_*` variables, the image name, data file names,
-browser storage keys (`cominavi.*`), OPDS URNs and the Basic realm keep
-`cominavi` on purpose, so existing installs and saved settings keep working.
+(English in both languages).
 Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
@@ -16,7 +13,7 @@ Current phase: **MVP complete** (milestones M0–M5 merged into `main`,
 README). Next: the 【推奨】 features in `docs/features.md`. Every API operation is classified in
 `server/internal/httpapi/access.go` (`opAccess`); an unlisted one is refused,
 and series/books are read only through the builders in `query.go`.
-The server listens on all interfaces (`COMINAVI_HOST` narrows it); a first
+The server listens on all interfaces (`MARS_HOST` narrows it); a first
 start prints a one-time setup token and writes it to `DATA/setup-token`;
 the web app's /login page shows the setup form until an admin exists.
 Reader progress writes carry a per-reader `writer` and `seq`; the server
@@ -37,14 +34,14 @@ a `code` and a message in the request's `Accept-Language`, and
   interaction model, screen specs (`docs/screens/`), integration and review.
 - **Haiku** subagents implement one screen each from its spec. A Haiku task
   edits only the files its spec lists. It reads
-  `.claude/skills/cominavi-design/SKILL.md` first and follows it.
+  `.claude/skills/mars-design/SKILL.md` first and follows it.
 - **Codex** (`codex:codex-rescue`) runs adversarial reviews at milestones.
   Findings are triaged by Opus; fixes go back to Haiku.
 
 ## Commands (run in `web/`)
 
 - `npm run dev` — dev server on http://localhost:5173; `/api` is proxied to
-  the Go server on :25600 (`COMINAVI_DEV=1 go run ./cmd/cominavi` in `server/`)
+  the Go server on :25600 (`MARS_DEV=1 go run ./cmd/mars` in `server/`)
 - `npm run dev:mock` — the same UI on invented data, no Go server needed
 - `npm run build:embed` — production build copied into the Go binary's
   `server/internal/webui/dist`
@@ -75,7 +72,7 @@ a `code` and a message in the request's `Accept-Language`, and
   draw anything. After installing a Fluid component, grep it for
   `useIcons()` and map each slot it reads to Keyline. An unmapped slot draws
   an empty box and warns `[icons]` in the dev console.
-- Skills in this repo: `cominavi-design`, `shadcn`,
+- Skills in this repo: `mars-design`, `shadcn`,
   `vercel-react-best-practices`, `web-design-guidelines`.
 - Initial JS budget: 260 KB gzip for everything loaded before the first
   screen (the entry chunk and its static imports: React, router, motion,

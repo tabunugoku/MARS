@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/db"
 )
 
 // TestPerfSync runs a first Sync of PERF_LIB into a fresh database with a

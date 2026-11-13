@@ -57,9 +57,9 @@ jobs:
           path: server/internal/webui/dist
       - name: Build static binaries
         run: |
-          GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/cominavi-amd64 ./cmd/cominavi
-          GOOS=linux GOARCH=arm64 go build -trimpath -o /tmp/cominavi-arm64 ./cmd/cominavi
-          ls -l /tmp/cominavi-*
+          GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/mars-amd64 ./cmd/mars
+          GOOS=linux GOARCH=arm64 go build -trimpath -o /tmp/mars-arm64 ./cmd/mars
+          ls -l /tmp/mars-*
 
   docker:
     runs-on: ubuntu-latest
@@ -73,12 +73,12 @@ jobs:
           platforms: linux/amd64
           push: false
           load: true
-          tags: cominavi:ci
+          tags: mars:ci
           build-args: VERSION=ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Smoke test, size and memory
-        run: bash .github/scripts/smoke-image.sh cominavi:ci
+        run: bash .github/scripts/smoke-image.sh mars:ci
       # The build stages run natively and cross-compile, so arm64 costs only
       # the Go build; this checks it still builds and reports its size.
       - name: Build image (linux/arm64)
@@ -88,11 +88,11 @@ jobs:
           platforms: linux/arm64
           push: false
           load: true
-          tags: cominavi:ci-arm64
+          tags: mars:ci-arm64
           cache-from: type=gha
       - name: arm64 image size
         run: |
-          size=$(docker image inspect -f '{{.Size}}' cominavi:ci-arm64)
+          size=$(docker image inspect -f '{{.Size}}' mars:ci-arm64)
           line="| image size (linux/arm64) | $(( size / 1024 / 1024 )) MiB ($size bytes) |"
           echo "$line"
           echo "$line" >>"$GITHUB_STEP_SUMMARY"

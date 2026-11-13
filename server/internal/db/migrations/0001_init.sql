@@ -1,4 +1,4 @@
--- ComiNavi schema, version 1. IDs are opaque text (ULID-like, sortable by
+-- MARS schema, version 1. IDs are opaque text (ULID-like, sortable by
 -- creation). Times are RFC 3339 UTC text. Booleans are 0/1 integers.
 
 CREATE TABLE settings (

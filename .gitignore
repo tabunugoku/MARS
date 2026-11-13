@@ -5,8 +5,8 @@ dist/
 
 # Go server
 /server/data/
-/server/cominavi
-/server/cominavi.exe
+/server/mars
+/server/mars.exe
 # The embedded UI is copied in by `npm run build:embed`; only the keep file is tracked.
 !/server/internal/webui/dist/
 /server/internal/webui/dist/*

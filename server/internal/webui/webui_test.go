@@ -11,7 +11,7 @@ func TestHandlerContentTypes(t *testing.T) {
 	root := fstest.MapFS{
 		"index.html":            {Data: []byte("<!doctype html>")},
 		"sw.js":                 {Data: []byte("self.addEventListener('fetch', () => {})")},
-		"manifest.webmanifest":  {Data: []byte(`{"name":"ComiNavi"}`)},
+		"manifest.webmanifest":  {Data: []byte(`{"name":"MARS"}`)},
 		"icon-192.png":          {Data: []byte("\x89PNG\r\n\x1a\n")},
 		"assets/index-abc12.js": {Data: []byte("export {}")},
 	}

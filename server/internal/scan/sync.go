@@ -7,8 +7,8 @@ import (
 	"path"
 	"time"
 
-	cdb "github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/ids"
+	cdb "github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/ids"
 )
 
 // Stats counts what one Sync changed.

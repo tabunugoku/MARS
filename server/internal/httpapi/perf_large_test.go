@@ -37,7 +37,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/scan"
 )
 
 func envInt(name string, def int) int {

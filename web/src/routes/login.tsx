@@ -203,8 +203,7 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
     );
   }
   // The night sky: the logo's planet and orbit, large, printed in dots. The
-  // near moon travels into place once. (The setting's value is still
-  // "compass", from before the rename to MARS.)
+  // near moon travels into place once.
   return (
     <>
       <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />

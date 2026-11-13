@@ -19,7 +19,7 @@ export function defineMessages<const J extends Record<string, Msg>>(m: {
   return m as Messages<Extract<keyof J, string>>;
 }
 
-const STORE_KEY = "cominavi.locale";
+const STORE_KEY = "mars.locale";
 
 /** The browser's language, if it is one we have. */
 export function browserLocale(): Locale | null {

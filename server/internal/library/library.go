@@ -18,12 +18,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
-	"github.com/tabunugoku/cominavi/server/internal/db"
-	"github.com/tabunugoku/cominavi/server/internal/events"
-	"github.com/tabunugoku/cominavi/server/internal/media"
-	"github.com/tabunugoku/cominavi/server/internal/scan"
-	"github.com/tabunugoku/cominavi/server/internal/task"
+	"github.com/tabunugoku/mars/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/db"
+	"github.com/tabunugoku/mars/server/internal/events"
+	"github.com/tabunugoku/mars/server/internal/media"
+	"github.com/tabunugoku/mars/server/internal/scan"
+	"github.com/tabunugoku/mars/server/internal/task"
 )
 
 var ErrNotFound = errors.New("library: not found")

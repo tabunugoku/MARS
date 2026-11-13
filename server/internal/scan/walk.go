@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/tabunugoku/cominavi/server/internal/archive"
-	"github.com/tabunugoku/cominavi/server/internal/natsort"
+	"github.com/tabunugoku/mars/server/internal/archive"
+	"github.com/tabunugoku/mars/server/internal/natsort"
 )
 
 // FoundBook is a book file seen on disk.
