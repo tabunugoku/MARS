@@ -515,11 +515,19 @@ export default function Screen() {
         {/* One row on a phone too: there Select and Filters show their icon
             only (the label stays for screen readers), plus the filter count. */}
         <div className="flex min-w-0 flex-wrap items-center gap-2 max-sm:flex-nowrap">
-          {!sel.active && series.length > 0 && (
+          {/* Stays in place while selecting, pressed, so the controls beside
+              it do not shift; pressing it again ends selection, like the
+              bar's close button. */}
+          {(sel.active || series.length > 0) && (
             <Button
-              variant="secondary"
+              variant={sel.active ? "primary" : "secondary"}
+              aria-pressed={sel.active}
               className="max-sm:px-2.5"
               onClick={() => {
+                if (sel.active) {
+                  sel.exit();
+                  return;
+                }
                 // A load left over from an earlier selection must not select everything now.
                 setLoadAllFor(null);
                 sel.enter();
