@@ -82,6 +82,7 @@ var messages = map[string]struct{ ja, en string }{
 	"media.pdf_too_big":               {"PDF が %d MB を超えています", "This PDF is over %d MB"},
 	"media.pdf_too_large":             {"PDF の %d ページの画像が大きすぎます", "PDF page %d image is too large"},
 	"media.pdf_undecodable":           {"PDF の %d ページをデコードできません", "PDF page %d cannot be decoded"},
+	"media.pdf_unrenderable":          {"PDF の %d ページを描画できません", "PDF page %d cannot be rendered"},
 	"media.pdf_unreadable":            {"PDF の %d ページを読めません", "PDF page %d cannot be read"},
 	"not_found.api_key":               {"API キーが見つかりません", "API key not found"},
 	"not_found.book":                  {"本が見つかりません", "Book not found"},

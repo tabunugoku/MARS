@@ -34,10 +34,14 @@ type pdfObj struct {
 type pdfPageSpec struct {
 	images []pdfObj
 	text   bool
+	ocr    bool   // invisible text (render mode 3), as an OCR layer has
+	lines  int    // dense 9 pt text lines, drawn down the page
+	box    [2]int // MediaBox width and height; zero means 200x200
+	fill   bool   // draw the image over the whole MediaBox, not 100x100
 }
 
 // makePDF assembles a minimal PDF with a correct xref table. Pages are
-// 200x200 points; images are drawn at x = 100*j.
+// 200x200 points unless box says otherwise; images are drawn at x = 100*j.
 func makePDF(pages []pdfPageSpec) []byte {
 	objs := []pdfObj{
 		{body: "<< /Type /Catalog /Pages 2 0 R >>"},
@@ -46,6 +50,10 @@ func makePDF(pages []pdfPageSpec) []byte {
 	}
 	var kids string
 	for _, pg := range pages {
+		box := pg.box
+		if box == [2]int{} {
+			box = [2]int{200, 200}
+		}
 		pageIdx := len(objs)
 		objs = append(objs, pdfObj{}, pdfObj{}) // page and content placeholders
 		kids += fmt.Sprintf("%d 0 R ", pageIdx+1)
@@ -62,15 +70,26 @@ func makePDF(pages []pdfPageSpec) []byte {
 			}
 			name := fmt.Sprintf("Im%d", j+1)
 			xobjs += fmt.Sprintf("/%s %d 0 R ", name, num)
-			draw += fmt.Sprintf("q 100 0 0 100 %d 0 cm /%s Do Q\n", 100*j, name)
+			if pg.fill {
+				draw += fmt.Sprintf("q %d 0 0 %d 0 0 cm /%s Do Q\n", box[0], box[1], name)
+			} else {
+				draw += fmt.Sprintf("q 100 0 0 100 %d 0 cm /%s Do Q\n", 100*j, name)
+			}
 		}
 		if pg.text {
 			draw += "BT /F1 12 Tf 10 180 Td (hello) Tj ET\n"
 		}
+		if pg.ocr {
+			draw += "BT 3 Tr /F1 12 Tf 10 100 Td (scanned words) Tj ET\n"
+		}
+		for l := 0; l < pg.lines; l++ {
+			draw += fmt.Sprintf("BT /F1 9 Tf 40 %d Td (Line %d: dense text for the render measurement) Tj ET\n",
+				box[1]-60-l*14, l+1)
+		}
 		objs[pageIdx] = pdfObj{body: fmt.Sprintf(
-			"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] "+
+			"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 %d %d] "+
 				"/Resources << /Font << /F1 3 0 R >> /XObject << %s>> >> /Contents %d 0 R >>",
-			xobjs, pageIdx+2)}
+			box[0], box[1], xobjs, pageIdx+2)}
 		objs[pageIdx+1] = pdfObj{stream: []byte(draw)}
 	}
 	objs[1] = pdfObj{body: fmt.Sprintf("<< /Type /Pages /Kids [%s] /Count %d >>", kids, len(pages))}
@@ -279,75 +298,6 @@ func TestPDFFlatePageAsPNG(t *testing.T) {
 	}
 }
 
-func TestPDFUnsupportedPages(t *testing.T) {
-	const w, h = 8, 8
-	rgb := gradientRGB(w, h)
-	cmyk := bytes.Repeat([]byte{10, 20, 30, 40}, w*h)
-	cases := []struct {
-		name  string
-		pages []pdfPageSpec
-		want  string
-	}{
-		{"two images on a page", []pdfPageSpec{
-			{images: []pdfObj{jpegObj(t, w, h)}},
-			{images: []pdfObj{jpegObj(t, w, h), jpegObj(t, w+1, h)}}, // identical images would be merged by pdfcpu
-		}, "PDF page 2 is not a single image"},
-		{"text-only page", []pdfPageSpec{
-			{images: []pdfObj{jpegObj(t, w, h)}},
-			{text: true},
-		}, "PDF page 2 is not a single image"},
-		{"CMYK image", []pdfPageSpec{
-			{images: []pdfObj{flateObj(w, h, "/DeviceCMYK", cmyk, nil)}},
-		}, "PDF page 1 uses CMYK colour"},
-		{"JPEG 2000 image", []pdfPageSpec{
-			{images: []pdfObj{{body: fmt.Sprintf("/Type /XObject /Subtype /Image /Width %d /Height %d "+
-				"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", w, h), stream: rgb}}},
-		}, "PDF page 1 uses an unsupported image encoding"},
-		{"same image drawn twice", []pdfPageSpec{
-			{images: []pdfObj{jpegObj(t, w, h), jpegObj(t, w, h)}}, // pdfcpu merges these into one object
-		}, "PDF page 1 is not a single image"},
-		{"DCT image with Decode array", []pdfPageSpec{
-			{images: []pdfObj{withDict(jpegObj(t, w, h), "/Decode [1 0 1 0 1 0]")}},
-		}, "PDF page 1 uses an unsupported image encoding"},
-		{"DCT image with SMask", []pdfPageSpec{
-			{images: []pdfObj{jpegWithSMask(t, w, h)}},
-		}, "PDF page 1 uses an unsupported image encoding"},
-		{"Flate image with Decode array", []pdfPageSpec{
-			{images: []pdfObj{withDict(flateObj(w, h, "/DeviceRGB", rgb, nil), "/Decode [1 0 1 0 1 0]")}},
-		}, "PDF page 1 uses an unsupported image encoding"},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			a, err := openPDFFile(t, makePDF(tc.pages))
-			if a != nil {
-				a.Close()
-			}
-			if !errors.Is(err, ErrUnsupported) {
-				t.Fatalf("err = %v, want ErrUnsupported", err)
-			}
-			if !strings.Contains(err.Error(), tc.want) {
-				t.Errorf("err = %q, want it to contain %q", err, tc.want)
-			}
-		})
-	}
-}
-
-func TestPDFAlphaImageIsUnsupported(t *testing.T) {
-	// pdfcpu's PNG output would drop the alpha channel, so an image with an
-	// SMask is refused rather than shown without its transparency.
-	const w, h = 8, 8
-	alpha := bytes.Repeat([]byte{200}, w*h)
-	mask := flateObj(w, h, "/DeviceGray", alpha, nil)
-	img := flateObj(w, h, "/DeviceRGB", gradientRGB(w, h), &mask)
-	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{img}}}))
-	if a != nil {
-		a.Close()
-	}
-	if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "PDF page 1 uses an unsupported image encoding") {
-		t.Fatalf("err = %v, want unsupported image encoding", err)
-	}
-}
-
 func TestPDFEncrypted(t *testing.T) {
 	plain := makePDF([]pdfPageSpec{{images: []pdfObj{jpegObj(t, 8, 8)}}})
 	for _, tc := range []struct {
@@ -466,30 +416,6 @@ func TestPDFFlateBombIsBounded(t *testing.T) {
 	}
 }
 
-func TestPDFImageTooLarge(t *testing.T) {
-	lowerPDFImageLimit(t, 1<<20)
-	cases := []struct {
-		name string
-		img  pdfObj
-	}{
-		// 2000x1000 RGB is 6 MB of pixels, over the 1 MiB limit.
-		{"over the byte limit", flateObj(2000, 1000, "/DeviceRGB", nil, nil)},
-		// A side over maxPDFImageSide is refused on the dimensions alone.
-		{"side over 20000", flateObj(20001, 1, "/DeviceGray", nil, nil)},
-	}
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{tc.img}}}))
-			if a != nil {
-				a.Close()
-			}
-			if !errors.Is(err, ErrUnsupported) || !strings.Contains(err.Error(), "image is too large") {
-				t.Fatalf("err = %v, want unsupported image is too large", err)
-			}
-		})
-	}
-}
-
 func TestPDFTruncatedFlateImage(t *testing.T) {
 	// The dictionary declares 100x100 RGB, but the stream holds 8 bytes.
 	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{
@@ -557,5 +483,332 @@ func TestOpenPathContextCanceled(t *testing.T) {
 	}
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("err = %v, want context.Canceled", err)
+	}
+}
+
+// checkDrawnEntry opens a drawn entry and checks that it is a PNG of the size
+// EntrySize reports, with the long side at pdfRenderLongSide. It returns the
+// PNG bytes.
+func checkDrawnEntry(t *testing.T, a Archive, name string) []byte {
+	t.Helper()
+	es, ok := a.(EntrySizer)
+	if !ok {
+		t.Fatal("archive does not implement EntrySizer")
+	}
+	w, h, ok, err := es.EntrySize(context.Background(), name)
+	if err != nil || !ok {
+		t.Fatalf("EntrySize(%s) = %d x %d, %v, %v", name, w, h, ok, err)
+	}
+	if max(w, h) != pdfRenderLongSide {
+		t.Errorf("%s: long side %d, want %d", name, max(w, h), pdfRenderLongSide)
+	}
+	b := readEntry(t, a, name)
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+	if err != nil || format != "png" || cfg.Width != w || cfg.Height != h {
+		t.Fatalf("%s: decode = %v %q %dx%d, want png %dx%d", name, err, format, cfg.Width, cfg.Height, w, h)
+	}
+	return b
+}
+
+// checkEntryNames fails unless a lists exactly the entries want, in order.
+func checkEntryNames(t *testing.T, a Archive, want ...string) {
+	t.Helper()
+	var got []string
+	for _, e := range a.Entries() {
+		got = append(got, e.Name)
+	}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("entries = %v, want %v", got, want)
+	}
+}
+
+// hasDarkPixel reports whether img has a pixel darker than mid grey.
+func hasDarkPixel(img image.Image) bool {
+	b := img.Bounds()
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			if r < 0x8000 && g < 0x8000 && bl < 0x8000 {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestPDFTextPagesAreDrawn(t *testing.T) {
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{text: true}, {text: true}, {text: true}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	checkEntryNames(t, a, "0001-rendered.png", "0002-rendered.png", "0003-rendered.png")
+	for _, e := range a.Entries() {
+		b := checkDrawnEntry(t, a, e.Name)
+		img, _, err := image.Decode(bytes.NewReader(b))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if r, g, bl, al := img.At(0, 0).RGBA(); r != 0xffff || g != 0xffff || bl != 0xffff || al != 0xffff {
+			t.Errorf("%s: pixel (0,0) = %v, want opaque white", e.Name, img.At(0, 0))
+		}
+		if !hasDarkPixel(img) {
+			t.Errorf("%s: no dark pixel, so the text was not drawn", e.Name)
+		}
+	}
+}
+
+func TestPDFMixedPages(t *testing.T) {
+	first := jpegObj(t, 8, 8)
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{
+		{images: []pdfObj{first}},
+		// A scan with an invisible text layer (OCR) keeps its own image.
+		{images: []pdfObj{jpegObj(t, 10, 8)}, ocr: true},
+		// Visible text over an image is drawn, so the text is not lost.
+		{images: []pdfObj{jpegObj(t, 8, 8)}, text: true},
+		{images: []pdfObj{jpegObj(t, 8, 8), jpegObj(t, 9, 8)}},
+		{text: true},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	checkEntryNames(t, a, "0001.jpg", "0002.jpg", "0003-rendered.png", "0004-rendered.png", "0005-rendered.png")
+	if b := readEntry(t, a, "0001.jpg"); !bytes.Equal(b, first.stream) {
+		t.Error("0001.jpg bytes differ from the embedded JPEG")
+	}
+	checkDrawnEntry(t, a, "0003-rendered.png")
+	checkDrawnEntry(t, a, "0004-rendered.png")
+	checkDrawnEntry(t, a, "0005-rendered.png")
+}
+
+func TestContentOpsText(t *testing.T) {
+	cases := []struct {
+		content string
+		text    bool
+	}{
+		{"BT /F1 9 Tf (a) Tj ET", true},
+		{"BT 3 Tr /F1 9 Tf (a) Tj ET", false},
+		{"BT 3 Tr [(a) 10 (b)] TJ ET", false},
+		{"q BT 3 Tr ET Q BT (a) Tj ET", true}, // Q restores mode 0
+		{"BT 3 Tr ET q BT 0 Tr ET Q BT (a) ' ET", false},
+		{"BT (Tj) 3 Tr ET", false}, // a string spelling Tj is not an operator
+		{"q 1 0 0 1 0 0 cm /Im1 Do Q", false},
+	}
+	for _, tc := range cases {
+		if _, _, text := contentOps([]byte(tc.content)); text != tc.text {
+			t.Errorf("contentOps(%q) text = %v, want %v", tc.content, text, tc.text)
+		}
+	}
+}
+
+func TestPDFOneImagePerPageNeverRenders(t *testing.T) {
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{
+		{images: []pdfObj{jpegObj(t, 16, 16)}},
+		{images: []pdfObj{flateObj(16, 16, "/DeviceRGB", noisePixels(16, 16, 3), nil)}},
+		{images: []pdfObj{jpegObj(t, 24, 16)}},
+	}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	before := pdfiumRenders.Load()
+	checkEntryNames(t, a, "0001.jpg", "0002.png", "0003.jpg")
+	for _, e := range a.Entries() {
+		readEntry(t, a, e.Name)
+	}
+	if n := pdfiumRenders.Load() - before; n != 0 {
+		t.Errorf("%d pages drawn, want none", n)
+	}
+}
+
+func TestPDFDrawnPagesAreLazy(t *testing.T) {
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{text: true}, {text: true}, {text: true}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+
+	before := pdfiumRenders.Load()
+	visited := 0
+	err = a.Walk(func(e Entry, r io.Reader) error {
+		visited++
+		return nil
+	})
+	if err != nil || visited != 3 {
+		t.Fatalf("Walk that skips: visited %d, err %v; want 3, nil", visited, err)
+	}
+	if n := pdfiumRenders.Load() - before; n != 0 {
+		t.Fatalf("a walk that skips every entry drew %d pages, want none", n)
+	}
+
+	before = pdfiumRenders.Load()
+	err = a.Walk(func(e Entry, r io.Reader) error {
+		if e.Name != "0002-rendered.png" {
+			return nil
+		}
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return err
+		}
+		_, _, err = image.DecodeConfig(bytes.NewReader(b))
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Walk reading one entry: %v", err)
+	}
+	if n := pdfiumRenders.Load() - before; n != 1 {
+		t.Fatalf("reading one entry drew %d pages, want 1", n)
+	}
+}
+
+func TestRenderPDFPage(t *testing.T) {
+	path := writePDFFile(t, makePDF([]pdfPageSpec{
+		{text: true, lines: 20, box: [2]int{595, 842}}, // A4 portrait
+		{text: true, box: [2]int{842, 595}},            // A4 landscape
+	}))
+	a, _, err := OpenPath(PathOf(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	ctx := context.Background()
+	wantDims := [][2]int{{1414, 2000}, {2000, 1414}}
+	for page := 1; page <= 2; page++ {
+		name := renderedPDFName(page)
+		w, h, ok, err := a.(EntrySizer).EntrySize(ctx, name)
+		if err != nil || !ok || [2]int{w, h} != wantDims[page-1] {
+			t.Fatalf("%s: EntrySize = %d x %d, %v, %v; want %v", name, w, h, ok, err, wantDims[page-1])
+		}
+		b, err := RenderPDFPage(ctx, PathOf(path), page)
+		if err != nil {
+			t.Fatalf("RenderPDFPage(%d): %v", page, err)
+		}
+		cfg, format, err := image.DecodeConfig(bytes.NewReader(b))
+		if err != nil || format != "png" || cfg.Width != w || cfg.Height != h {
+			t.Fatalf("page %d: decode = %v %q %dx%d, want png %dx%d", page, err, format, cfg.Width, cfg.Height, w, h)
+		}
+	}
+	for _, page := range []int{0, 3} {
+		if _, err := RenderPDFPage(ctx, PathOf(path), page); !errors.Is(err, ErrUnsupported) {
+			t.Errorf("RenderPDFPage(%d) err = %v, want ErrUnsupported", page, err)
+		}
+	}
+}
+
+func TestRenderedPDFPageNames(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		page int
+		ok   bool
+	}{
+		{"0007-rendered.png", 7, true},
+		{"0123-rendered.png", 123, true},
+		{"0001.png", 0, false},
+		{"x-rendered.png", 0, false},
+		{"0000-rendered.png", 0, false},
+		{"0001-rendered.jpg", 0, false},
+	} {
+		page, ok := RenderedPDFPage(tc.name)
+		if page != tc.page || ok != tc.ok {
+			t.Errorf("RenderedPDFPage(%q) = %d, %v; want %d, %v", tc.name, page, ok, tc.page, tc.ok)
+		}
+	}
+	if got := renderedPDFName(7); got != "0007-rendered.png" {
+		t.Errorf("renderedPDFName(7) = %q", got)
+	}
+}
+
+func TestPDFDrawnPages(t *testing.T) {
+	const w, h = 8, 8
+	rgb := gradientRGB(w, h)
+	cmyk := bytes.Repeat([]byte{10, 20, 30, 40}, w*h)
+	cases := []struct {
+		name  string
+		pages []pdfPageSpec
+		want  []string
+	}{
+		{"two images on a page", []pdfPageSpec{
+			{images: []pdfObj{jpegObj(t, w, h)}},
+			{images: []pdfObj{jpegObj(t, w, h), jpegObj(t, w+1, h)}}, // identical images would be merged by pdfcpu
+		}, []string{"0001.jpg", "0002-rendered.png"}},
+		{"text-only page", []pdfPageSpec{
+			{images: []pdfObj{jpegObj(t, w, h)}},
+			{text: true},
+		}, []string{"0001.jpg", "0002-rendered.png"}},
+		{"CMYK image", []pdfPageSpec{
+			{images: []pdfObj{flateObj(w, h, "/DeviceCMYK", cmyk, nil)}},
+		}, []string{"0001-rendered.png"}},
+		{"JPEG 2000 image", []pdfPageSpec{
+			{images: []pdfObj{{body: fmt.Sprintf("/Type /XObject /Subtype /Image /Width %d /Height %d "+
+				"/ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /JPXDecode", w, h), stream: rgb}}},
+		}, []string{"0001-rendered.png"}},
+		{"same image drawn twice", []pdfPageSpec{
+			{images: []pdfObj{jpegObj(t, w, h), jpegObj(t, w, h)}}, // pdfcpu merges these into one object
+		}, []string{"0001-rendered.png"}},
+		{"DCT image with Decode array", []pdfPageSpec{
+			{images: []pdfObj{withDict(jpegObj(t, w, h), "/Decode [1 0 1 0 1 0]")}},
+		}, []string{"0001-rendered.png"}},
+		{"DCT image with SMask", []pdfPageSpec{
+			{images: []pdfObj{jpegWithSMask(t, w, h)}},
+		}, []string{"0001-rendered.png"}},
+		{"Flate image with Decode array", []pdfPageSpec{
+			{images: []pdfObj{withDict(flateObj(w, h, "/DeviceRGB", rgb, nil), "/Decode [1 0 1 0 1 0]")}},
+		}, []string{"0001-rendered.png"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a, err := openPDFFile(t, makePDF(tc.pages))
+			if err != nil {
+				t.Fatalf("open: %v", err)
+			}
+			defer a.Close()
+			checkEntryNames(t, a, tc.want...)
+			for _, name := range tc.want {
+				if _, ok := RenderedPDFPage(name); ok {
+					checkDrawnEntry(t, a, name)
+				}
+			}
+		})
+	}
+}
+
+func TestPDFAlphaImageIsDrawn(t *testing.T) {
+	// pdfcpu's PNG output would drop the alpha channel, so an image with an
+	// SMask is not served as its PNG; the page is drawn instead.
+	const w, h = 8, 8
+	alpha := bytes.Repeat([]byte{200}, w*h)
+	mask := flateObj(w, h, "/DeviceGray", alpha, nil)
+	img := flateObj(w, h, "/DeviceRGB", gradientRGB(w, h), &mask)
+	a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{img}}}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer a.Close()
+	checkEntryNames(t, a, "0001-rendered.png")
+	checkDrawnEntry(t, a, "0001-rendered.png")
+}
+
+func TestPDFImageTooLargeIsDrawn(t *testing.T) {
+	lowerPDFImageLimit(t, 1<<20)
+	cases := []struct {
+		name string
+		img  pdfObj
+	}{
+		// 2000x1000 RGB is 6 MB of pixels, over the 1 MiB limit.
+		{"over the byte limit", flateObj(2000, 1000, "/DeviceRGB", nil, nil)},
+		// A side over maxPDFImageSide is refused on the dimensions alone.
+		{"side over 20000", flateObj(20001, 1, "/DeviceGray", nil, nil)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			a, err := openPDFFile(t, makePDF([]pdfPageSpec{{images: []pdfObj{tc.img}}}))
+			if err != nil {
+				t.Fatalf("open: %v", err)
+			}
+			defer a.Close()
+			checkEntryNames(t, a, "0001-rendered.png")
+			checkDrawnEntry(t, a, "0001-rendered.png")
+		})
 	}
 }

@@ -1,5 +1,7 @@
 // Package archive reads comic books: CBZ (zip), CBR (RAR4/RAR5), CB7 (7z)
-// and PDF (one image per page), all in pure Go.
+// and PDF, all without cgo. A PDF page that is one browser-servable image is
+// served as that image; any other page is drawn to PNG by pdfium, which runs
+// as WebAssembly on wazero.
 //
 // Names returned by Entries are the archive's own entry names. They are data
 // from the file, not trusted paths: callers must never join them onto a
@@ -61,6 +63,13 @@ func OpenContext(ctx context.Context, a Archive, name string) (io.ReadCloser, er
 		return co.OpenContext(ctx, name)
 	}
 	return a.Open(name)
+}
+
+// EntrySizer is implemented by archives that know an entry's pixel size
+// without reading it (PDF pages drawn by pdfium). ok is false for entries it
+// does not know; the caller then reads the entry as usual.
+type EntrySizer interface {
+	EntrySize(ctx context.Context, name string) (w, h int, ok bool, err error)
 }
 
 // SkipRest stops a Walk early.

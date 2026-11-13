@@ -116,6 +116,7 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 	if coverIdx < 0 || coverIdx >= len(names) {
 		coverIdx = 0
 	}
+	sizer, _ := a.(archive.EntrySizer)
 	var (
 		cover    []byte
 		ciBytes  []byte
@@ -142,6 +143,18 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 			return nil
 		}
 		pageSeen[i] = true
+		if i != coverIdx && sizer != nil {
+			// A page drawn by pdfium is sized without being drawn; only the
+			// cover is read, so it is the one page drawn during analysis.
+			w, h, ok, err := sizer.EntrySize(ctx, e.Name)
+			if err != nil {
+				return fmt.Errorf("page %d: %w", i+1, err)
+			}
+			if ok {
+				pages[i].Width, pages[i].Height = w, h
+				return nil
+			}
+		}
 		var coverBuf *bytes.Buffer
 		if i == coverIdx {
 			coverBuf = &bytes.Buffer{}

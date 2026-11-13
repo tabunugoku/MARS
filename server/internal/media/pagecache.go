@@ -66,8 +66,14 @@ func (c *PageCache) Open(ctx context.Context, bookID, key string, archivePath ar
 	unlock := c.lockBook(bookID)
 	defer unlock()
 
+	if drawnBook(archivePath, pages) {
+		return c.openPage(ctx, bookID, key, archivePath, pages, n)
+	}
+
 	bookDir := filepath.Join(c.Dir, bookID)
-	if c.valid(bookDir, key) {
+	// A valid dir without the page was filled one page at a time (an earlier
+	// analysis had drawn pages), so it is extracted again in full.
+	if c.valid(bookDir, key) && fileExists(filepath.Join(bookDir, strconv.Itoa(n))) {
 		now := time.Now()
 		if err := os.Chtimes(filepath.Join(bookDir, keyFileName), now, now); err != nil {
 			return nil, err
@@ -81,6 +87,147 @@ func (c *PageCache) Open(ctx context.Context, bookID, key string, archivePath ar
 		return nil, fmt.Errorf("media: page %d not cached: %w", n, err)
 	}
 	return f, nil
+}
+
+// drawnBook reports whether the book is a PDF with pages drawn by pdfium. Such
+// a book is cached one page at a time (see openPage); any other book is
+// extracted whole.
+func drawnBook(archivePath archive.Path, pages []Page) bool {
+	if f, ok := archive.FormatOf(archivePath.Rel); !ok || f != archive.PDF {
+		return false
+	}
+	for _, p := range pages {
+		if _, ok := archive.RenderedPDFPage(p.Entry); ok {
+			return true
+		}
+	}
+	return false
+}
+
+// openPage is Open for a book with drawn pages. Each page is written the first
+// time it is asked for: a drawn page is rendered alone, and the image pages
+// are extracted in one walk that never draws anything. The caller holds the
+// book's lock.
+func (c *PageCache) openPage(ctx context.Context, bookID, key string, archivePath archive.Path, pages []Page, n int) (*os.File, error) {
+	bookDir := filepath.Join(c.Dir, bookID)
+	pagePath := filepath.Join(bookDir, strconv.Itoa(n))
+	if c.valid(bookDir, key) {
+		now := time.Now()
+		if err := os.Chtimes(filepath.Join(bookDir, keyFileName), now, now); err != nil {
+			return nil, err
+		}
+	} else if err := resetBookDir(c.Dir, bookDir, key); err != nil {
+		return nil, err
+	}
+
+	if !fileExists(pagePath) {
+		if pdfPage, drawn := archive.RenderedPDFPage(pages[n-1].Entry); drawn {
+			if err := c.drawPage(ctx, bookID, bookDir, archivePath, n, pdfPage); err != nil {
+				return nil, err
+			}
+		} else if err := c.extractImages(ctx, bookID, bookDir, archivePath, pages); err != nil {
+			return nil, err
+		}
+	}
+
+	f, err := os.Open(pagePath)
+	if err != nil {
+		return nil, fmt.Errorf("media: page %d not cached: %w", n, err)
+	}
+	return f, nil
+}
+
+// resetBookDir replaces bookDir with an empty directory that holds only the
+// key file. In a book with drawn pages a valid key does not mean every page is
+// present, so this runs only when the key differs.
+func resetBookDir(cacheDir, bookDir, key string) error {
+	if err := os.RemoveAll(bookDir); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return err
+	}
+	if err := os.Mkdir(bookDir, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(bookDir, keyFileName), []byte(key), 0o644)
+}
+
+// drawPage renders page pdfPage of the PDF (the number in its entry name) and
+// stores it as bookDir/<n>, n being the book's page number. It makes room
+// first, and gives the render ExtractTimeout. The caller holds the book's lock.
+func (c *PageCache) drawPage(ctx context.Context, bookID, bookDir string, archivePath archive.Path, n, pdfPage int) error {
+	c.evict(bookID, 4<<20)
+	ctx, cancel := context.WithTimeout(ctx, ExtractTimeout)
+	defer cancel()
+	data, err := archive.RenderPDFPage(ctx, archivePath, pdfPage)
+	if err != nil {
+		return err
+	}
+	if len(data) > MaxEntryBytes {
+		return ErrTooLarge
+	}
+	return writeFileAtomic(bookDir, strconv.Itoa(n), data)
+}
+
+// extractImages writes every image page of a PDF book that is not cached yet,
+// from one walk of the archive. Drawn pages are left out of the walk's list,
+// so the walk never reads, and so never draws, them. The caller holds the
+// book's lock.
+func (c *PageCache) extractImages(ctx context.Context, bookID, bookDir string, archivePath archive.Path, pages []Page) error {
+	var missing []Page
+	for _, p := range pages {
+		if _, drawn := archive.RenderedPDFPage(p.Entry); drawn {
+			continue
+		}
+		if !fileExists(filepath.Join(bookDir, strconv.Itoa(p.Number))) {
+			missing = append(missing, p)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	release, err := c.takeSlot(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	info, err := archivePath.Stat()
+	if err != nil {
+		return err
+	}
+	c.evict(bookID, info.Size())
+	if _, err := writePages(ctx, bookDir, archivePath, missing, true); err != nil {
+		return err
+	}
+	c.evict(bookID, 0)
+	return nil
+}
+
+// writeFileAtomic writes data to dir/name through a temp file in dir, which is
+// renamed into place once complete, so the file only exists when whole.
+func writeFileAtomic(dir, name string, data []byte) error {
+	f, err := os.CreateTemp(dir, name+tmpInfix+"*")
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if err == nil {
+		err = os.Rename(f.Name(), filepath.Join(dir, name))
+	}
+	if err != nil {
+		_ = os.Remove(f.Name())
+	}
+	return err
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // lockBook takes the per-book lock and returns the function that releases it.
@@ -148,6 +295,21 @@ func (c *PageCache) semaphore() chan struct{} {
 	return c.sem
 }
 
+// takeSlot waits for an extraction slot and returns the func that gives it
+// back. It gives up with ctx.Err() if ctx ends while waiting.
+func (c *PageCache) takeSlot(ctx context.Context) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	sem := c.semaphore()
+	select {
+	case sem <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	return func() { <-sem }, nil
+}
+
 // valid reports whether bookDir was extracted from the file version key.
 func (c *PageCache) valid(bookDir, key string) bool {
 	b, err := os.ReadFile(filepath.Join(bookDir, keyFileName))
@@ -158,16 +320,11 @@ func (c *PageCache) valid(bookDir, key string) bool {
 // slot first, and gives up with ctx.Err() if ctx ends while waiting. The
 // caller must hold the book's lock.
 func (c *PageCache) extract(ctx context.Context, bookID, key string, archivePath archive.Path, pages []Page) error {
-	if err := ctx.Err(); err != nil {
+	release, err := c.takeSlot(ctx)
+	if err != nil {
 		return err
 	}
-	sem := c.semaphore()
-	select {
-	case sem <- struct{}{}:
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-	defer func() { <-sem }()
+	defer release()
 
 	info, err := archivePath.Stat()
 	if err != nil {
@@ -199,7 +356,7 @@ func (c *PageCache) writeBook(ctx context.Context, bookID, key string, archivePa
 		}
 	}()
 
-	written, err := writePages(ctx, tmp, archivePath, pages)
+	written, err := writePages(ctx, tmp, archivePath, pages, false)
 	if err != nil {
 		return err
 	}
@@ -223,10 +380,13 @@ func (c *PageCache) writeBook(ctx context.Context, bookID, key string, archivePa
 }
 
 // writePages walks the archive once and writes each page entry to dir/<n>.
+// Only the entries of pages are read; any other entry is skipped unread.
 // Duplicate entry names keep the first page number, and duplicate entries in
-// the archive keep the first occurrence. It returns the entry names that were
-// written, mapped to their page number. It stops with ctx.Err() once ctx ends.
-func writePages(ctx context.Context, dir string, archivePath archive.Path, pages []Page) (map[string]int, error) {
+// the archive keep the first occurrence. With atomic, each page is written to
+// a temp file that is renamed into place when complete. It returns the entry
+// names that were written, mapped to their page number. It stops with ctx.Err()
+// once ctx ends.
+func writePages(ctx context.Context, dir string, archivePath archive.Path, pages []Page, atomic bool) (map[string]int, error) {
 	want := make(map[string]int, len(pages))
 	for _, p := range pages {
 		if _, dup := want[p.Entry]; !dup {
@@ -257,21 +417,13 @@ func writePages(ctx context.Context, dir string, archivePath archive.Path, pages
 		if _, dup := written[e.Name]; dup {
 			return nil
 		}
-		f, err := os.OpenFile(filepath.Join(dir, strconv.Itoa(num)), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
-		if err != nil {
-			return err
-		}
 		// Read at most the remaining budget plus one byte, so an oversized
 		// book is detected without writing much past the limit.
-		n, err := io.Copy(f, io.LimitReader(r, MaxExtractedBook-total+1))
-		cerr := f.Close()
+		n, err := copyPage(dir, num, r, MaxExtractedBook-total+1, atomic)
 		total += n
 		written[e.Name] = num
 		if err != nil {
 			return err
-		}
-		if cerr != nil {
-			return cerr
 		}
 		if total > MaxExtractedBook {
 			return ErrCacheTooBig
@@ -285,6 +437,38 @@ func writePages(ctx context.Context, dir string, archivePath archive.Path, pages
 		return nil, err
 	}
 	return written, nil
+}
+
+// copyPage writes at most limit bytes of r to dir/<num> and returns how many
+// were written. With atomic, the bytes go to a temp file that is renamed to
+// dir/<num> when the copy and close both succeed.
+func copyPage(dir string, num int, r io.Reader, limit int64, atomic bool) (int64, error) {
+	name := strconv.Itoa(num)
+	var (
+		f   *os.File
+		err error
+	)
+	if atomic {
+		f, err = os.CreateTemp(dir, name+tmpInfix+"*")
+	} else {
+		f, err = os.OpenFile(filepath.Join(dir, name), os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+	}
+	if err != nil {
+		return 0, err
+	}
+	n, err := io.Copy(f, io.LimitReader(r, limit))
+	if cerr := f.Close(); err == nil {
+		err = cerr
+	}
+	if atomic {
+		if err == nil {
+			err = os.Rename(f.Name(), filepath.Join(dir, name))
+		}
+		if err != nil {
+			_ = os.Remove(f.Name())
+		}
+	}
+	return n, err
 }
 
 // evict removes the least recently used book dirs while the cache, counting

@@ -255,9 +255,12 @@ function BookPage({ id }: { id: string }) {
   const authors = book.authors.map((a) => t("author", { name: a.name, role: roles[a.role] })).join(t("listSep"));
   // Marking read needs the page count and a readable archive.
   const canMarkRead = book.pageCount > 0 && book.mediaStatus === "ready";
-  // A PDF whose pages are not single images cannot go to the reader: offer the
-  // browser's own PDF viewer instead (streaming permission only).
-  const pdfInBrowser = book.format === "pdf" && book.mediaStatus === "unsupported";
+  // The server draws PDF pages it cannot serve as images, so a PDF goes to the
+  // reader like any book. Only a PDF whose analysis failed (encrypted, too
+  // big, unreadable) offers the browser's own PDF viewer instead (streaming
+  // permission only).
+  const isPDF = book.format === "pdf";
+  const pdfInBrowser = isPDF && (book.mediaStatus === "unsupported" || book.mediaStatus === "error");
 
   const regenerate = async () => {
     try {
@@ -288,6 +291,10 @@ function BookPage({ id }: { id: string }) {
   const menu: { label: string; onSelect: () => void }[] = [
     { label: t("incognito"), onSelect: () => navigate(`/read/${book.id}?incognito=1`) },
   ];
+  // A readable PDF opens in the reader; its own viewer stays one click away.
+  if (isPDF && !pdfInBrowser && canStream) {
+    menu.push({ label: t("openInBrowser"), onSelect: () => window.open(bookInlineUrl(book.id), "_blank", "noopener") });
+  }
   if (canDownload) menu.push({ label: t("download"), onSelect: () => startDownload(bookFileUrl(book.id)) });
   // Same rule as editing read lists (server: UpdateReadList is admin only).
   if (isAdmin) {
