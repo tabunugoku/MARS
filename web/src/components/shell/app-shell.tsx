@@ -10,7 +10,7 @@ import { House, LibraryBig, Search, Grid2x2, Sun, Moon } from "@keyline-icons/re
 import { AppSidebar } from "./app-sidebar";
 import { useTheme } from "./theme";
 import { PageSkeleton } from "@/components/media/skeletons";
-import { CompassBackdrop } from "@/components/brand/compass-backdrop";
+import { ToneBackdrop } from "@/components/brand/tone-backdrop";
 import { motion } from "motion/react";
 import { defineMessages, useT } from "@/i18n";
 
@@ -44,7 +44,7 @@ export function AppShell() {
     <SidebarProvider peek="hover" className="h-svh max-md:pb-[calc(3.5rem+1px+env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
       <AppSidebar />
       <SidebarInset className="overflow-hidden max-md:ml-2!">
-        <CompassBackdrop />
+        <ToneBackdrop />
         <Topbar />
         <div className="relative min-h-0 flex-1 overflow-y-auto md:pb-[env(safe-area-inset-bottom)]" id="cn-scroll">
           <Suspense fallback={<PageSkeleton />}>

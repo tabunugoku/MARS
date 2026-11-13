@@ -60,7 +60,9 @@ panels, headings, icons, secondary buttons).
 - **Colours**: `brand` is violet: actions, selection, read progress, the
   primary call to action (at most one per screen). `here` (cyan, `bg-here`,
   `text-here`) marks only "you are here": the current reading position in a
-  `DotTrack`, the dot beside the selected nav row, the compass tip. Never use
+  `DotTrack`, the dot beside the selected nav row, the compass tip on the login
+  page (the only place the compass rose is drawn; app screens keep only the
+  `.tone` ground behind the content). Never use
   `here` for buttons or decoration. Everything else is neutral. No emoji.
 - **Dots (screentone)** are the texture: `.tone` (quiet ground) and
   `.tone-strong` (small areas) from `styles/tokens.css`. Progress is a
@@ -88,8 +90,7 @@ panels, headings, icons, secondary buttons).
   the dots of a `DotTrack` filling in and `CountUp` numbers; nothing flies in.
   No looping motion except loading states. Already built in, so don't
   re-implement: card hover lift with the violet dot spotlight
-  (`SeriesCard`/`BookCard`), the compass backdrop that turns per route, the
-  gliding cyan dot on the active nav row, dot-wave skeletons, the screentone
+  (`SeriesCard`/`BookCard`), the gliding cyan dot on the active nav row, dot-wave skeletons, the screentone
   wipe on theme switch (call `toggle(buttonEl)` from `useTheme`).
 - **Toasts**: `toast.success(...)` (an object, not a function) from `@yusufceng1z/ding-react` for confirmations
   ("既読にしました", "スキャンを開始しました"). One short sentence.
