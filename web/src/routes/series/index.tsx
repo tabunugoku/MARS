@@ -2,7 +2,7 @@ import type { IconComponent } from "@/lib/icon-context";
 import { Fragment, useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { AnimatePresence } from "motion/react";
-import { ArrowDown, ArrowUp, ChevronLeft, Circle, CircleCheck, ListChecks, ListPlus, Play, Tag } from "@keyline-icons/react";
+import { ArrowDown, ArrowUp, ChevronLeft, Circle, CircleCheck, ListChecks, ListPlus, MoreHorizontal, Play, Tag } from "@keyline-icons/react";
 import { toast } from "@yusufceng1z/ding-react";
 import { api, errorMessage, formatDate, seriesFileUrl, startDownload, statusLabel, useApi, type Series } from "@/api";
 import { useLiveReload } from "@/api/live";
@@ -339,17 +339,27 @@ function SeriesPage({ id }: { id: string }) {
             <DotTrack percent={series.bookCount ? (series.booksRead / series.bookCount) * 100 : 0} max={series.bookCount} label={t("progress")} />
           </div>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          {/* One row on a phone, as on the book page: there More shows its
+              icon only (the label stays for screen readers) and the main
+              action takes the rest of the row. */}
+          <div className="mt-2 flex flex-wrap items-center gap-2 max-sm:flex-nowrap">
             {primary && (
-              <BrandAction to={primary.to} icon={Play}>
+              <BrandAction to={primary.to} icon={Play} className="max-sm:flex-1">
                 {primary.label}
               </BrandAction>
             )}
-            <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)}>
+            <Button variant="secondary" disabled={busy || books.length === 0} onClick={() => markRead(!allRead)} className="max-sm:shrink-0">
               {allRead ? t("markUnread") : t("markRead")}
             </Button>
             <DropdownMenu>
-              <DropdownTrigger render={<Button variant="secondary">{t("more")}</Button>} />
+              <DropdownTrigger
+                render={
+                  <Button variant="secondary" className="max-sm:shrink-0 max-sm:px-2.5">
+                    <MoreHorizontal size={16} className="sm:hidden" />
+                    <span className="max-sm:sr-only">{t("more")}</span>
+                  </Button>
+                }
+              />
               <DropdownContent align="start" sideOffset={4} className="w-56">
                 <MenuItem index={0} label={t("editMetadata")} onSelect={() => { setEditRun((r) => r + 1); setEditOpen(true); }} />
                 {isAdmin && <MenuItem index={1} label={t("addToCollection")} onSelect={() => setAddOpen(true)} />}
