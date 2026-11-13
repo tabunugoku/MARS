@@ -9,6 +9,8 @@ import type {
   Series,
   ServerSettings,
   Task,
+  TrashedBook,
+  TrashedSeries,
   User,
 } from "@/api/types";
 
@@ -176,6 +178,15 @@ export const tasks: Task[] = [
 export const mediaIssues: MediaIssue[] = [
   ...books.filter((b) => b.mediaStatus === "error").map((b) => ({ bookId: b.id, kind: "error" as const, detail: "アーカイブを開けません（CRC エラー）" })),
   { bookId: books[12].id, kind: "missing", detail: "スキャン時にファイルが見つかりませんでした（ゴミ箱に移動済み）" },
+];
+
+export const trashedSeries: TrashedSeries[] = [
+  { id: "ts-1", libraryId: "lib-manga", title: "霧の港の写本", path: "霧の港の写本", deletedAt: daysAgo(4), bookCount: 3 },
+  { id: "ts-2", libraryId: "lib-webtoon", title: "月下の交換所", path: "月下の交換所 (2021)", deletedAt: daysAgo(12), bookCount: 7 },
+];
+
+export const trashedBooks: TrashedBook[] = [
+  { id: "tb-1", seriesId: series[2].id, seriesTitle: series[2].title, libraryId: series[2].libraryId, title: "第3巻", path: `${series[2].title}/vol03.cbz`, deletedAt: daysAgo(2) },
 ];
 
 export const settings: ServerSettings = {

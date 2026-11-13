@@ -583,7 +583,25 @@ export const mockApi: Api = {
     return delay(undefined);
   },
   mediaIssues: () => delay(db.mediaIssues),
-  emptyTrash: () => delay({ series: 0, books: 0 }),
+  trash: () => delay({ series: db.trashedSeries, books: db.trashedBooks }),
+  deleteTrashedSeries: (id) => {
+    const i = db.trashedSeries.findIndex((x) => x.id === id);
+    if (i < 0) return fail(404, "シリーズが見つかりません");
+    db.trashedSeries.splice(i, 1);
+    return delay(undefined);
+  },
+  deleteTrashedBook: (id) => {
+    const i = db.trashedBooks.findIndex((x) => x.id === id);
+    if (i < 0) return fail(404, "本が見つかりません");
+    db.trashedBooks.splice(i, 1);
+    return delay(undefined);
+  },
+  emptyTrash: () => {
+    const counts = { series: db.trashedSeries.length, books: db.trashedBooks.length };
+    db.trashedSeries.length = 0;
+    db.trashedBooks.length = 0;
+    return delay(counts);
+  },
   settings: () => delay(loadSettings()),
   saveSettings: (changes) => {
     const next = { ...loadSettings(), ...changes };

@@ -43,13 +43,8 @@ const m = defineMessages({
     taskStopped: "タスクを中止しました",
     allStopped: "すべてのタスクを中止しました",
     stopFailed: ({ n, error }) => `${n} 件を中止できませんでした：${error}`,
-    emptyTrash: "ゴミ箱を空にする",
-    emptied: ({ series, books }) => `ゴミ箱を空にしました（シリーズ ${series} 件、本 ${books} 件）`,
     stopAllTitle: "すべてのタスクを中止しますか",
     stopAllBody: "実行中と待機中のタスクをすべて止めます。",
-    emptyTrashTitle: "ゴミ箱を空にしますか",
-    emptyTrashBody: "ゴミ箱のファイルを完全に削除します。元に戻せません。",
-    empty: "空にする",
   },
   en: {
     title: "Tasks",
@@ -76,14 +71,8 @@ const m = defineMessages({
     taskStopped: "Task stopped",
     allStopped: "All tasks stopped",
     stopFailed: ({ n, error }) => `Could not stop ${n} ${n === 1 ? "task" : "tasks"}: ${error}`,
-    emptyTrash: "Empty trash",
-    emptied: ({ series, books }) =>
-      `Emptied the trash: ${series} series, ${books} ${books === 1 ? "book" : "books"}`,
     stopAllTitle: "Stop all tasks?",
     stopAllBody: "Stops all running and queued tasks",
-    emptyTrashTitle: "Empty trash?",
-    emptyTrashBody: "Permanently deletes the files in the trash. This cannot be undone.",
-    empty: "Empty",
   },
 });
 
@@ -99,10 +88,9 @@ export default function Screen() {
   };
   const historyHeads = [t("colKind"), t("colLabel"), t("colState"), t("colStarted")];
   const { data, error, reload } = useApi(() => Promise.all([api.tasks(), api.libraries()]), []);
-  const [confirm, setConfirm] = useState<"abort" | "trash" | null>(null);
+  const [confirm, setConfirm] = useState<"abort" | null>(null);
   const [busyIds, setBusyIds] = useState<Set<string>>(new Set());
   const [aborting, setAborting] = useState(false);
-  const [emptying, setEmptying] = useState(false);
 
   // Live task rows by id, laid over the last loaded list until the next load.
   const [patch, setPatch] = useState<{ base: unknown; rows: Map<string, Task> }>({ base: undefined, rows: new Map() });
@@ -180,19 +168,6 @@ export default function Screen() {
     }
   };
 
-  const emptyTrash = async () => {
-    setEmptying(true);
-    try {
-      const r = await api.emptyTrash();
-      toast.success(t("emptied", { series: r.series, books: r.books }));
-      reload();
-    } catch (err) {
-      toast.error(errorMessage(err));
-    } finally {
-      setEmptying(false);
-    }
-  };
-
   return (
     <Page>
       <PageHeader
@@ -202,9 +177,6 @@ export default function Screen() {
             <>
               <Button variant="tertiary" disabled={!hasActive || aborting} onClick={() => setConfirm("abort")}>
                 {t("stopAll")}
-              </Button>
-              <Button variant="secondary" disabled={emptying} onClick={() => setConfirm("trash")}>
-                {t("emptyTrash")}
               </Button>
             </>
           )
@@ -332,14 +304,6 @@ export default function Screen() {
         body={t("stopAllBody")}
         confirmLabel={t("stopAll")}
         onConfirm={() => void cancelAll()}
-      />
-      <ConfirmDialog
-        open={confirm === "trash"}
-        onOpenChange={(open) => !open && setConfirm(null)}
-        title={t("emptyTrashTitle")}
-        body={t("emptyTrashBody")}
-        confirmLabel={t("empty")}
-        onConfirm={() => void emptyTrash()}
       />
     </Page>
   );
