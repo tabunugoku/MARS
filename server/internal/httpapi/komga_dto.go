@@ -379,6 +379,49 @@ type KomgaPageDto struct {
 	Height    int    `json:"height"`
 }
 
+// ─── Account ─────────────────────────────────────────────────────────────────
+
+// KomgaUserDto is the account Komga answers for /users/me. The labels are
+// not kept (always empty), and there is no age restriction (null).
+type KomgaUserDto struct {
+	Id                 string   `json:"id"`
+	Email              string   `json:"email"`
+	Roles              []string `json:"roles"`
+	SharedAllLibraries bool     `json:"sharedAllLibraries"`
+	SharedLibrariesIds []string `json:"sharedLibrariesIds"`
+	LabelsAllow        []string `json:"labelsAllow"`
+	LabelsExclude      []string `json:"labelsExclude"`
+	AgeRestriction     *int     `json:"ageRestriction"`
+}
+
+// komgaUserDto converts a user. Roles are USER, ADMIN for an administrator,
+// and FILE_DOWNLOAD and PAGE_STREAMING for the permissions the caller holds.
+func komgaUserDto(u User, admin, download, stream bool) KomgaUserDto {
+	roles := []string{"USER"}
+	if admin {
+		roles = []string{"ADMIN", "USER"}
+	}
+	if download {
+		roles = append(roles, "FILE_DOWNLOAD")
+	}
+	if stream {
+		roles = append(roles, "PAGE_STREAMING")
+	}
+	email := u.Email
+	if email == "" {
+		email = u.Name
+	}
+	return KomgaUserDto{
+		Id:                 u.Id,
+		Email:              email,
+		Roles:              roles,
+		SharedAllLibraries: u.AllLibraries,
+		SharedLibrariesIds: orEmpty(u.LibraryIds),
+		LabelsAllow:        []string{},
+		LabelsExclude:      []string{},
+	}
+}
+
 // ─── Libraries, collections, read lists ──────────────────────────────────────
 
 type KomgaLibraryDto struct {
