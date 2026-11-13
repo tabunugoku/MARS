@@ -44,7 +44,7 @@ const I = (c: unknown) => c as IconComponent;
 
 const m = defineMessages({
   ja: {
-    homeLabel: "ComiNavi ホーム",
+    homeLabel: "MARS ホーム",
     searchPlaceholder: "シリーズ・巻・著者を検索",
     search: "検索",
     home: "ホーム",
@@ -66,7 +66,7 @@ const m = defineMessages({
     logout: "ログアウト",
   },
   en: {
-    homeLabel: "ComiNavi home",
+    homeLabel: "MARS home",
     searchPlaceholder: "Search series, books, authors",
     search: "Search",
     home: "Home",
@@ -215,7 +215,7 @@ export function AppSidebar() {
         <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label={t("homeLabel")}>
           <AppMark size={28} className="-ml-1" />
           <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
-            ComiNavi
+            MARS
           </span>
         </Link>
         <form

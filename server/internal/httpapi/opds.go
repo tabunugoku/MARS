@@ -550,7 +550,7 @@ func (s *server) opdsSeries(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) opdsSearchDoc(w http.ResponseWriter, r *http.Request) {
 	doc := opdsSearchDoc{
-		ShortName:      "ComiNavi",
+		ShortName:      "MARS",
 		Description:    msg(r.Context(), "opds.search_description"),
 		InputEncoding:  "UTF-8",
 		OutputEncoding: "UTF-8",

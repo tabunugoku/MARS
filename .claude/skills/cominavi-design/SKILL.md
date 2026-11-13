@@ -1,11 +1,12 @@
 ---
 name: cominavi-design
-description: ComiNavi's UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
+description: MARS's (formerly ComiNavi) UI rulebook — tokens, shared components, layout, motion, icons and copy rules for every screen in web/. Use before writing or reviewing any UI code in this repo (routes, components, styles), including when implementing a screen spec from docs/screens/.
 ---
 
-# ComiNavi design system
+# MARS design system
 
-ComiNavi (Comic Navigator) is a self-hosted comic server. The direction is
+MARS ("MARS: A Reading Server", formerly ComiNavi) is a self-hosted comic
+server. Tagline: "Your manga. Your server. Your universe." (always English). The direction is
 **a night chart of Mars, printed in screentone dots**: covers are the
 content, the chrome is flat and dark, and the richness comes from dots and
 motion that answer what the reader does. Dark ("night chart") is the default;

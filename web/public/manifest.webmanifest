@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "ComiNavi",
-  "short_name": "ComiNavi",
-  "description": "自宅サーバーのマンガ・コミックを読むためのアプリ",
+  "name": "MARS: A Reading Server",
+  "short_name": "MARS",
+  "description": "Your manga. Your server. Your universe.",
   "lang": "ja",
   "dir": "ltr",
   "start_url": "/",

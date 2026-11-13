@@ -1,4 +1,4 @@
-// Command cominavi runs the ComiNavi server: the REST API under /api/v1 and
+// Command cominavi runs the MARS server: the REST API under /api/v1 and
 // the embedded web UI everywhere else.
 package main
 

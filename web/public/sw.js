@@ -1,4 +1,4 @@
-// ComiNavi service worker: caches the app shell so an installed app opens
+// MARS service worker: caches the app shell so an installed app opens
 // fast. It is not an offline mode. It never touches /api (book data, page
 // images, thumbnails, progress, the /api/v1/events stream), anything
 // cross-origin, or any non-GET.

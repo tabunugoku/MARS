@@ -1,4 +1,10 @@
-# ComiNavi
+# MARS
+
+**MARS: A Reading Server**
+
+*Your manga. Your server. Your universe.*
+
+MARS was called ComiNavi before. The Docker image, environment variables and file names still use `cominavi`, so existing installs keep working.
 
 A lightweight, self-hosted comic and manga server. One static Go binary
 (SQLite inside, web UI embedded) that scans your folders, builds series and
@@ -87,12 +93,12 @@ The token is deleted once the administrator has been created.
 Reader apps that speak OPDS (Panels, Chunky, KyBook) use
 `http://HOST:25600/opds/v1.2/catalog`. The Mihon Komga extension and tracker
 use `http://HOST:25600/komga`. Both are off by default: turn them on in
-設定 > サーバー, under 連携. Sign in with a ComiNavi user name and password,
+設定 > サーバー, under 連携. Sign in with a MARS user name and password,
 or an API key. Details are in [docs/opds-komga.md](docs/opds-komga.md).
 
 ## Installing on a phone or tablet (PWA)
 
-ComiNavi is an installable web app: *Add to Home Screen* (iOS Safari) or
+MARS is an installable web app: *Add to Home Screen* (iOS Safari) or
 *Install app* (Chrome, Edge, Android) opens it full screen with its own icon.
 The service worker caches only the app shell (scripts, styles, icons). It
 never stores book data, page images or reading progress, and it is not an
@@ -100,7 +106,7 @@ offline mode.
 
 Browsers allow installation and service workers only on **HTTPS** (or on
 `localhost`). Over plain HTTP on the LAN, such as `http://192.168.1.10:25600`,
-ComiNavi works the same in the browser but offers no installation; that is
+MARS works the same in the browser but offers no installation; that is
 expected, not an error. To install it, put HTTPS in front:
 
 - **Tailscale** (simplest when the readers are already on your tailnet): in

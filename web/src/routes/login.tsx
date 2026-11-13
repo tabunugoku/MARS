@@ -17,6 +17,8 @@ import { SetupForm } from "./login-setup";
 
 const m = defineMessages({
   ja: {
+    // The tagline stays in English in both languages.
+    tagline: "Your manga. Your server. Your universe.",
     signIn: "ログイン",
     username: "ユーザー名またはメールアドレス",
     password: "パスワード",
@@ -24,6 +26,7 @@ const m = defineMessages({
     keepSignedIn: "ログイン状態を保持する",
   },
   en: {
+    tagline: "Your manga. Your server. Your universe.",
     signIn: "Sign in",
     username: "Username or email",
     password: "Password",
@@ -59,7 +62,7 @@ export default function Screen() {
         )}
 
         <p className={cn(typeClass("caption"), "absolute bottom-6 text-muted-foreground")}>
-          {health && `ComiNavi ${health.version}`}
+          {health && `MARS ${health.version}`}
         </p>
       </main>
     </div>
@@ -99,8 +102,11 @@ function SignInForm() {
     <form onSubmit={submit} noValidate className="flex w-full max-w-[360px] flex-col gap-6">
       <div className="flex items-center gap-2">
         <AppMark size={40} className="-ml-1" />
-        <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-          ComiNavi
+        <span className="flex flex-col">
+          <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
+            MARS
+          </span>
+          <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("tagline")}</span>
         </span>
       </div>
 

@@ -1,5 +1,5 @@
 // Stand-in for lucide-react, wired in vite.config.ts (resolve.alias).
-// Fluid's lib/icon-context imports Lucide for its default icon map. ComiNavi
+// Fluid's lib/icon-context imports Lucide for its default icon map. MARS
 // maps every slot it uses to Keyline (lib/icons.ts), so the Lucide drawings
 // would ship at startup and never show. Each name here is a blank 24px icon
 // instead; in development it warns once, so a slot that was never mapped to

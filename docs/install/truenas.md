@@ -1,7 +1,7 @@
-# Installing ComiNavi on TrueNAS SCALE
+# Installing MARS on TrueNAS SCALE
 
 This guide is for **TrueNAS SCALE 25.10 (Goldeye)** and its Docker-based
-Apps. It covers the two datasets ComiNavi needs, the permissions for the
+Apps. It covers the two datasets MARS needs, the permissions for the
 `apps` user, and both ways to install a custom app: **Install via YAML** and
 the **Custom App** form. Pick one; they end in the same app.
 
@@ -20,12 +20,12 @@ own.
 
 ## 2. Datasets and permissions
 
-Keep ComiNavi's own data and your comics in **separate datasets**. They
+Keep MARS's own data and your comics in **separate datasets**. They
 want different settings, and the comics should stay read-only to the app.
 
 ### Data dataset (`/data` in the container)
 
-One dataset holds everything ComiNavi writes: the SQLite database,
+One dataset holds everything MARS writes: the SQLite database,
 thumbnails, the page cache and the one-time setup token. There is no separate
 config folder.
 
@@ -64,7 +64,7 @@ sudo cp -p cominavi.db cominavi.db.new && sudo mv cominavi.db.new cominavi.db
 The database is always `cominavi.db` in the data folder, so it cannot live in
 a dataset of its own; the whole data dataset follows the database's needs.
 
-**Optional: the page cache on its own dataset.** ComiNavi caches pages it
+**Optional: the page cache on its own dataset.** MARS caches pages it
 extracted from CBR and CB7 archives under `/data/cache` (bounded in size).
 It can be rebuilt at any time, so you may keep it out of snapshots: create a
 child dataset `tank/apps/cominavi/cache` with the default 128K record size,
@@ -78,7 +78,7 @@ Do not put the data dataset on an SMB share.
 Use your existing comics dataset, for example `tank/media/comics`.
 
 - Give the `apps` **group** (568) read and traverse access, applied
-  recursively: *Read* in an NFSv4 ACL, `r-x` in a POSIX ACL. ComiNavi never
+  recursively: *Read* in an NFSv4 ACL, `r-x` in a POSIX ACL. MARS never
   writes there.
 - Record Size: **1M** is the best fit for large archives read from start to
   end, if you are creating the dataset now. An existing dataset does not need
@@ -180,14 +180,14 @@ Choose **Install**.
 
 ### Watching a library for changes
 
-A library can have **Watch for changes** switched on. ComiNavi then rescans
+A library can have **Watch for changes** switched on. MARS then rescans
 it about 30 seconds after files in it are added, changed or removed, in
 addition to the scheduled scans.
 
 - It works with folders the container sees as local paths, such as the
   `/comics` mount from a local dataset.
 - SMB or NFS shares mounted inside the container usually deliver no change
-  events, and ComiNavi cannot detect that. Keep a scheduled scan on such
+  events, and MARS cannot detect that. Keep a scheduled scan on such
   libraries; it picks up changes anyway.
 - Each folder takes one watch. A large library may need a higher limit:
   **System > Advanced > Sysctl**, add `fs.inotify.max_user_watches` with a
@@ -206,7 +206,7 @@ addition to the scheduled scans.
 
 ## 8. Behind a reverse proxy
 
-If another app (for example a reverse proxy) forwards requests to ComiNavi,
+If another app (for example a reverse proxy) forwards requests to MARS,
 set `COMINAVI_TRUSTED_PROXIES` to the proxy's address, or to the apps'
 address pool (**Apps > Configuration > Settings**, *Address Pools*), so the
 server trusts its `X-Forwarded-For` header. Add it as an environment variable
@@ -214,7 +214,7 @@ in either method.
 
 ### Installing the app on phones and tablets
 
-Phones and tablets can install ComiNavi to the home screen, but only over
+Phones and tablets can install MARS to the home screen, but only over
 HTTPS: at `http://<truenas-ip>:25600` it works in the browser without the
 install option. If the TrueNAS **Tailscale** app is installed, enable
 *MagicDNS* and *HTTPS Certificates* in the Tailscale admin console, open a

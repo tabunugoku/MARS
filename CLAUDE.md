@@ -1,6 +1,11 @@
-# ComiNavi
+# MARS (formerly ComiNavi)
 
 A lightweight, self-hosted comic/manga server (Komga-class features, no Java).
+"MARS: A Reading Server" — tagline "Your manga. Your server. Your universe."
+(English in both languages). Only the displayed name changed: the Go module,
+`cmd/cominavi`, `COMINAVI_*` variables, the image name, data file names,
+browser storage keys (`cominavi.*`), OPDS URNs and the Basic realm keep
+`cominavi` on purpose, so existing installs and saved settings keep working.
 Backend: Go + SQLite (`server/`, contract in `api/openapi.yaml`). Frontend: React 19 + Vite +
 Tailwind v4 + shadcn with the Fluid Functionalism registry (`web/`).
 
@@ -58,7 +63,7 @@ a `code` and a message in the request's `Accept-Language`, and
 - `web/src/components/shell/` — sidebar, topbar, bottom tabs, theme
 - `web/src/components/media/` — Cover, cards, grids, shelves, skeletons
 - `web/src/routes/` — one file (or folder) per screen, lazy-loaded
-- `web/src/styles/tokens.css` — ComiNavi colour tokens over the Fluid theme
+- `web/src/styles/tokens.css` — MARS colour tokens over the Fluid theme
 - `docs/features.md` — Komga feature inventory and adoption decisions
 
 ## Tools

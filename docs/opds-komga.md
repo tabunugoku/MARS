@@ -1,6 +1,6 @@
 # OPDS and the Komga-compatible API
 
-ComiNavi speaks two protocols that other apps already know:
+MARS speaks two protocols that other apps already know:
 
 - **OPDS 1.2** with OPDS-PSE page streaming, for reader apps such as Panels,
   Chunky and KyBook. Catalog address: `http://HOST:25600/opds/v1.2/catalog`.

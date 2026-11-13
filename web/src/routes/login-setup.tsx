@@ -84,7 +84,7 @@ export function SetupForm() {
       <div className="flex items-center gap-2">
         <AppMark size={40} className="-ml-1" />
         <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-          ComiNavi
+          MARS
         </span>
       </div>
 

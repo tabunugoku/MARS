@@ -1,6 +1,6 @@
 // Fluid components ship a few hard-coded English strings (screen-reader
 // names, one tooltip) with no prop to override them, plus one layout rule
-// ComiNavi overrides (button icon padding). Rather than hand-edit
+// MARS overrides (button icon padding). Rather than hand-edit
 // components/ui/, this script swaps each string for a call to uiText("key")
 // from src/i18n/ui.ts, which holds both languages. It is idempotent: run it
 // again after any `shadcn add --overwrite` (npm run localize:fluid).
@@ -37,7 +37,7 @@ const table = {
   ],
 };
 
-// Not strings: ComiNavi centres every button's content exactly, so an icon
+// Not strings: MARS centres every button's content exactly, so an icon
 // gets the same side padding as text (Fluid pulls it 4px closer).
 const layout = {
   "button.tsx": [
