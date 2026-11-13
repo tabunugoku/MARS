@@ -33,6 +33,9 @@ type Deps struct {
 	Gate    *SetupGate
 	// TrustedProxies are reverse proxies whose X-Forwarded-For is believed.
 	TrustedProxies []netip.Prefix
+	// JPEGCacheDir keeps JPEG copies of WebP and AVIF covers for the OPDS and
+	// Komga routes (see jpegThumbnail). Empty turns those copies off.
+	JPEGCacheDir string
 	// Events feeds GET /events; nil turns the stream off.
 	Events *events.Hub
 	// Heartbeat is the stream's keep-alive interval (25 s when zero).
@@ -65,8 +68,8 @@ func New(d Deps) http.Handler {
 	mux.HandleFunc("POST /setup", s.handleSetup)
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}", s.servePage)
 	mux.HandleFunc("GET /books/{bookId}/pages/{page}/thumbnail", s.servePageThumbnail)
-	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book"))
-	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series"))
+	mux.HandleFunc("GET /books/{bookId}/thumbnail", s.serveThumbnail("book", false))
+	mux.HandleFunc("GET /series/{seriesId}/thumbnail", s.serveThumbnail("series", false))
 	mux.HandleFunc("GET /books/{bookId}/file", s.serveBookFile)
 	mux.HandleFunc("GET /series/{seriesId}/file", s.serveSeriesZip)
 	mux.HandleFunc("GET /public/covers/{seriesId}", s.servePublicCover)

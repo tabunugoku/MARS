@@ -18,6 +18,7 @@ import (
 
 	"github.com/tabunugoku/mars/server/internal/ids"
 	"github.com/tabunugoku/mars/server/internal/library"
+	"github.com/tabunugoku/mars/server/internal/media"
 	"github.com/tabunugoku/mars/server/internal/task"
 )
 
@@ -502,7 +503,9 @@ func (s *server) servePage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *server) serveThumbnail(kind string) http.HandlerFunc {
+// serveThumbnail serves the cover of a book or series. With jpegOnly the
+// reply is a JPEG even when the stored file is not (see sendThumbnail).
+func (s *server) serveThumbnail(kind string, jpegOnly bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		id := r.PathValue("bookId")
 		if kind == "series" {
@@ -519,13 +522,16 @@ func (s *server) serveThumbnail(kind string) http.HandlerFunc {
 			writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
 			return
 		}
-		s.sendThumbnail(w, r, kind, id)
+		s.sendThumbnail(w, r, kind, id, jpegOnly)
 	}
 }
 
 // sendThumbnail writes the cover of a book or series. The caller has
-// already decided that the requester may see it.
-func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id string) {
+// already decided that the requester may see it. The content type follows
+// the stored file. With jpegOnly, a stored file that is not a JPEG is sent
+// as a JPEG converted once (see jpegThumbnail), for clients that cannot
+// decode WebP or AVIF.
+func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id string, jpegOnly bool) {
 	p, err := s.Library.ThumbnailPath(r.Context(), kind, id)
 	if errors.Is(err, library.ErrNotFound) {
 		writeError(r.Context(), w, http.StatusNotFound, "not_found.cover")
@@ -534,6 +540,14 @@ func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id 
 	if err != nil {
 		writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 		return
+	}
+	if jpegOnly && !isJPEGName(p) {
+		p, err = s.jpegThumbnail(r.Context(), p)
+		if err != nil {
+			slog.Warn("cover as jpeg", "kind", kind, "id", id, "err", err)
+			writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
+			return
+		}
 	}
 	f, err := os.Open(p)
 	if err != nil {
@@ -547,7 +561,7 @@ func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id 
 		return
 	}
 	h := w.Header()
-	h.Set("Content-Type", "image/jpeg")
+	h.Set("Content-Type", media.ContentTypeForName(p))
 	h.Set("X-Content-Type-Options", "nosniff")
 	// Thumbnails are regenerated in place, so revalidate instead of
 	// caching forever; ServeContent answers 304 from Last-Modified.

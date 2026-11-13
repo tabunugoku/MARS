@@ -88,6 +88,7 @@ func run() error {
 	if err := queue.Run(ctx); err != nil {
 		return err
 	}
+	cache := &thumbCache{db: database}
 	lib := &library.Service{
 		DB:           database,
 		Queue:        queue,
@@ -95,8 +96,10 @@ func run() error {
 		Pages:        &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
 		PageThumbDir: cfg.PageThumbDir(),
 		Events:       hub,
-		// Read at most every thumbCacheTTL, so a new size applies without a restart.
-		ThumbSize: (&thumbCache{db: database}).bounds,
+		// Read at most every thumbCacheTTL, so a new size or format applies
+		// without a restart.
+		ThumbSize:   cache.bounds,
+		ThumbFormat: cache.format,
 	}
 	go lib.Schedule(ctx)
 	go lib.Watch(ctx)
@@ -111,7 +114,7 @@ func run() error {
 	deps := httpapi.Deps{
 		DB: database, Version: version, Library: lib, Tasks: queue,
 		Auth: store, Limiter: &auth.Limiter{}, Gate: gate, TrustedProxies: cfg.TrustedProxies,
-		Events: hub,
+		Events: hub, JPEGCacheDir: filepath.Join(cfg.ThumbnailDir(), library.JPEGCopyDir),
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", httpapi.New(deps)))
@@ -183,34 +186,51 @@ func writeListenAddr(path, addr string) error {
 	return os.Rename(tmp, path)
 }
 
-// thumbCacheTTL is how long a thumbnail box read from the settings is kept.
+// thumbCacheTTL is how long the thumbnail settings read from the database are
+// kept.
 const thumbCacheTTL = 30 * time.Second
 
-// thumbCache holds the thumbnail box of the stored settings, so that making a
-// thumbnail does not query the database. A new size applies within
-// thumbCacheTTL.
+// thumbCache holds the thumbnail box and format of the stored settings, so that
+// making a thumbnail does not query the database. A new size or format applies
+// within thumbCacheTTL.
 type thumbCache struct {
-	db   *sql.DB
-	mu   sync.Mutex
-	w, h int
-	at   time.Time
+	db       *sql.DB
+	mu       sync.Mutex
+	w, h     int
+	thumbFmt media.Format
+	at       time.Time
 }
 
-// bounds returns the thumbnail box (width, height), reading the settings again
-// once the cached box is older than thumbCacheTTL.
-func (c *thumbCache) bounds(ctx context.Context) (int, int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+// refresh reads the settings again once the cached values are older than
+// thumbCacheTTL. The caller holds c.mu.
+func (c *thumbCache) refresh(ctx context.Context) {
 	if !c.at.IsZero() && time.Since(c.at) < thumbCacheTTL {
-		return c.w, c.h
+		return
 	}
 	s, err := httpapi.ReadServerSettings(ctx, c.db)
 	if err != nil {
 		slog.Warn("stored server settings could not be read, using defaults", "err", err)
 	}
 	c.w, c.h = httpapi.ThumbBounds(string(s.ThumbnailSize))
+	c.thumbFmt = media.ParseFormat(string(s.ThumbnailFormat))
 	c.at = time.Now()
+}
+
+// bounds returns the thumbnail box (width, height) from the settings.
+func (c *thumbCache) bounds(ctx context.Context) (int, int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.refresh(ctx)
 	return c.w, c.h
+}
+
+// format returns the thumbnail format from the settings: JPEG unless the stored
+// value is webp or avif.
+func (c *thumbCache) format(ctx context.Context) media.Format {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.refresh(ctx)
+	return c.thumbFmt
 }
 
 // purgeSessions deletes expired sessions once an hour.

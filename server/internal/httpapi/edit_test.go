@@ -169,9 +169,15 @@ func TestSettings(t *testing.T) {
 	}
 	e.admin.json("PATCH", "/api/v1/settings", map[string]any{"port": 0}, 400, nil)
 	e.admin.json("PATCH", "/api/v1/settings", map[string]any{"taskThreads": 17}, 400, nil)
-	rec := e.admin.do("PATCH", "/api/v1/settings", map[string]any{"thumbnailFormat": "webp"})
+	for _, f := range []string{"webp", "avif", "jpeg"} {
+		e.admin.json("PATCH", "/api/v1/settings", map[string]any{"thumbnailFormat": f}, 200, &s)
+		if string(s.ThumbnailFormat) != f {
+			t.Fatalf("thumbnailFormat %s: got %+v", f, s)
+		}
+	}
+	rec := e.admin.do("PATCH", "/api/v1/settings", map[string]any{"thumbnailFormat": "bmp"})
 	if rec.Code != 400 || !strings.Contains(rec.Body.String(), "この形式にはまだ対応していません") {
-		t.Fatalf("webp: %d %s", rec.Code, rec.Body)
+		t.Fatalf("bmp: %d %s", rec.Code, rec.Body)
 	}
 
 	e.admin.json("PATCH", "/api/v1/settings", map[string]any{"rememberMeDays": 7}, 200, &s)

@@ -289,3 +289,23 @@ more on a phone or a slow link.
   user's four writers and two readers.
 - A library split across several root folders or libraries. The work is
   per library, so this should scale linearly.
+
+## Thumbnail formats (2026-11-13)
+
+Making a thumbnail from a 1200x1800 JPEG page, fitted into the default 400x600
+box, four at a time (as with four task threads), on the development machine
+(Windows, ARM64). WebP and AVIF run libwebp and libavif as WebAssembly
+(`gen2brain/webp`, `gen2brain/avif`), so they stay pure Go.
+
+| Format | Settings | 4 in parallel | Size of one | Peak memory (Go `Sys`) |
+|---|---|---|---|---|
+| JPEG | quality 85 | 0.14 s | 50 KB | 126 MB |
+| WebP | quality 80, method 4 | 0.25 s | 30 KB | 158 MB |
+| AVIF | quality 60, speed 8 | 2.36 s | 29 KB | 281 MB |
+
+AVIF costs about 0.6 s of one thread per thumbnail: for 37,000 books that is
+about 6 hours on one thread, 1.5 hours on four. WebP gives nearly the same
+size for a tenth of the time, so it is the better choice for a large library;
+AVIF stays available. Speed 6 halves the file again but takes over 1.5 s per
+image, so it was not used. The server binary grows from 21.4 MB to 29.8 MB
+(linux/amd64, `-s -w`).

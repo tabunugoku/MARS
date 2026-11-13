@@ -147,7 +147,7 @@ func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, pa
 	if len(img) > media.MaxEntryBytes {
 		return media.ErrTooLarge
 	}
-	jpg, err := media.Thumbnail(img, pageThumbW, pageThumbH)
+	jpg, err := media.Thumbnail(img, pageThumbW, pageThumbH, media.FormatJPEG)
 	if err != nil {
 		return err
 	}

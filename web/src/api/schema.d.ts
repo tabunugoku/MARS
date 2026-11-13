@@ -1697,7 +1697,7 @@ export interface components {
             /** @enum {string} */
             thumbnailSize: "small" | "medium" | "large" | "xlarge";
             /**
-             * @description Only jpeg is produced today
+             * @description Format of thumbnails made from now on; existing ones change when regenerated. OPDS and the Komga API always serve JPEG.
              * @enum {string}
              */
             thumbnailFormat: "webp" | "jpeg" | "avif";

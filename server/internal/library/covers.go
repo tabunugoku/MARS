@@ -38,21 +38,33 @@ func ThumbVersion(name string) string { return fmt.Sprintf("%x", hash(name)) }
 // made from. Other errors are server errors.
 var ErrImage = errors.New("library: image")
 
-// newThumbName is a file name under ThumbDir that no earlier thumbnail had.
-func newThumbName(prefix string) string {
+// newThumbName is a file name under ThumbDir that no earlier thumbnail had,
+// with the extension ext (".jpg", ".webp" or ".avif").
+func newThumbName(prefix string, ext string) string {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		// Never expected; the clock still makes the name fresh.
-		return fmt.Sprintf("%s-%x.jpg", prefix, time.Now().UnixNano())
+		return fmt.Sprintf("%s-%x%s", prefix, time.Now().UnixNano(), ext)
 	}
-	return prefix + "-" + hex.EncodeToString(b[:]) + ".jpg"
+	return prefix + "-" + hex.EncodeToString(b[:]) + ext
 }
 
-// removeThumb deletes a thumbnail file that no row refers to any more. An
-// error is ignored: a file left behind is harmless.
-func (s *Service) removeThumb(name string) {
-	if name != "" {
-		_ = os.Remove(filepath.Join(s.ThumbDir, filepath.Base(name)))
+// JPEGCopyDir is the folder under a thumbnail folder that keeps JPEG copies
+// of WebP and AVIF thumbnails, for clients that only read JPEG (OPDS, the
+// Komga API). A copy is named after its thumbnail, so RemoveThumb removes both.
+const JPEGCopyDir = "jpeg"
+
+// RemoveThumb deletes a thumbnail file that no row refers to any more, and
+// its JPEG copy if one was made, so the two always go together. An error is
+// ignored: a file left behind is harmless.
+func (s *Service) RemoveThumb(name string) {
+	if name == "" {
+		return
+	}
+	base := filepath.Base(name)
+	_ = os.Remove(filepath.Join(s.ThumbDir, base))
+	if ext := filepath.Ext(base); ext != ".jpg" && ext != ".jpeg" {
+		_ = os.Remove(filepath.Join(s.ThumbDir, JPEGCopyDir, strings.TrimSuffix(base, ext)+".jpg"))
 	}
 }
 
@@ -68,7 +80,7 @@ func (s *Service) thumbStored(res sql.Result, err error, name string) error {
 		}
 	}
 	if err != nil {
-		s.removeThumb(name)
+		s.RemoveThumb(name)
 	}
 	return err
 }
@@ -104,11 +116,12 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 		return err
 	}
 	w, h := s.thumbBounds(ctx)
-	jpg, err := media.Thumbnail(img, w, h)
+	f := s.thumbFormat(ctx)
+	jpg, err := media.Thumbnail(img, w, h, f)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrImage, err)
 	}
-	name, err := s.writeThumb("series-"+seriesID, jpg)
+	name, err := s.writeThumb("series-"+seriesID, jpg, f)
 	if err != nil {
 		return err
 	}
@@ -117,7 +130,7 @@ func (s *Service) SetSeriesUpload(ctx context.Context, seriesID string, img []by
 	if err := s.thumbStored(res, err, name); err != nil {
 		return err
 	}
-	s.removeThumb(sr.thumb)
+	s.RemoveThumb(sr.thumb)
 	s.seriesChanged(sr.libraryID)
 	return nil
 }
@@ -149,7 +162,7 @@ func (s *Service) DropSeriesUpload(ctx context.Context, seriesID string) error {
 		WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), seriesID); err != nil {
 		return err
 	}
-	s.removeThumb(sr.thumb)
+	s.RemoveThumb(sr.thumb)
 	sr.thumb, sr.source, sr.sig = "", "", ""
 	s.seriesChanged(sr.libraryID)
 	l, err := s.load(ctx, sr.libraryID)
@@ -181,11 +194,12 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 		return err
 	}
 	w, h := s.thumbBounds(ctx)
-	jpg, err := media.Thumbnail(img, w, h)
+	f := s.thumbFormat(ctx)
+	jpg, err := media.Thumbnail(img, w, h, f)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrImage, err)
 	}
-	name, err := s.writeThumb(bookID, jpg)
+	name, err := s.writeThumb(bookID, jpg, f)
 	if err != nil {
 		return err
 	}
@@ -194,7 +208,7 @@ func (s *Service) SetBookUpload(ctx context.Context, bookID string, img []byte) 
 	if err := s.thumbStored(res, err, name); err != nil {
 		return err
 	}
-	s.removeThumb(old)
+	s.RemoveThumb(old)
 	s.bookChanged(libID, seriesID, bookID, status)
 	return nil
 }
@@ -267,12 +281,14 @@ func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) (bool,
 			}
 			img, err := readArtwork(l.root, filepath.Join(sr.dir, name))
 			var jpg []byte
+			var f media.Format
 			if err == nil {
 				w, h := s.thumbBounds(ctx)
-				jpg, err = media.Thumbnail(img, w, h)
+				f = s.thumbFormat(ctx)
+				jpg, err = media.Thumbnail(img, w, h, f)
 			}
 			if err == nil {
-				thumb, err := s.writeThumb("series-"+sr.id, jpg)
+				thumb, err := s.writeThumb("series-"+sr.id, jpg, f)
 				if err != nil {
 					return false, err
 				}
@@ -283,7 +299,7 @@ func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) (bool,
 				} else if err != nil {
 					return false, err
 				}
-				s.removeThumb(sr.thumb)
+				s.RemoveThumb(sr.thumb)
 				return true, nil
 			}
 			slog.Warn("local artwork", "series", sr.id, "file", name, "err", err)
@@ -296,7 +312,7 @@ func (s *Service) syncSeriesArt(ctx context.Context, l lib, sr seriesArt) (bool,
 		WHERE id = ?`, time.Now().UTC().Format(time.RFC3339Nano), sr.id); err != nil {
 		return false, err
 	}
-	s.removeThumb(sr.thumb)
+	s.RemoveThumb(sr.thumb)
 	return true, nil
 }
 
