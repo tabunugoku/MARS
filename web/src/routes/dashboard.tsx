@@ -146,8 +146,10 @@ export default function Screen() {
       <h1 className="sr-only">{t("home")}</h1>
 
       {hero && (
-        <section className="mb-10 flex gap-4 rounded-[12px] bg-card p-4 md:p-5 tone">
-          <div className="w-[96px] shrink-0 sm:w-[120px]">
+        // On phones the text column is too narrow for both buttons, so their
+        // row spans the card under the cover; wider, it stays in the column.
+        <section className="mb-10 grid grid-cols-[96px_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-[12px] bg-card p-4 sm:grid-cols-[120px_minmax(0,1fr)] sm:grid-rows-[1fr_auto] md:p-5 tone">
+          <div className="sm:row-span-2">
             <Cover src={hero.thumbnailUrl} title={heroSeriesTitle} label={String(hero.number)} />
           </div>
           <div className="flex min-w-0 flex-1 flex-col gap-1">
@@ -166,14 +168,14 @@ export default function Screen() {
                 P.<CountUp value={heroPage} /> / {t("pagesLeft", { total: hero.pageCount, left: hero.pageCount - heroPage })}
               </p>
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              <BrandAction to={`/read/${hero.id}`} icon={Play}>
-                {t("resume")}
-              </BrandAction>
-              <Button variant="secondary" asChild>
-                <Link to={`/books/${hero.id}`}>{t("bookDetails")}</Link>
-              </Button>
-            </div>
+          </div>
+          <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2">
+            <BrandAction to={`/read/${hero.id}`} icon={Play}>
+              {t("resume")}
+            </BrandAction>
+            <Button variant="secondary" asChild>
+              <Link to={`/books/${hero.id}`}>{t("bookDetails")}</Link>
+            </Button>
           </div>
         </section>
       )}
