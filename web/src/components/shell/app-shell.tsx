@@ -41,12 +41,12 @@ export function AppShell() {
   // viewport-fit=cover (index.html): keep clear of the notch and rounded
   // corners in landscape, and of the status bar if it overlays.
   return (
-    <SidebarProvider peek="hover" className="h-svh pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
+    <SidebarProvider peek="hover" className="h-svh max-md:pb-[calc(3.5rem+1px+env(safe-area-inset-bottom))] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] pt-[env(safe-area-inset-top)]">
       <AppSidebar />
-      <SidebarInset className="overflow-hidden">
+      <SidebarInset className="overflow-hidden max-md:ml-2!">
         <CompassBackdrop />
         <Topbar />
-        <div className="relative min-h-0 flex-1 overflow-y-auto pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-[env(safe-area-inset-bottom)]" id="cn-scroll">
+        <div className="relative min-h-0 flex-1 overflow-y-auto md:pb-[env(safe-area-inset-bottom)]" id="cn-scroll">
           <Suspense fallback={<PageSkeleton />}>
             <Outlet />
           </Suspense>
@@ -94,7 +94,7 @@ function ThemeGlyph({ dark }: { dark: boolean }) {
 
 function Tab({ to, label, icon, active, onClick }: { to?: string; label: string; icon: ReactNode; active: boolean; onClick?: () => void }) {
   const cls = cn(
-    "flex flex-1 flex-col items-center justify-center gap-0.5 py-1.5 transition-colors duration-80",
+    "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 transition-colors duration-80",
     typeClass("micro"),
     active ? "text-foreground" : "text-muted-foreground",
   );
