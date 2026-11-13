@@ -1,243 +1,263 @@
 <!doctype html>
-<html lang="ja">
+<html lang="ja" data-theme="dark">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark light">
-  <title>MARS: A Reading Server</title>
-  <meta name="description" content="MARS は、手元のマンガやコミックをブラウザで読めるようにする、軽量なセルフホストのサーバーです。Java も外部のデータベースもいりません。">
-  <link rel="canonical" href="https://tabunugoku.github.io/MARS/ja/">
-  <link rel="alternate" hreflang="en" href="https://tabunugoku.github.io/MARS/">
-  <link rel="alternate" hreflang="ja" href="https://tabunugoku.github.io/MARS/ja/">
-  <link rel="alternate" hreflang="x-default" href="https://tabunugoku.github.io/MARS/">
-
-  <meta property="og:type" content="website">
-  <meta property="og:site_name" content="MARS">
-  <meta property="og:locale" content="ja_JP">
-  <meta property="og:locale:alternate" content="en_US">
-  <meta property="og:title" content="MARS: A Reading Server">
-  <meta property="og:description" content="MARS は、手元のマンガやコミックをブラウザで読めるようにする、軽量なセルフホストのサーバーです。Java も外部のデータベースもいりません。">
-  <meta property="og:url" content="https://tabunugoku.github.io/MARS/ja/">
-  <meta property="og:image" content="https://tabunugoku.github.io/MARS/assets/shots/ja-home.webp">
-  <meta property="og:image:alt" content="MARS のホーム画面。シリーズのカバーがグリッドに並んでいます。">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="MARS: A Reading Server">
-  <meta name="twitter:description" content="MARS は、手元のマンガやコミックをブラウザで読めるようにする、軽量なセルフホストのサーバーです。Java も外部のデータベースもいりません。">
-  <meta name="twitter:image" content="https://tabunugoku.github.io/MARS/assets/shots/ja-home.webp">
-
-  <link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
-  <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400..600&display=swap">
-  <link rel="stylesheet" href="../assets/site.css">
-  <script>
-    (function () {
-      try {
-        var t = localStorage.getItem("mars-theme");
-        if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
-      } catch (e) {}
-    })();
-  </script>
-  <script src="../assets/site.js" defer></script>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MARS | 自分のサーバーで動かす、マンガとコミックのサーバー</title>
+<meta name="description" content="MARS は、自分のサーバーで動かすマンガ・コミックのサーバーです。フォルダのマンガをシリーズと巻にまとめ、ブラウザで読めます。">
+<link rel="canonical" href="https://tabunugoku.github.io/MARS/ja/">
+<link rel="alternate" hreflang="en" href="https://tabunugoku.github.io/MARS/">
+<link rel="alternate" hreflang="ja" href="https://tabunugoku.github.io/MARS/ja/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="ja_JP">
+<meta property="og:title" content="MARS: A Reading Server">
+<meta property="og:description" content="自分のサーバーで動かす、マンガとコミックのサーバー。Your manga. Your server. Your universe.">
+<meta property="og:url" content="https://tabunugoku.github.io/MARS/ja/">
+<meta property="og:image" content="https://tabunugoku.github.io/MARS/assets/og-ja.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#120d0b">
+<link rel="icon" href="../assets/logo.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
+<link rel="preload" href="../assets/fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+<script>
+  // Set the theme before first paint: a saved choice, else the system's.
+  (function () {
+    var t;
+    try { t = localStorage.getItem("mars-site-theme"); } catch (e) {}
+    if (t !== "light" && t !== "dark") t = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
+    document.documentElement.dataset.theme = t;
+    if (t === "light") document.querySelector('meta[name="theme-color"]').setAttribute("content", "#f8f5f4");
+  })();
+</script>
+<link rel="stylesheet" href="../assets/site.css">
+<script src="../assets/site.js" defer></script>
 </head>
-<body id="top">
-  <a class="skip-link" href="#main">本文へ移動</a>
+<body>
+<a class="skip" href="#main">本文へ移動</a>
 
-  <header class="site-header">
-    <div class="wrap header-inner">
-      <a class="brand" href="#top" aria-label="MARS, ページの先頭へ">
-        <img src="../assets/logo.svg" alt="" width="28" height="28">
-        <span>MARS</span>
-      </a>
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="./" aria-label="MARS のトップ"><img src="../assets/logo.svg" alt="" width="28" height="28">MARS</a>
+    <nav class="nav-links" aria-label="ページ内の項目">
+      <a href="#read">機能</a>
+      <a href="#start">はじめかた</a>
+      <a href="#docs">ドキュメント</a>
+    </nav>
+    <div class="nav-tools">
+      <a href="../" hreflang="en" lang="en">English</a>
+      <button class="icon-btn" type="button" data-theme-toggle data-to-light="ライトテーマにする" data-to-dark="ダークテーマにする" aria-label="テーマを切り替える">
+        <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 12C16.5 14.4854 14.4854 16.5 12 16.5C9.5147 16.5 7.5 14.4854 7.5 12C7.5 9.5147 9.5147 7.5 12 7.5C14.4854 7.5 16.5 9.5147 16.5 12ZM20.5 12L22 12M18.0104 18.0104L19.0711 19.0711M12 20.5L12 22M5.9896 18.0104L4.9289 19.0711M3.5 12L2 12M5.9896 5.9896L4.9289 4.9289M12 3.5L12 2M18.0104 5.9896L19.0711 4.9289"/></svg>
+        <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12C21 16.9706 16.9706 21 12 21C7.0294 21 3 16.9706 3 12C3 7.0294 7.0294 3 12 3C9.9618 5.5477 10.1652 9.2206 12.4723 11.5277C14.7794 13.8348 18.4523 14.0382 21 12Z"/></svg>
+      </button>
+      <a href="https://github.com/tabunugoku/MARS">GitHub</a>
+    </div>
+  </div>
+</header>
 
-      <nav class="primary-nav" aria-label="主要なメニュー">
-        <ul>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.ja.md">ドキュメント</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.ja.md">API</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.ja.md">ロードマップ</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/releases">リリース</a></li>
+<main id="main">
+
+  <section class="hero tone" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div class="hero-copy" data-enter>
+        <h1 id="hero-title" class="h1"><span class="ph">手持ちのマンガを、</span><span class="ph">ブラウザで読める本棚に</span></h1>
+        <p class="lead">MARS は、自分のサーバーで動かすマンガ・コミックのサーバーです。フォルダを読み込んでシリーズと巻にまとめ、どの端末のブラウザからでも続きを読めます。</p>
+        <div class="actions">
+          <a class="btn btn-primary" href="#start">はじめかたを見る
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H18.0587M12.1229 5L18.8261 11.5875C19.058 11.8153 19.058 12.1847 18.8261 12.4125L12.1229 19"/></svg>
+          </a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS">GitHub で見る</a>
+        </div>
+        <p class="fact"><span>Docker イメージは約 8 MiB</span><span>amd64 と arm64</span><span>MIT ライセンス</span></p>
+      </div>
+      <div class="hero-shot" data-enter-shot>
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+          <img src="../assets/shots/ja-home.webp" data-dark="../assets/shots/ja-home.webp" data-light="../assets/shots/ja-home-light.webp" width="1600" height="1000" alt="MARS のホーム画面。読みかけの巻と、ページの進み具合を示す点の列、読みかけのシリーズの棚" fetchpriority="high">
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" id="read" aria-labelledby="read-title">
+    <div class="wrap split">
+      <div class="split-copy">
+        <h2 id="read-title" class="h2">ブラウザを開けば、すぐに読める</h2>
+        <p class="lead">リーダーはブラウザの中で動きます。読むためのアプリを入れる必要はありません。</p>
+        <ul class="points">
+          <li>右から左、左から右、縦方向に対応しています。Webtoon のような縦スクロールと、見開き表示も使えます。</li>
+          <li>読んだページを覚えていて、次の巻へそのまま進めます。</li>
+          <li>シークレットモードで読むと、進捗を残しません。</li>
+          <li>背景色は黒・グレー・白から選べます。</li>
         </ul>
-      </nav>
-
-      <div class="header-tools">
-        <nav class="lang" aria-label="言語">
-          <a href="../" lang="en">English</a>
-          <a href="./" lang="ja" aria-current="page"><span class="here-dot" aria-hidden="true"></span>日本語</a>
-        </nav>
-        <button class="icon-btn theme-toggle" type="button" data-theme-toggle aria-label="テーマを切り替え" title="テーマを切り替え">
-          <svg class="i-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M16.5 12C16.5 14.4854 14.4854 16.5 12 16.5C9.5147 16.5 7.5 14.4854 7.5 12C7.5 9.5147 9.5147 7.5 12 7.5C14.4854 7.5 16.5 9.5147 16.5 12ZM20.5 12L22 12M18.0104 18.0104L19.0711 19.0711M12 20.5L12 22M5.9896 18.0104L4.9289 19.0711M3.5 12L2 12M5.9896 5.9896L4.9289 4.9289M12 3.5L12 2M18.0104 5.9896L19.0711 4.9289"/></svg>
-          <svg class="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M21 12C21 16.9706 16.9706 21 12 21C7.0294 21 3 16.9706 3 12C3 7.0294 7.0294 3 12 3C9.9618 5.5477 10.1652 9.2206 12.4723 11.5277C14.7794 13.8348 18.4523 14.0382 21 12Z"/></svg>
-        </button>
-        <a class="gh-link" href="https://github.com/tabunugoku/MARS">GitHub</a>
-        <button class="icon-btn menu-toggle" type="button" data-menu-toggle aria-expanded="false" aria-controls="mobile-menu" aria-label="メニュー">
-          <svg class="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M4 6H20M4 12H20M4 18H20"/></svg>
-          <svg class="i-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M7 7L17 17M17 7L7 17"/></svg>
-        </button>
+      </div>
+      <div class="stack">
+        <div class="frame">
+          <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+          <img src="../assets/shots/ja-reader.webp" width="1600" height="1000" loading="lazy" alt="リーダーでマンガの 1 ページを表示した画面。下にページ番号と、点の列で示す進み具合">
+        </div>
+        <div class="phone">
+          <img src="../assets/shots/ja-m-reader.webp" width="780" height="1688" loading="lazy" alt="同じページをスマートフォンのリーダーで表示した画面">
+        </div>
       </div>
     </div>
+  </section>
 
-    <div class="mobile-menu" id="mobile-menu" hidden>
-      <ul>
-        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.ja.md">ドキュメント</a></li>
-        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.ja.md">API</a></li>
-        <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.ja.md">ロードマップ</a></li>
-        <li><a href="https://github.com/tabunugoku/MARS/releases">リリース</a></li>
-        <li><a href="https://github.com/tabunugoku/MARS">GitHub</a></li>
-      </ul>
+  <section class="section" id="library" aria-labelledby="library-title">
+    <div class="wrap split flip">
+      <div class="split-copy">
+        <h2 id="library-title" class="h2">フォルダを指定すれば、シリーズと巻にまとまる</h2>
+        <p class="lead">アーカイブを入れたフォルダが、シリーズになります。表紙の画像と <code>ComicInfo.xml</code> も読み込みます。</p>
+        <ul class="points">
+          <li>CBZ / ZIP、CBR / RAR（RAR5 を含む）、CB7 / 7z、PDF に対応しています。</li>
+          <li>ファイルの変更を監視して、自動でスキャンします。定期スキャンと起動時のスキャンもできます。</li>
+          <li>メタデータは画面から編集できます。ロックした項目は、スキャンで上書きされません。</li>
+          <li>コレクションとリーディングリストで、作品や巻をまとめられます。</li>
+        </ul>
+      </div>
+      <div class="frame">
+        <div class="frame-bar" aria-hidden="true"><span class="dots"><i></i><i></i><i></i></span><span class="url">localhost:25600</span></div>
+        <img src="../assets/shots/ja-series.webp" width="1600" height="1000" loading="lazy" alt="シリーズの画面。表紙、読書の状況、タグと、巻の一覧">
+      </div>
     </div>
-  </header>
+  </section>
 
-  <main id="main">
-    <!-- 1. Hero -->
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap hero-grid">
-        <div class="hero-copy">
-          <h1 class="display" id="hero-title" lang="en">
-            <span>Your manga.</span>
-            <span>Your server.</span>
-            <span>Your universe.</span>
-          </h1>
-          <p class="lead">MARS は、手元のマンガやコミックをブラウザで読めるようにする、軽量なセルフホストのサーバーです。Java も外部のデータベースもいりません。</p>
-          <div class="actions">
-            <a class="btn btn-primary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.ja.md">はじめる</a>
-            <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS">GitHub で見る</a>
+  <section class="section" id="connect" aria-labelledby="connect-title">
+    <div class="wrap connect-grid">
+      <div class="split-copy">
+        <h2 id="connect-title" class="h2">ユーザーを分けて使い、ほかのアプリからも読める</h2>
+        <p class="lead">ユーザーごとに、見られるライブラリを分けられます。</p>
+        <div class="cards">
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 6H13.5M19 18V6C19 3.79086 17.2091 2 15 2H9C6.79086 2 5 3.79086 5 6V18C5 20.2091 6.79086 22 9 22H15C17.2091 22 19 20.2091 19 18Z"/></svg>スマホとタブレット</h3>
+            <p>ホーム画面に追加して、アプリのように使えます（PWA）。</p>
           </div>
-          <div class="cmd">
-            <code id="docker-cmd">docker run -d -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</code>
-            <button class="copy-btn" type="button" data-copy aria-controls="docker-cmd" data-copied="コピーしました" aria-label="コマンドをコピー">
-              <svg class="i-copy" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
-              <svg class="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M5 12L9.66667 17L19 7"/></svg>
-              <span class="copy-tip" data-copy-label role="status"></span>
-            </button>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7L16 7C17.6569 7 19 8.3431 19 10L19 11C19 14.866 15.866 18 12 18C8.134 18 5 14.866 5 11L5 10C5 8.3431 6.3431 7 8 7ZM9 2L9 7M15 2L15 7M12 18L12 22"/></svg>Mihon</h3>
+            <p>Komga 拡張とトラッカーが使う、Komga 互換 API を備えています。</p>
+          </div>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4L8 4C10.2091 4 12 5.7909 12 8C12 5.7909 13.7909 4 16 4L20 4C21.1046 4 22 4.8954 22 6L22 15C22 16.1046 21.1046 17 20 17L15 17C13.3431 17 12 18.3431 12 20C12 18.3431 10.6569 17 9 17L4 17C2.8954 17 2 16.1046 2 15L2 6C2 4.8954 2.8954 4 4 4ZM12 8L12 20"/></svg>OPDS 1.2</h3>
+            <p>Panels、Chunky、KyBook などの電子書籍アプリから読めます。</p>
+          </div>
+          <div class="card">
+            <h3><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 12C10 14.2091 8.2091 16 6 16C3.7909 16 2 14.2091 2 12C2 9.7909 3.7909 8 6 8C8.2091 8 10 9.7909 10 12ZM10 12L22 12M17 12L17 16M21 12L21 16"/></svg>ユーザーと API キー</h3>
+            <p>管理者と一般ユーザーを分けられます。外部のアプリ用に API キーを発行できます。</p>
           </div>
         </div>
-
-        <figure class="window">
-          <img class="shot-dark" src="../assets/shots/ja-home.webp" alt="MARS のホーム画面。シリーズのカバーがグリッドに並んでいます。" width="1920" height="1200">
-          <img class="shot-light" src="../assets/shots/ja-home-light.webp" alt="ライトテーマの MARS のホーム画面。シリーズのカバーがグリッドに並んでいます。" width="1920" height="1200" loading="lazy">
-        </figure>
       </div>
-    </section>
-
-    <!-- 2. Features -->
-    <section class="section" aria-label="機能">
-      <div class="wrap">
-        <div class="feature-grid">
-          <article class="feature f1">
-            <div class="shot">
-              <img class="pos-top" src="../assets/shots/ja-library.webp" alt="フォルダから作ったマンガのシリーズを並べたライブラリ画面。" width="1920" height="1200" loading="lazy">
-            </div>
-            <div class="feature-body">
-              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M3 7C3 5.3431 4.3431 4 6 4L8.6716 4C9.202 4 9.7107 4.2107 10.0858 4.5858L11.4142 5.9142C11.7893 6.2893 12.298 6.5 12.8284 6.5L18 6.5C19.6569 6.5 21 7.8431 21 9.5L21 17C21 18.6569 19.6569 20 18 20L6 20C4.3431 20 3 18.6569 3 17Z"/></svg></span>
-              <h3 class="title-1">フォルダを登録するだけ</h3>
-              <p>CBZ、CBR（RAR5 を含む）、CB7、PDF に対応し、フォルダの構成と ComicInfo.xml からシリーズと巻を作ります。ファイルの変更を監視して、追加された本を自動で取り込むこともできます。</p>
-            </div>
-          </article>
-
-          <article class="feature f2">
-            <div class="shot">
-              <img class="pos-center" src="../assets/shots/ja-series.webp" alt="巻と読書の進み具合を表示するシリーズの画面。" width="1920" height="1200" loading="lazy">
-            </div>
-            <div class="feature-body">
-              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M4 4L8 4C10.2091 4 12 5.7909 12 8C12 5.7909 13.7909 4 16 4L20 4C21.1046 4 22 4.8954 22 6L22 15C22 16.1046 21.1046 17 20 17L15 17C13.3431 17 12 18.3431 12 20C12 18.3431 10.6569 17 9 17L4 17C2.8954 17 2 16.1046 2 15L2 6C2 4.8954 2.8954 4 4 4ZM12 8L12 20"/></svg></span>
-              <h3 class="title-1">マンガの読み方に合わせて</h3>
-              <p>右から左、見開き、Webtoon の縦スクロールで読めます。読んだ位置は端末をまたいで同期され、読み終えたら次の巻へ進めます。</p>
-            </div>
-          </article>
-
-          <article class="feature f3">
-            <div class="feature-body">
-              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M8 14H10C13.3137 14 16 16.6863 16 20C16 20.5523 15.5523 21 15 21H3C2.44772 21 2 20.5523 2 20C2 16.6863 4.68629 14 8 14ZM9 4C10.6569 4 12 5.34315 12 7C12 8.65685 10.6569 10 9 10C7.34315 10 6 8.65685 6 7C6 5.34315 7.34315 4 9 4ZM16 4C17.6569 4 19 5.34315 19 7C19 8.65685 17.6569 10 16 10M18.3333 14.4713C20.554 15.409 22 17.589 22 20C22 20.5523 21.5523 21 21 21"/></svg></span>
-              <h3 class="title-1">家族や仲間と、好きなアプリで</h3>
-              <p>ユーザーごとに、見られるライブラリと権限を決められます。OPDS 1.2 と Komga 互換 API で、Mihon や OPDS に対応したアプリからも読めます。</p>
-            </div>
-          </article>
-
-          <article class="feature f4">
-            <div class="feature-body">
-              <span class="feature-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" focusable="false"><path d="M22 12C22 17.5228 17.5228 22 12 22C6.4772 22 2 17.5228 2 12C2 6.4772 6.4772 2 12 2C17.5228 2 22 6.4772 22 12ZM12 12L12 7"/></svg></span>
-              <h3 class="title-1">小さく動く</h3>
-              <p>1 つの Go バイナリで動き、Docker イメージは約 8 MiB です。109 冊をスキャンしたあとのメモリは約 51 MiB でした。amd64 と arm64 に対応します。</p>
-            </div>
-          </article>
+      <div class="connect-phone">
+        <div class="phone">
+          <img src="../assets/shots/ja-m-home.webp" width="780" height="1688" loading="lazy" alt="スマートフォンの MARS。読みかけの巻があるホーム画面と、下のタブバー">
         </div>
       </div>
-    </section>
+    </div>
+  </section>
 
-    <!-- 3. Reader moment -->
-    <section class="section reader-moment tone" aria-labelledby="reader-title">
-      <div class="wrap reader-grid">
-        <div class="section-head">
-          <h2 class="section-title" id="reader-title">紙の本と同じ向きで</h2>
-          <p>マンガは右から左へめくり、見開きでは表紙だけを 1 ページで表示します。Webtoon は縦に続けて読め、拡大の方法や背景色も選べます。</p>
-        </div>
-        <div>
-          <figure class="reader-window" id="reader-window">
-            <img src="../assets/shots/ja-reader.webp" alt="右から左へめくるマンガを表示したリーダー画面。" width="1920" height="1200" loading="lazy">
-            <img src="../assets/shots/ja-reader-57.webp" alt="" width="1920" height="1200" loading="lazy">
-            <img src="../assets/shots/ja-reader-58.webp" alt="" width="1920" height="1200" loading="lazy">
-          </figure>
-          <div class="pager" aria-hidden="true"><span class="is-on"></span><span></span><span></span></div>
-        </div>
+  <section class="section tagline" aria-label="タグライン">
+    <div class="wrap">
+      <p lang="en"><span class="line"><span class="w">Your</span> <span class="w">manga.</span></span><span class="line"><span class="w">Your</span> <span class="w">server.</span></span><span class="line"><span class="w">Your</span> <span class="w red">universe.</span></span></p>
+    </div>
+  </section>
+
+  <section class="section" id="start" aria-labelledby="start-title">
+    <div class="wrap start-grid">
+      <div class="split-copy">
+        <h2 id="start-title" class="h2">Docker で起動して、3 つの手順で使い始める</h2>
+        <p class="lead">Docker と、マンガを置いたフォルダを用意します。環境は <code>linux/amd64</code> か <code>linux/arm64</code> です。</p>
       </div>
-    </section>
-
-    <!-- 4. Phones -->
-    <section class="section" aria-labelledby="phones-title">
-      <div class="wrap phones-grid">
-        <div class="section-head">
-          <h2 class="section-title" id="phones-title">ホーム画面に追加して使う</h2>
-          <p>HTTPS で開けば、スマホやタブレットのホーム画面に追加して、アプリのように使えます。</p>
-        </div>
-        <div class="phones">
-          <figure class="phone"><img src="../assets/shots/ja-mobile-home.webp" alt="スマホで表示した MARS のホーム画面。" width="780" height="1688" loading="lazy"></figure>
-          <figure class="phone"><img src="../assets/shots/ja-mobile-series.webp" alt="スマホで表示した MARS のシリーズの画面。" width="780" height="1688" loading="lazy"></figure>
-          <figure class="phone"><img src="../assets/shots/ja-mobile-reader.webp" alt="スマホで表示した MARS のリーダー画面。" width="780" height="1688" loading="lazy"></figure>
-        </div>
-      </div>
-    </section>
-
-    <!-- 5. Get started -->
-    <section class="section" aria-labelledby="start-title">
-      <div class="wrap">
-        <h2 class="section-title" id="start-title">3 つの手順で読みはじめる</h2>
+      <div>
         <ol class="steps">
-          <li><span class="step-n" aria-hidden="true">1</span><p>Docker でコンテナを起動します。</p></li>
-          <li><span class="step-n" aria-hidden="true">2</span><p>起動ログのセットアップトークンを入力して、管理者を作ります。</p></li>
-          <li><span class="step-n" aria-hidden="true">3</span><p>マンガのフォルダをライブラリに追加します。</p></li>
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">1</span>
+            <div class="step-body">
+              <h3>起動する</h3>
+              <p>次のコマンドを実行します。<code>/path/to/comics</code> は、マンガのフォルダに置き換えてください。</p>
+              <div class="cmd">
+                <pre id="cmd-run">docker run -d --name mars -p 25600:25600 -v mars-data:/data -v /path/to/comics:/comics:ro ghcr.io/tabunugoku/mars:1</pre>
+                <button class="copy" type="button" data-copy="cmd-run" data-idle="コピー" data-done="コピーしました" aria-label="docker run のコマンドをコピー">
+                  <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
+                  <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
+                  <span class="label">コピー</span>
+                </button>
+              </div>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">2</span>
+            <div class="step-body">
+              <h3>管理者を作る</h3>
+              <p>ブラウザで <span class="mono">http://localhost:25600</span> を開き、セットアップトークンを入力して管理者を作ります。トークンは次のコマンドで確認できます。</p>
+              <div class="cmd">
+                <pre id="cmd-token">docker logs mars 2>&amp;1 | grep token=</pre>
+                <button class="copy" type="button" data-copy="cmd-token" data-idle="コピー" data-done="コピーしました" aria-label="セットアップトークンを表示するコマンドをコピー">
+                  <svg class="i-copy" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15.8284 4C15.4046 2.8015 14.2714 2 13 2H5C3.34315 2 2 3.34315 2 5V13C2 14.2714 2.8015 15.4046 4 15.8284M11 8H19C20.65684 8 22 9.34316 22 11V19C22 20.65684 20.65684 22 19 22H11C9.34316 22 8 20.65684 8 19V11C8 9.34316 9.34316 8 11 8Z"/></svg>
+                  <svg class="i-check" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12L9.66667 17L19 7"/></svg>
+                  <span class="label">コピー</span>
+                </button>
+              </div>
+            </div>
+          </li>
+          <li class="step">
+            <span class="step-dot" aria-hidden="true">3</span>
+            <div class="step-body">
+              <h3>ライブラリを追加する</h3>
+              <p>管理 &gt; ライブラリ設定 で<strong>ライブラリを追加</strong>を選び、フォルダに <code>/comics</code> を指定して保存します。</p>
+            </div>
+          </li>
         </ol>
+        <p class="sr" id="copy-status" role="status" aria-live="polite"></p>
         <div class="start-links">
           <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.ja.md">Docker でのインストール</a>
-          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/truenas.ja.md">TrueNAS へのインストール</a>
-          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/configuration.ja.md">設定</a>
+          <a class="btn btn-secondary" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/truenas.ja.md">TrueNAS SCALE へのインストール</a>
         </div>
       </div>
-    </section>
-  </main>
+    </div>
+  </section>
 
-  <footer class="site-footer">
-    <div class="wrap footer-grid">
-      <div>
-        <a class="footer-brand" href="#top">
-          <img src="../assets/logo.svg" alt="" width="32" height="32">
-          <span>MARS: A Reading Server</span>
+  <section class="section fit" id="docs" aria-labelledby="docs-title">
+    <div class="wrap">
+      <h2 id="docs-title" class="h2">次に読むもの</h2>
+      <div class="docs">
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/README.ja.md">
+          <h3>ドキュメントの目次<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>導入、使い方、運用の資料の一覧です。</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/install/docker.ja.md">
+          <h3>Docker でのインストール<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>ボリュームと権限、docker compose での起動です。</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/api.ja.md">
+          <h3>API<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>REST API の認証、エラーの形式、利用例です。</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.ja.md">
+          <h3>ロードマップ<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>今後の予定と、検討中の機能です。</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS/releases">
+          <h3>リリース<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>バージョンごとの変更点です。</p>
+        </a>
+        <a class="doc" href="https://github.com/tabunugoku/MARS">
+          <h3>GitHub<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6H17.5C17.77614 6 18 6.22386 18 6.5V18M7.2 16.8L17.4 6.6"/></svg></h3>
+          <p>ソースコード、不具合の報告、コントリビュートの手順です。</p>
         </a>
       </div>
-      <div class="footer-legal">
-        <ul class="footer-links">
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/README.ja.md">ドキュメント</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/api.ja.md">API</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/docs/roadmap.ja.md">ロードマップ</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/releases">リリース</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS">GitHub</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/CHANGELOG.md">変更履歴</a></li>
-          <li><a href="https://github.com/tabunugoku/MARS/blob/main/LICENSE">ライセンス</a></li>
-        </ul>
-        <p class="fineprint">MIT ライセンスで公開しています。</p>
-        <p class="fineprint">画面の作品名とデータは架空のものです。</p>
-      </div>
     </div>
-  </footer>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="../assets/logo.svg" alt="" width="24" height="24">MARS: A Reading Server</a>
+    <nav aria-label="フッター">
+      <a href="https://github.com/tabunugoku/MARS">GitHub</a>
+      <a href="https://github.com/tabunugoku/MARS/releases">リリース</a>
+      <a href="https://github.com/tabunugoku/MARS/blob/main/LICENSE">MIT ライセンス</a>
+      <a href="../" hreflang="en" lang="en">English</a>
+    </nav>
+  </div>
+</footer>
 </body>
 </html>
