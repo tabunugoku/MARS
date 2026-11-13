@@ -57,9 +57,13 @@ jobs:
           path: server/internal/webui/dist
       - name: Build static binaries
         run: |
-          GOOS=linux GOARCH=amd64 go build -trimpath -o /tmp/mars-amd64 ./cmd/mars
-          GOOS=linux GOARCH=arm64 go build -trimpath -o /tmp/mars-arm64 ./cmd/mars
+          GOOS=linux GOARCH=amd64 go build -tags nodynamic -trimpath -o /tmp/mars-amd64 ./cmd/mars
+          GOOS=linux GOARCH=arm64 go build -tags nodynamic -trimpath -o /tmp/mars-arm64 ./cmd/mars
           ls -l /tmp/mars-*
+          # Must stay static: distroless/static has no dynamic loader.
+          for b in /tmp/mars-*; do
+            if readelf -l "$b" | grep -q INTERP; then echo "$b is dynamically linked"; exit 1; fi
+          done
 
   docker:
     runs-on: ubuntu-latest

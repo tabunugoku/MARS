@@ -22,8 +22,11 @@ COPY server/ ./
 COPY --from=web /src/server/internal/webui/dist ./internal/webui/dist
 ARG TARGETOS TARGETARCH
 ARG VERSION=dev
+# nodynamic: the WebP/AVIF encoders would otherwise look for a system libwebp
+# or libavif through purego, which links the binary dynamically; the
+# distroless/static image has no loader, so the binary would not start.
 RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH \
-    go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
+    go build -tags nodynamic -trimpath -ldflags="-s -w -X main.version=${VERSION}" \
     -o /out/mars ./cmd/mars \
  && mkdir -p /out/data
 

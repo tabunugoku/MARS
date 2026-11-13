@@ -144,7 +144,7 @@ Needs Node 22 and Go (the version in `server/go.mod`). The binary is pure Go
 
 ```sh
 cd web && npm ci && npm run build:embed   # builds the UI into server/internal/webui/dist
-cd ../server && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o mars ./cmd/mars
+cd ../server && CGO_ENABLED=0 go build -tags nodynamic -trimpath -ldflags="-s -w" -o mars ./cmd/mars
 ./mars
 ```
 
