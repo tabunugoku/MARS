@@ -65,8 +65,8 @@ panels, headings, icons, secondary buttons).
   keeps white text readable in both themes. Errors and destructive actions
   use `destructive` (crimson), never the brand red. `here` (blue, `bg-here`,
   `text-here`) marks only "you are here": the current reading position in a
-  `DotTrack`, the dot beside the selected nav row, the compass tip on the login
-  page (the only place the compass rose is drawn; app screens keep only the
+  `DotTrack`, the dot beside the selected nav row, the near moon of the
+  sign-in page's planet (`PlanetOrbit`, the only large drawing; app screens keep only the
   `.tone` ground behind the content). Never use
   `here` for buttons or decoration. Everything else is neutral. No emoji.
 - **Dots (screentone)** are the texture: `.tone` (quiet ground) and
@@ -90,7 +90,7 @@ panels, headings, icons, secondary buttons).
   `@/lib/springs`, or motion/react spring options); CSS transitions use
   80–300ms with the one glide curve `ease-[cubic-bezier(0.16,1,0.3,1)]`.
   No overshooting curves on hover or press; overshoot belongs only to the
-  springs that model something physical (page turns, the compass needle).
+  springs that model something physical (page turns, the moon settling on the sign-in orbit).
   Animate transform/opacity only. Respect reduced motion. Allowed on load:
   the dots of a `DotTrack` filling in and `CountUp` numbers; nothing flies in.
   No looping motion except loading states. Already built in, so don't

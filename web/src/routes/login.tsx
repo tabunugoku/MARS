@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, errorMessage, safeNext, useApi, type LoginScreen } from "@/api";
 import { AppMark } from "@/components/brand/app-mark";
-import { CompassRose } from "@/components/brand/compass-rose";
+import { PlanetOrbit } from "@/components/brand/planet-orbit";
 import { Cover } from "@/components/media/cover";
 import { Block } from "@/components/media/skeletons";
 import { LoadError } from "@/components/shell/load-error";
@@ -202,16 +202,13 @@ function Backdrop({ screen }: { screen: LoginScreen | undefined }) {
       </>
     );
   }
-  // The night chart: the same rose as behind every screen. Its needle swings
-  // in once to the mark's own 35° heading.
+  // The night sky: the logo's planet and orbit, large, printed in dots. The
+  // near moon travels into place once. (The setting's value is still
+  // "compass", from before the rename to MARS.)
   return (
     <>
       <div className="tone absolute inset-0 opacity-70 [mask-image:radial-gradient(closest-side,#000,transparent)]" />
-      <CompassRose
-        deg={35}
-        from={-90}
-        className="absolute left-1/2 top-1/2 size-[min(88%,680px)] -translate-x-1/2 -translate-y-1/2 opacity-[0.16] dark:opacity-[0.2]"
-      />
+      <PlanetOrbit className="absolute left-1/2 top-1/2 size-[min(92%,720px)] -translate-x-1/2 -translate-y-1/2" />
     </>
   );
 }

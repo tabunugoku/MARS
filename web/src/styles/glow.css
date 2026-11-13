@@ -2,7 +2,7 @@
    exp/glow trial; the flat version is tag design/flat-v1). It stays on the
    night chart: light comes only from what the chart would light — the
    blue "you are here" dot like a beacon, the red route already travelled,
-   the one call to action, the login compass needle catching starlight. Surfaces,
+   the one call to action, the blue moon on the sign-in page's orbit. Surfaces,
    text and chrome stay flat. Dots and small marks use filter: drop-shadow so
    their rings (box-shadow) survive; the CTA uses box-shadow because its hover
    already animates filter. */
@@ -12,7 +12,6 @@
   --glow-brand-soft: color-mix(in oklab, var(--brand) 35%, transparent);
   --glow-here: color-mix(in oklab, var(--here) 85%, transparent);
   --glow-here-soft: color-mix(in oklab, var(--here) 40%, transparent);
-  --glow-star: color-mix(in oklab, var(--foreground) 55%, transparent);
 }
 /* Chart paper: light reads as ink bleeding, so it is smaller and fainter. */
 :root:not(.dark) {
@@ -20,7 +19,6 @@
   --glow-brand-soft: color-mix(in oklab, var(--brand) 18%, transparent);
   --glow-here: color-mix(in oklab, var(--here) 55%, transparent);
   --glow-here-soft: color-mix(in oklab, var(--here) 22%, transparent);
-  --glow-star: transparent;
 }
 
 /* "You are here": nav dot, DotTrack position, reader rail thumb. */
@@ -58,9 +56,9 @@ button.bg-brand-fill:not(:focus-visible):hover {
   filter: drop-shadow(0 0 10px var(--glow-brand));
 }
 
-/* The backdrop compass needle catches a little starlight (dark only). */
-[data-compass] g {
-  filter: drop-shadow(0 0 10px var(--glow-star));
+/* The near moon on the sign-in page's orbit is "you are here" too. */
+[data-orbit-here] {
+  filter: drop-shadow(0 0 8px var(--glow-here)) drop-shadow(0 0 24px var(--glow-here-soft));
 }
 
 /* A lifted cover throws red light on the chart below it. */
