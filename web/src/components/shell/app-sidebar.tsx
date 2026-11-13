@@ -10,13 +10,12 @@ import {
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
 import { MenuItem } from "@/components/ui/menu-item";
 import { SidebarUserFooter } from "@/components/sidebar-app/user-footer";
 import { SidebarSearchField } from "@/components/sidebar-app/search-field";
 import type { IconComponent } from "@/lib/icon-context";
-import { type RefObject, useEffect, useRef } from "react";
+import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, useApi } from "@/api";
 import { defineMessages, useT } from "@/i18n";
 import { fontWeights } from "@/lib/font-weight";
@@ -94,26 +93,26 @@ function NavRow({ to, icon, label, badge, exact }: { to: string; icon: IconCompo
   const { pathname } = useLocation();
   const active = exact ? pathname === to : pathname === to || pathname.startsWith(`${to}/`);
   // On phones the sidebar is mounted twice (the hidden rail and the sheet),
-  // and two dots sharing one layoutId hide each other, so the dot there is
-  // plain and does not glide.
-  const { isMobile } = useSidebar();
-  const hereClass = "absolute -left-3 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here ring-[3px] ring-here/20";
+  // and two dots sharing one layoutId would hide each other. Each copy gets
+  // its own id, read from where the row sits before the first paint.
+  const gutter = useRef<HTMLSpanElement>(null);
+  const [copy, setCopy] = useState<"rail" | "sheet">();
+  useLayoutEffect(() => {
+    setCopy(gutter.current?.closest('[data-mobile="true"]') ? "sheet" : "rail");
+  }, []);
   return (
     <SidebarMenuItem className="relative">
       {/* The route: one faint dot per row in the gutter, and the cyan
           "you are here" dot that glides along it to the current row. */}
-      <span aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1 rounded-full bg-foreground/20" />
-      {active &&
-        (isMobile ? (
-          <span aria-hidden className={hereClass} />
-        ) : (
-          <motion.span
-            layoutId="cn-nav-here"
-            aria-hidden
-            className={hereClass}
-            transition={{ type: "spring", mass: 0.6, stiffness: 380, damping: 26 }}
-          />
-        ))}
+      <span ref={gutter} aria-hidden className="absolute -left-2.5 top-1/2 -mt-0.5 size-1 rounded-full bg-foreground/20" />
+      {active && copy && (
+        <motion.span
+          layoutId={`cn-nav-here-${copy}`}
+          aria-hidden
+          className="absolute -left-3 top-1/2 z-10 -mt-1 size-2 rounded-full bg-here ring-[3px] ring-here/20"
+          transition={{ type: "spring", mass: 0.6, stiffness: 380, damping: 26 }}
+        />
+      )}
       <SidebarMenuButton asChild icon={icon} isActive={active}>
         <Link to={to}>{label}</Link>
       </SidebarMenuButton>
