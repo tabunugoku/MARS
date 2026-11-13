@@ -2,25 +2,13 @@
 
 # Docker でのインストール
 
-このページでは、Docker で MARS を動かす手順を説明します。次の版では、公開イメージが再び利用できるようになる予定です。
+このページでは、Docker で MARS を動かす手順を説明します。公開イメージは `ghcr.io/tabunugoku/mars` です。
 
 ## 必要なもの
 
 - Docker（Docker Engine または Docker Desktop）と、Docker Compose（任意）
 - マンガやコミックを置いたフォルダ
 - `linux/amd64` または `linux/arm64` の環境
-
-## イメージを作る
-
-公開イメージは取り下げているため、ソースコードからイメージを作ります。Git と Docker が必要です。
-
-```sh
-git clone https://github.com/tabunugoku/MARS.git
-cd MARS
-docker build -t mars .
-```
-
-作られるイメージの名前は `mars` です。以下の例では、このイメージを使います。
 
 ## docker run で起動する
 
@@ -29,7 +17,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  mars
+  ghcr.io/tabunugoku/mars:0.1
 ```
 
 - `-v mars-data:/data` は、データベース、サムネイル、ページのキャッシュを保存します。`mars-data` は Docker が管理する名前付きボリュームです。
@@ -43,7 +31,7 @@ docker run -d --name mars \
 ```yaml
 services:
   mars:
-    image: mars
+    image: ghcr.io/tabunugoku/mars:0.1
     container_name: mars
     restart: unless-stopped
     ports:
@@ -108,32 +96,38 @@ docker compose up -d
 
 イメージにはシェルが入っていないため、`docker exec` でファイルを読むことはできません。ログか `docker cp` を使ってください。
 
+## イメージのタグ
+
+| タグ | 意味 |
+| --- | --- |
+| `0.1` | 0.1.x のすべてのリリースに追従します。通常はこのタグを使ってください |
+| `0.1.0` | この版だけを指定します |
+| `latest` | 最新のリリースです。新しいマイナー版やメジャー版が出ると、そちらに移ります |
+
+MARS は 0.x のあいだ、新しいマイナー版（0.2 など）で動作が変わることがあります。そのため、新しいマイナー版へは、タグを自分で変えて移行してください。
+
 ## アップグレード
 
 アップグレードの前に、データをバックアップしてください。手順は [バックアップ](../backup.ja.md) を参照してください。
 
-docker run で起動している場合は、ソースを更新してイメージを作り直し、コンテナを作り直します。
+docker run で起動している場合は、新しいイメージを取得してから、コンテナを作り直します。
 
 ```sh
-cd MARS
-git pull
-docker build -t mars .
+docker pull ghcr.io/tabunugoku/mars:0.1
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  mars
+  ghcr.io/tabunugoku/mars:0.1
 ```
 
 データは名前付きボリュームに残るため、作り直しても失われません。
 
-docker compose で起動している場合は、ソースを更新してイメージを作り直し、コンテナを作り直します。
+docker compose で起動している場合は、新しいイメージを取得してから、コンテナを起動し直します。
 
 ```sh
-cd MARS
-git pull
-docker build -t mars .
+docker compose pull
 docker compose up -d
 ```
 
@@ -170,3 +164,17 @@ Caddy、Traefik、nginx などのリバースプロキシで証明書を用意�
 環境変数の詳しい説明は [設定](../configuration.ja.md) を参照してください。
 
 アプリのインストール後は、起動するたびにサーバーから新しいバージョンを読み込みます。サーバーに接続できないときだけ、キャッシュされたアプリの画面を表示します。
+
+## イメージを自分でビルドする
+
+公開イメージを使わず、ソースコードからイメージを作ることもできます。Git と Docker が必要です。
+
+```sh
+git clone https://github.com/tabunugoku/MARS.git
+cd MARS
+docker build -t mars .
+```
+
+作られるイメージの名前は `mars` です。この場合は、上の例の `ghcr.io/tabunugoku/mars:0.1` を `mars` に置き換えてください。
+
+ソースから作ったイメージを更新するには、`git pull` でソースを更新してから `docker build -t mars .` をもう一度実行し、[アップグレード](#アップグレード) と同じようにコンテナを作り直してください。

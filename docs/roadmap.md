@@ -2,7 +2,7 @@ English | [日本語](roadmap.ja.md)
 
 # Roadmap
 
-v1.0.0 includes the features up to Phase 11. This page describes the plans after that.
+v0.1.0 (a preview) includes the features up to Phase 11. This page describes the plans after that.
 
 The order below is a guide. Priorities can change based on demand and bug reports. Send requests and feedback as [GitHub issues](https://github.com/tabunugoku/MARS/issues).
 

@@ -11,7 +11,7 @@ body:
     id: version
     attributes:
       label: Version
-      description: Commit or version you run, for example `main@abc1234`
+      description: Image tag or version you run, for example `0.1.0` or `main@abc1234`
     validations:
       required: true
   - type: dropdown

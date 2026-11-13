@@ -6,7 +6,7 @@
 
 *Your manga. Your server. Your universe.*
 
-> v1.0.0 は、大きなライブラリで不具合が見つかったため取り下げました。修正した版を準備しています。それまでは、ソースからビルドして使ってください。
+> 現在の版は v0.1.0（プレビュー版）です。v1.0.0 は、大きなライブラリで不具合が見つかったため取り下げました。
 
 ![MARS のホーム画面](docs/screenshots/desktop-home.ja.webp)
 
@@ -61,17 +61,14 @@ MARS は軽量でセルフホストできるコミック・マンガのサーバ
 
 ## クイックスタート
 
-Docker が使える環境で、リポジトリを取得してイメージを作り、起動します。`/path/to/comics` は、マンガのフォルダに置き換えてください。
+Docker が使える環境で、公開イメージを起動します。`/path/to/comics` は、マンガのフォルダに置き換えてください。
 
 ```sh
-git clone https://github.com/tabunugoku/MARS.git
-cd MARS
-docker build -t mars .
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  mars
+  ghcr.io/tabunugoku/mars:0.1
 ```
 
 1. ブラウザで http://localhost:25600 を開きます。

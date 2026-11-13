@@ -2,8 +2,6 @@
 
 # TrueNAS SCALE への MARS のインストール
 
-> 次の版を公開するまで、この手順は使えません。公開イメージ `ghcr.io/tabunugoku/mars` を取り下げているためです。
-
 このガイドは **TrueNAS SCALE 25.10（Goldeye）** と、Docker ベースの Apps を対象としています。MARS が必要とする 2 つのデータセット、`apps` ユーザーの権限、そしてカスタムアプリをインストールする 2 つの方法（**Install via YAML** と **Custom App** フォーム）を説明します。どちらか一方を選んでください。どちらの方法でも、同じアプリになります。
 
 例では、プール名を `tank` としています。お使いの環境に合わせて、プール名とパスを置き換えてください。
@@ -70,7 +68,7 @@ sudo cp -p mars.db mars.db.new && sudo mv mars.db.new mars.db
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:1
+    image: ghcr.io/tabunugoku/mars:0.1
     user: "568:568"
     restart: unless-stopped
     ports:
@@ -102,7 +100,7 @@ services:
 | --- | --- | --- |
 | Application Name | Application Name | `mars` |
 | Image Configuration | Repository | `ghcr.io/tabunugoku/mars` |
-| | Tag | `1` |
+| | Tag | `0.1` |
 | | Pull Policy | Only pull image if not present on host（既定値） |
 | Container Configuration | Timezone | お使いの時間帯 |
 | | Restart Policy | Unless Stopped |
@@ -145,8 +143,8 @@ services:
 
 ## 7. 更新とバックアップ
 
-- タグ `1` は 1.x のすべてのリリースに追従します。新しいイメージが公開されると、アプリに **Update** が表示されます。または **Pull Image** を使って、新しい `1` を取得できます。
-- タグ `2` へ変えるのは、2.0 が出たときだけにしてください。1.x のあいだは、タグ `1` のままで問題ありません。
+- タグ `0.1` は 0.1.x のすべてのリリースに追従します。新しいイメージが公開されると、アプリに **Update** が表示されます。または **Pull Image** を使って、新しい `0.1` を取得できます。
+- MARS は 0.x のあいだ、新しいマイナー版（0.2 など）で動作が変わることがあります。移行するときは、タグを `0.2` に変えてください。
 - データのデータセットには、定期的にスナップショットを設定してください。スナップショットを戻す前に、アプリを停止してください。データベースが開いたままファイルが書き換わると、データベースが壊れることがあります。
 
 ## 8. リバースプロキシの背後で使う場合
