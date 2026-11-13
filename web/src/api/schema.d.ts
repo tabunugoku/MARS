@@ -38,6 +38,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/fs/directories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Folders directly inside a server folder, for picking a library folder (administrators only)
+         * @description Lists only folders, never files. Names starting with a dot are left out.
+         *     An empty path starts at the filesystem root.
+         */
+        get: operations["listDirectories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/libraries": {
         parameters: {
             query?: never;
@@ -1261,6 +1282,20 @@ export interface components {
         LibraryKind: "manga" | "webtoon" | "comics" | "books";
         /** @enum {string} */
         ScanInterval: "off" | "hourly" | "daily" | "weekly";
+        DirectoryListing: {
+            /** @description The listed folder, cleaned and absolute */
+            path: string;
+            /** @description The folder above it; null at the root */
+            parent?: string | null;
+            directories: components["schemas"]["DirectoryEntry"][];
+        };
+        DirectoryEntry: {
+            name: string;
+            /** @description Absolute path of this folder */
+            path: string;
+            /** @description Whether the server can list it (a library folder must be readable) */
+            readable: boolean;
+        };
         Library: {
             id: string;
             name: string;
@@ -1922,6 +1957,31 @@ export interface operations {
                     "application/json": components["schemas"]["LoginScreen"];
                 };
             };
+        };
+    };
+    listDirectories: {
+        parameters: {
+            query?: {
+                /** @description Absolute folder path on the server; empty for the root */
+                path?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The folder and the folders in it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryListing"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
         };
     };
     listLibraries: {
