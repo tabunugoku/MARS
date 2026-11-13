@@ -45,6 +45,7 @@ var opAccess = map[string]access{
 	// Administration
 	"CreateLibrary": adminOnly, "UpdateLibrary": adminOnly, "DeleteLibrary": adminOnly, "ScanLibrary": adminOnly,
 	"AnalyzeBook": adminOnly, "ListTasks": adminOnly, "CancelTask": adminOnly, "ListMediaIssues": adminOnly, "EmptyTrash": adminOnly,
+	"ListTrash": adminOnly, "DeleteTrashedSeries": adminOnly, "DeleteTrashedBook": adminOnly,
 	"ListUsers": adminOnly, "CreateUser": adminOnly, "UpdateUser": adminOnly, "DeleteUser": adminOnly,
 	"GetSettings": adminOnly, "UpdateSettings": adminOnly,
 	"UpdateSeries": adminOnly, "UpdateBook": adminOnly,

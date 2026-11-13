@@ -924,6 +924,61 @@ export interface paths {
         patch: operations["updateSettings"];
         trace?: never;
     };
+    "/trash": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is in the trash (administrators only). Books inside a trashed series are counted on the series, not listed. */
+        get: operations["listTrash"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/series/{seriesId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one trashed series and its books from the database (administrators only; files are not touched) */
+        delete: operations["deleteTrashedSeries"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/trash/books/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Remove one trashed book from the database (administrators only; files are not touched) */
+        delete: operations["deleteTrashedBook"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/trash/empty": {
         parameters: {
             query?: never;
@@ -1721,6 +1776,32 @@ export interface components {
             opdsEnabled?: boolean;
             komgaApiEnabled?: boolean;
             loginBackdrop?: components["schemas"]["LoginBackdrop"];
+        };
+        TrashList: {
+            series: components["schemas"]["TrashedSeries"][];
+            books: components["schemas"]["TrashedBook"][];
+        };
+        TrashedSeries: {
+            id: string;
+            libraryId: string;
+            title: string;
+            /** @description Folder (or one-shot file) relative to the library root */
+            path: string;
+            /** Format: date-time */
+            deletedAt: string;
+            /** @description Books that go with it */
+            bookCount: number;
+        };
+        TrashedBook: {
+            id: string;
+            seriesId: string;
+            seriesTitle: string;
+            libraryId: string;
+            title: string;
+            /** @description File path relative to the library root */
+            path: string;
+            /** Format: date-time */
+            deletedAt: string;
         };
         TrashResult: {
             series: number;
@@ -3610,6 +3691,68 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    listTrash: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Trashed series and books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrashList"];
+                };
+            };
+        };
+    };
+    deleteTrashedSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                seriesId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteTrashedBook: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     emptyTrash: {
