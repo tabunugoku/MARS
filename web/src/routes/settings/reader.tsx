@@ -45,7 +45,8 @@ import { defineMessages, useT } from "@/i18n";
 const m = defineMessages({
   ja: {
     title: "リーダー設定",
-    meta: "すべての作品に使う表示設定です。PC 用とモバイル用があり、端末ごとにどちらを使うか選べます。シリーズや巻ごとの設定は、リーダーの表示設定で選べ、どちらの端末にも効きます。",
+    meta: "すべての作品に使う表示設定です。PC 用とモバイル用があり、端末ごとにどちらを使うか選べます。",
+    metaPerBook: "シリーズや巻ごとの設定は、リーダーの表示設定で選べ、どちらの端末にも効きます。",
     followSeries: "作品の指定に従う",
     thisDevice: "この端末",
     deviceSettings: "この端末で使う設定",
@@ -71,7 +72,8 @@ const m = defineMessages({
   },
   en: {
     title: "Reader settings",
-    meta: "The display settings for every work. There is a PC set and a mobile set, and each device can choose which one it uses. Series and volume settings are chosen in the reader's display settings and apply on both devices.",
+    meta: "The display settings for every work. There is a PC set and a mobile set, and each device can choose which one it uses.",
+    metaPerBook: "Series and volume settings are chosen in the reader's display settings and apply on both devices.",
     followSeries: "Follow the series",
     thisDevice: "This device",
     deviceSettings: "Settings for this device",
@@ -101,7 +103,18 @@ type Target = { kind: "series" | "book"; id: string };
 
 function Header() {
   const t = useT(m);
-  return <PageHeader title={t("title")} meta={t("meta")} />;
+  return (
+    <PageHeader
+      title={t("title")}
+      meta={
+        <>
+          {t("meta")}
+          <br />
+          {t("metaPerBook")}
+        </>
+      }
+    />
+  );
 }
 
 const profileOptions = () => Object.entries(profileLabel()) as [ReaderProfile, string][];
