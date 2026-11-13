@@ -490,89 +490,15 @@ func (s *server) UpdateSettings(ctx context.Context, req UpdateSettingsRequestOb
 // series cascades to its live books and their pages, progress and list
 // entries; those cascaded rows are not counted, only the rows named directly.
 func (s *server) EmptyTrash(ctx context.Context, _ EmptyTrashRequestObject) (EmptyTrashResponseObject, error) {
-	// A scan restores trashed rows by the ids it read earlier, across
-	// several commits: wait for running scans and hold new ones off.
-	resume, err := s.Library.PauseScans(ctx)
+	res, _, err := s.purgeTrash(ctx, "", "")
 	if err != nil {
 		return nil, err
-	}
-	defer resume()
-	tx, err := s.DB.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer tx.Rollback()
-	// Cover files of every book that goes, including those cascaded away.
-	rows, err := tx.QueryContext(ctx, `SELECT thumbnail FROM books WHERE thumbnail != '' AND
-		(deleted_at IS NOT NULL OR series_id IN (SELECT id FROM series WHERE deleted_at IS NOT NULL))`)
-	if err != nil {
-		return nil, err
-	}
-	var thumbs []string
-	for rows.Next() {
-		var name string
-		if err := rows.Scan(&name); err != nil {
-			rows.Close()
-			return nil, err
-		}
-		thumbs = append(thumbs, name)
-	}
-	rows.Close()
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	// Uploaded or local-artwork covers of series that go.
-	srows, err := tx.QueryContext(ctx, `SELECT thumbnail FROM series WHERE thumbnail != '' AND deleted_at IS NOT NULL`)
-	if err != nil {
-		return nil, err
-	}
-	for srows.Next() {
-		var name string
-		if err := srows.Scan(&name); err != nil {
-			srows.Close()
-			return nil, err
-		}
-		thumbs = append(thumbs, name)
-	}
-	srows.Close()
-	if err := srows.Err(); err != nil {
-		return nil, err
-	}
-
-	emptied, err := collectionsLosing(ctx, tx, `SELECT id FROM series WHERE deleted_at IS NOT NULL`)
-	if err != nil {
-		return nil, err
-	}
-
-	var res TrashResult
-	if res.Books, err = execCount(ctx, tx, `DELETE FROM books WHERE deleted_at IS NOT NULL`); err != nil {
-		return nil, err
-	}
-	if res.Series, err = execCount(ctx, tx, `DELETE FROM series WHERE deleted_at IS NOT NULL`); err != nil {
-		return nil, err
-	}
-	if err := dropEmptied(ctx, tx, emptied); err != nil {
-		return nil, err
-	}
-	// Search rows for the removed rows (the sync keeps the rest current).
-	if _, err := tx.ExecContext(ctx, `DELETE FROM search_rows
-		WHERE (kind = 'book' AND ref NOT IN (SELECT id FROM books))
-		   OR (kind = 'series' AND ref NOT IN (SELECT id FROM series))`); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	// Files go only after the rows are gone. A file left behind is harmless
-	// (its name is unique to a removed book), so errors are ignored.
-	for _, name := range thumbs {
-		s.Library.RemoveThumb(name)
 	}
 	return EmptyTrash200JSONResponse(res), nil
 }
 
-func execCount(ctx context.Context, tx *sql.Tx, q string) (int, error) {
-	res, err := tx.ExecContext(ctx, q)
+func execCount(ctx context.Context, tx *sql.Tx, q string, args ...any) (int, error) {
+	res, err := tx.ExecContext(ctx, q, args...)
 	if err != nil {
 		return 0, err
 	}

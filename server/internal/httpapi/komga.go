@@ -32,6 +32,20 @@ import (
 // returns everything, unknown filter or sort values are ignored, and a book
 // list (series books, read list books, /books) returns only books whose media
 // is READY unless media_status says otherwise.
+//
+// Supported (all under /komga/api/v1 unless noted):
+//   - libraries; series (list, new, updated, one, books, thumbnail)
+//   - books (list, latest, ondeck, one, thumbnail, pages, pages/{n} with
+//     convert=png, file, next, previous)
+//   - read lists (list, one, books, thumbnail) and collections (list, one,
+//     series, thumbnail)
+//   - genres, tags, publishers, authors (v1; v2 is paged and filterable)
+//   - users/me (v1 and v2)
+//   - read progress: the Tachiyomi tracker endpoints (komga_progress.go), and
+//     PATCH/DELETE books/{id}/read-progress, POST/DELETE series/{id}/read-progress
+//
+// Every one is scoped by libScope and the trash, as the main API is; anything
+// the caller may not see is 404 (or left out of a list).
 
 const (
 	komgaDefaultSize = 20
@@ -47,12 +61,19 @@ func (s *server) komgaRoutes(mux *http.ServeMux) {
 	const api = "GET /komga/api/v1/"
 	mux.HandleFunc(api+"libraries", s.komgaLibraries)
 	mux.HandleFunc(api+"series", s.komgaSeriesList)
+	mux.HandleFunc(api+"series/new", s.komgaSeriesRecent(Created))
+	mux.HandleFunc(api+"series/updated", s.komgaSeriesRecent(Updated))
 	mux.HandleFunc(api+"series/{seriesId}", s.komgaSeriesOne)
 	mux.HandleFunc(api+"series/{seriesId}/books", s.komgaSeriesBooks)
 	mux.HandleFunc(api+"series/{seriesId}/thumbnail", s.serveThumbnail("series", true))
 	mux.HandleFunc(api+"books", s.komgaBookList)
+	mux.HandleFunc(api+"books/ondeck", s.komgaOnDeck)
+	mux.HandleFunc(api+"books/latest", s.komgaLatestBooks)
 	mux.HandleFunc(api+"books/{bookId}", s.komgaBookOne)
 	mux.HandleFunc(api+"books/{bookId}/thumbnail", s.serveThumbnail("book", true))
+	mux.HandleFunc(api+"books/{bookId}/file", s.serveBookFile)
+	mux.HandleFunc(api+"books/{bookId}/next", s.komgaSiblingBook(true))
+	mux.HandleFunc(api+"books/{bookId}/previous", s.komgaSiblingBook(false))
 	mux.HandleFunc(api+"books/{bookId}/pages", s.komgaPages)
 	mux.HandleFunc(api+"books/{bookId}/pages/{page}", s.komgaPage)
 	mux.HandleFunc(api+"readlists", s.komgaReadLists)
@@ -60,7 +81,12 @@ func (s *server) komgaRoutes(mux *http.ServeMux) {
 	mux.HandleFunc(api+"readlists/{readListId}/books", s.komgaReadListBooks)
 	mux.HandleFunc(api+"readlists/{readListId}/thumbnail", s.komgaReadListThumbnail)
 	mux.HandleFunc(api+"collections", s.komgaCollections)
+	mux.HandleFunc(api+"collections/{collectionId}", s.komgaCollectionOne)
 	mux.HandleFunc(api+"collections/{collectionId}/series", s.komgaCollectionSeries)
+	mux.HandleFunc(api+"collections/{collectionId}/thumbnail", s.komgaCollectionThumbnail)
+	mux.HandleFunc(api+"users/me", s.komgaUserMe)
+	mux.HandleFunc("GET /komga/api/v2/users/me", s.komgaUserMe)
+	mux.HandleFunc("GET /komga/api/v2/authors", s.komgaAuthorListV2)
 	mux.HandleFunc(api+"genres", s.komgaStrings(`g.value`, `, json_each(s.genres) g`, ``))
 	mux.HandleFunc(api+"tags", s.komgaStrings(`t.value`, `, json_each(s.tags) t`, ``))
 	mux.HandleFunc(api+"publishers", s.komgaStrings(`s.publisher`, ``, ` AND s.publisher <> ''`))
@@ -286,6 +312,27 @@ func (s *server) komgaSeriesList(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, komgaWrap(komgaMap(items, komgaSeries), total, pg))
 }
 
+// komgaSeriesRecent lists the visible series newest first by the given sort
+// (Created for /series/new, Updated for /series/updated), paged, and takes
+// library_id like the other series lists.
+func (s *server) komgaSeriesRecent(by SeriesSort) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		q, pg := r.URL.Query(), komgaPagingOf(r)
+		if komgaDeletedOnly(q) {
+			writeJSON(w, http.StatusOK, komgaWrap([]KomgaSeriesDto{}, 0, pg))
+			return
+		}
+		desc := true
+		p := ListSeriesParams{Sort: &by, Desc: &desc}
+		items, total, err := s.komgaSeriesPage(r.Context(), p, komgaValues(q["library_id"]), pg)
+		if err != nil {
+			s.komgaFail(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, komgaWrap(komgaMap(items, komgaSeries), total, pg))
+	}
+}
+
 func (s *server) komgaSeriesOne(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	x, ok, err := s.oneSeries(ctx, r.PathValue("seriesId"))
@@ -423,6 +470,95 @@ func (s *server) komgaSeriesBooks(w http.ResponseWriter, r *http.Request) {
 }
 
 // ─── Books ───────────────────────────────────────────────────────────────────
+
+// komgaLibraryWhere is the library_id condition on books b, with its
+// arguments (none when no library is named).
+func komgaLibraryWhere(q url.Values) (string, []any) {
+	libs := komgaValues(q["library_id"])
+	if len(libs) == 0 {
+		return "", nil
+	}
+	args := make([]any, len(libs))
+	for i, l := range libs {
+		args[i] = l
+	}
+	return ` AND b.library_id IN (` + placeholders(len(libs)) + `)`, args
+}
+
+// komgaWriteBooks answers page pg of the books selected by where and tail
+// (see komgaBooks) as a Komga page.
+func (s *server) komgaWriteBooks(w http.ResponseWriter, r *http.Request, where string, args []any, tail string, tailArgs []any, pg komgaPaging) {
+	items, total, err := s.komgaBooks(r.Context(), where, args, tail, tailArgs, pg)
+	if err != nil {
+		s.komgaFail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, komgaWrap(komgaMap(items, komgaBook), total, pg))
+}
+
+// komgaOnDeck is GET /books/ondeck: the same books as the main API's on-deck
+// list (onDeckWhere, in the same order), paged, and library_id.
+func (s *server) komgaOnDeck(w http.ResponseWriter, r *http.Request) {
+	q, pg := r.URL.Query(), komgaPagingOf(r)
+	if komgaDeletedOnly(q) {
+		writeJSON(w, http.StatusOK, komgaWrap([]KomgaBookDto{}, 0, pg))
+		return
+	}
+	uid := currentUser(r.Context()).ID
+	lw, la := komgaLibraryWhere(q)
+	// onDeckWhere binds the caller's id three times, the ORDER BY once more.
+	args := append([]any{uid, uid, uid}, la...)
+	tail := `ORDER BY (SELECT max(sr.read_at) FROM books sb
+	  CROSS JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
+	  WHERE sb.series_id = b.series_id AND sb.deleted_at IS NULL) DESC, b.id`
+	s.komgaWriteBooks(w, r, onDeckWhere+lw, args, tail, []any{uid}, pg)
+}
+
+// komgaLatestBooks is GET /books/latest: the books the caller may see, newest
+// added first, paged, and library_id.
+func (s *server) komgaLatestBooks(w http.ResponseWriter, r *http.Request) {
+	q, pg := r.URL.Query(), komgaPagingOf(r)
+	if komgaDeletedOnly(q) {
+		writeJSON(w, http.StatusOK, komgaWrap([]KomgaBookDto{}, 0, pg))
+		return
+	}
+	lw, la := komgaLibraryWhere(q)
+	s.komgaWriteBooks(w, r, lw, la, `ORDER BY b.created_at DESC, b.id DESC`, nil, pg)
+}
+
+// komgaSiblingBook answers the next (or, when !next, the previous) visible
+// live book of the same series in number, path order. None is 404.
+func (s *server) komgaSiblingBook(next bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		cur, ok, err := s.oneBook(ctx, r.PathValue("bookId"))
+		if err != nil {
+			s.komgaFail(w, r, err)
+			return
+		}
+		if !ok {
+			writeError(ctx, w, http.StatusNotFound, "not_found.book")
+			return
+		}
+		var list []Book
+		if next {
+			list, err = s.listBooks(ctx, ` AND b.series_id = ? AND (b.number_sort, b.path) > (?, ?)`,
+				`ORDER BY b.number_sort, b.path LIMIT 1`, cur.SeriesId, cur.NumberSort, cur.Path)
+		} else {
+			list, err = s.listBooks(ctx, ` AND b.series_id = ? AND (b.number_sort, b.path) < (?, ?)`,
+				`ORDER BY b.number_sort DESC, b.path DESC LIMIT 1`, cur.SeriesId, cur.NumberSort, cur.Path)
+		}
+		if err != nil {
+			s.komgaFail(w, r, err)
+			return
+		}
+		if len(list) == 0 {
+			writeError(ctx, w, http.StatusNotFound, "not_found.book")
+			return
+		}
+		writeJSON(w, http.StatusOK, komgaBook(list[0]))
+	}
+}
 
 // komgaBookList is GET /books: the books the caller may see, filtered by
 // search, library_id, read_status and media_status.
@@ -718,21 +854,68 @@ func (s *server) komgaCollections(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, komgaWrap(komgaMap(komgaSlice(all, pg), komgaCollection), len(all), pg))
 }
 
+// komgaCollectionMembers returns a collection's visible series in its order;
+// ok is false when the caller may not see the collection.
+func (s *server) komgaCollectionMembers(ctx context.Context, id string) (series []Series, ok bool, err error) {
+	resp, err := s.ListCollectionSeries(ctx, ListCollectionSeriesRequestObject{CollectionId: id})
+	if err != nil {
+		return nil, false, err
+	}
+	all, ok := resp.(ListCollectionSeries200JSONResponse)
+	return []Series(all), ok, nil
+}
+
 // komgaCollectionSeries lists a collection's visible series, in its order.
 func (s *server) komgaCollectionSeries(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	resp, err := s.ListCollectionSeries(ctx, ListCollectionSeriesRequestObject{CollectionId: r.PathValue("collectionId")})
+	all, ok, err := s.komgaCollectionMembers(ctx, r.PathValue("collectionId"))
 	if err != nil {
 		s.komgaFail(w, r, err)
 		return
 	}
-	all, ok := resp.(ListCollectionSeries200JSONResponse)
 	if !ok {
 		writeError(ctx, w, http.StatusNotFound, "not_found.collection")
 		return
 	}
 	pg := komgaPagingOf(r)
-	writeJSON(w, http.StatusOK, komgaWrap(komgaMap(komgaSlice([]Series(all), pg), komgaSeries), len(all), pg))
+	writeJSON(w, http.StatusOK, komgaWrap(komgaMap(komgaSlice(all, pg), komgaSeries), len(all), pg))
+}
+
+// komgaCollectionOne is GET /collections/{id}: one collection, as the list
+// shows it.
+func (s *server) komgaCollectionOne(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	cs, err := s.collections(ctx, ` WHERE id = ?`, r.PathValue("collectionId"))
+	if err != nil {
+		s.komgaFail(w, r, err)
+		return
+	}
+	if len(cs) == 0 {
+		writeError(ctx, w, http.StatusNotFound, "not_found.collection")
+		return
+	}
+	writeJSON(w, http.StatusOK, komgaCollection(cs[0]))
+}
+
+// komgaCollectionThumbnail is the thumbnail of the collection's first visible
+// series, as a JPEG.
+func (s *server) komgaCollectionThumbnail(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	all, ok, err := s.komgaCollectionMembers(ctx, r.PathValue("collectionId"))
+	if err != nil {
+		s.komgaFail(w, r, err)
+		return
+	}
+	if !ok {
+		writeError(ctx, w, http.StatusNotFound, "not_found.collection")
+		return
+	}
+	if len(all) == 0 {
+		writeError(ctx, w, http.StatusNotFound, "not_found.cover")
+		return
+	}
+	// The members are already limited to series the caller may see.
+	s.sendThumbnail(w, r, "series", all[0].Id, true)
 }
 
 // ─── Filter options ──────────────────────────────────────────────────────────
@@ -750,30 +933,89 @@ func (s *server) komgaStrings(expr, from, cond string) http.HandlerFunc {
 	}
 }
 
-// komgaAuthorList answers the distinct author names with their roles.
-func (s *server) komgaAuthorList(w http.ResponseWriter, r *http.Request) {
-	scope, args := libScope(r.Context(), "s.library_id")
-	rows, err := s.DB.QueryContext(r.Context(), `SELECT DISTINCT json_extract(a.value, '$.name'), json_extract(a.value, '$.role')
+// komgaAuthorRows returns the distinct author names and roles of the live
+// series that where (a condition on series s, with args) selects.
+func (s *server) komgaAuthorRows(ctx context.Context, where string, args []any) ([]KomgaAuthorDto, error) {
+	rows, err := s.DB.QueryContext(ctx, `SELECT DISTINCT json_extract(a.value, '$.name'), json_extract(a.value, '$.role')
 		FROM series s, json_each(s.authors) a
-		WHERE s.deleted_at IS NULL AND `+scope+` AND json_extract(a.value, '$.name') <> ''
+		WHERE s.deleted_at IS NULL AND `+where+` AND json_extract(a.value, '$.name') <> ''
 		ORDER BY 1, 2`, args...)
 	if err != nil {
-		s.komgaFail(w, r, err)
-		return
+		return nil, err
 	}
 	defer rows.Close()
 	out := []KomgaAuthorDto{}
 	for rows.Next() {
 		var a KomgaAuthorDto
 		if err := rows.Scan(&a.Name, &a.Role); err != nil {
-			s.komgaFail(w, r, err)
-			return
+			return nil, err
 		}
 		out = append(out, a)
 	}
-	if err := rows.Err(); err != nil {
+	return out, rows.Err()
+}
+
+// komgaAuthorList answers the distinct author names with their roles.
+func (s *server) komgaAuthorList(w http.ResponseWriter, r *http.Request) {
+	scope, args := libScope(r.Context(), "s.library_id")
+	out, err := s.komgaAuthorRows(r.Context(), scope, args)
+	if err != nil {
 		s.komgaFail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, out)
+}
+
+// komgaAuthorListV2 is GET /api/v2/authors: the same authors, paged, and
+// filtered by search (name), role, library_id, collection_id and series_id.
+// Each filter is optional; a value that matches nothing gives an empty page.
+func (s *server) komgaAuthorListV2(w http.ResponseWriter, r *http.Request) {
+	q, pg := r.URL.Query(), komgaPagingOf(r)
+	if komgaDeletedOnly(q) {
+		writeJSON(w, http.StatusOK, komgaWrap([]KomgaAuthorDto{}, 0, pg))
+		return
+	}
+	ctx := r.Context()
+	where, args := libScope(ctx, "s.library_id")
+	if v := strings.TrimSpace(q.Get("search")); v != "" {
+		where += ` AND json_extract(a.value, '$.name') LIKE ? ESCAPE '\'`
+		args = append(args, likePattern(v))
+	}
+	if roles := komgaValues(q["role"]); len(roles) > 0 {
+		where += ` AND lower(json_extract(a.value, '$.role')) IN (` + placeholders(len(roles)) + `)`
+		for _, v := range roles {
+			args = append(args, strings.ToLower(v))
+		}
+	}
+	if libs := komgaValues(q["library_id"]); len(libs) > 0 {
+		where += ` AND s.library_id IN (` + placeholders(len(libs)) + `)`
+		args = append(args, anyStrings(libs)...)
+	}
+	if cols := komgaValues(q["collection_id"]); len(cols) > 0 {
+		where += ` AND s.id IN (SELECT series_id FROM collection_series WHERE collection_id IN (` + placeholders(len(cols)) + `))`
+		args = append(args, anyStrings(cols)...)
+	}
+	if ids := komgaValues(q["series_id"]); len(ids) > 0 {
+		where += ` AND s.id IN (` + placeholders(len(ids)) + `)`
+		args = append(args, anyStrings(ids)...)
+	}
+	all, err := s.komgaAuthorRows(ctx, where, args)
+	if err != nil {
+		s.komgaFail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, komgaWrap(komgaSlice(all, pg), len(all), pg))
+}
+
+// komgaUserMe is GET /users/me (v1 and v2): the caller's account in Komga's
+// shape. The email is the sign-in email; the roles and sharing follow the
+// caller's permissions.
+func (s *server) komgaUserMe(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	u, err := s.userByID(ctx, currentUser(ctx).ID)
+	if err != nil {
+		s.komgaFail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, komgaUserDto(u, currentUser(ctx).IsAdmin(), canDownload(ctx), canStream(ctx)))
 }

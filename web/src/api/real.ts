@@ -6,7 +6,7 @@ import type {
   Dashboard, Health, Library, LibraryCreate, LibraryUpdate, LoginRequest, LoginScreen, MediaIssue, Page,
   ReaderPrefsAll, ReadList, ReadListCreate, ReadListUpdate, ReadProgress, SearchResult, Series, SeriesQuery,
   SeriesFacets, SeriesBulkUpdate, BookBulkUpdate, BulkResult, CblImportResult,
-  SeriesUpdate, ServerSettings, SetupRequest, Task, TrashResult, User, UserCreate, UserUpdate,
+  SeriesUpdate, ServerSettings, SetupRequest, Task, TrashList, TrashResult, User, UserCreate, UserUpdate,
 } from "./types";
 import type { GlobalReaderPrefs, ReaderPrefs, ReaderProfile } from "./reader-prefs";
 
@@ -158,6 +158,9 @@ export const realApi = {
   tasks: () => get<Task[]>("/tasks"),
   cancelTask: (id: string) => request<void>("POST", `/tasks/${enc(id)}/cancel`),
   mediaIssues: () => get<MediaIssue[]>("/media/issues"),
+  trash: () => get<TrashList>("/trash"),
+  deleteTrashedSeries: (id: string) => request<void>("DELETE", `/trash/series/${enc(id)}`),
+  deleteTrashedBook: (id: string) => request<void>("DELETE", `/trash/books/${enc(id)}`),
   emptyTrash: () => request<TrashResult>("POST", "/trash/empty"),
   settings: () => get<ServerSettings>("/settings"),
   /** Sends only the changed fields; the server merges them into the stored

@@ -992,6 +992,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/ServerSettings" }
         "400": { $ref: "#/components/responses/BadRequest" }
+  /trash:
+    get:
+      operationId: listTrash
+      summary: What is in the trash (administrators only). Books inside a trashed series are counted on the series, not listed.
+      responses:
+        "200":
+          description: Trashed series and books
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TrashList" }
+  /trash/series/{seriesId}:
+    parameters:
+      - { name: seriesId, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: deleteTrashedSeries
+      summary: Remove one trashed series and its books from the database (administrators only; files are not touched)
+      responses:
+        "204": { description: Removed }
+        "404": { $ref: "#/components/responses/NotFound" }
+  /trash/books/{bookId}:
+    parameters:
+      - { name: bookId, in: path, required: true, schema: { type: string } }
+    delete:
+      operationId: deleteTrashedBook
+      summary: Remove one trashed book from the database (administrators only; files are not touched)
+      responses:
+        "204": { description: Removed }
+        "404": { $ref: "#/components/responses/NotFound" }
   /trash/empty:
     post:
       operationId: emptyTrash
@@ -1836,6 +1864,33 @@ components:
         opdsEnabled: { type: boolean }
         komgaApiEnabled: { type: boolean }
         loginBackdrop: { $ref: "#/components/schemas/LoginBackdrop" }
+    TrashList:
+      type: object
+      required: [series, books]
+      properties:
+        series: { type: array, items: { $ref: "#/components/schemas/TrashedSeries" } }
+        books: { type: array, items: { $ref: "#/components/schemas/TrashedBook" } }
+    TrashedSeries:
+      type: object
+      required: [id, libraryId, title, path, deletedAt, bookCount]
+      properties:
+        id: { type: string }
+        libraryId: { type: string }
+        title: { type: string }
+        path: { type: string, description: "Folder (or one-shot file) relative to the library root" }
+        deletedAt: { type: string, format: date-time }
+        bookCount: { type: integer, description: "Books that go with it" }
+    TrashedBook:
+      type: object
+      required: [id, seriesId, seriesTitle, libraryId, title, path, deletedAt]
+      properties:
+        id: { type: string }
+        seriesId: { type: string }
+        seriesTitle: { type: string }
+        libraryId: { type: string }
+        title: { type: string }
+        path: { type: string, description: "File path relative to the library root" }
+        deletedAt: { type: string, format: date-time }
     TrashResult:
       type: object
       required: [series, books]
