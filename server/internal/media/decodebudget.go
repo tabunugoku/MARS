@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"image"
+	"io"
 	"sync"
 	"sync/atomic"
 
@@ -105,7 +106,11 @@ func DecodeBudgeted(ctx context.Context, img []byte) (image.Image, func(), error
 	if err != nil {
 		return nil, nil, err
 	}
-	src, _, err := image.Decode(bytes.NewReader(img))
+	var r io.Reader = bytes.NewReader(img)
+	if format == "jpeg" {
+		r = jpegReader(img)
+	}
+	src, _, err := image.Decode(r)
 	if err != nil {
 		release()
 		return nil, nil, err

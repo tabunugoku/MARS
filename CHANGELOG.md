@@ -5,6 +5,13 @@ All notable changes to MARS are listed here. Versions follow
 `ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
 (0.x releases get no `X` tag).
 
+## Unreleased
+
+### Fixed
+
+- CMYK JPEG pages without an Adobe marker (common in print-resolution scans) now get covers and page thumbnails; they failed with "4-component JPEG doesn't have Adobe APP14 metadata".
+- A page whose thumbnail cannot be made is not decoded again on every page-list open (until the book file changes or the server restarts), and the warning is logged once.
+
 ## 0.1.1 — 2026-11-14
 
 Faster analysis and thumbnails.
