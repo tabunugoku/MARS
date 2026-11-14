@@ -40,20 +40,40 @@ type PageThumb struct {
 // errStale: the book file changed while a thumbnail was being made.
 var errStale = errors.New("page thumbnail: book changed")
 
+// ErrPageThumbFailed is returned for a page whose thumbnail already failed for
+// this book version; callers need not log it again.
+var ErrPageThumbFailed = errors.New("page thumbnail: failed before")
+
+// maxPageThumbFailed bounds the failed set; at this size it is emptied.
+const maxPageThumbFailed = 4096
+
 type pageThumbs struct {
 	once     sync.Once
 	sem      chan struct{}
 	mu       sync.Mutex
 	inflight map[string]chan struct{}
-	written  int64      // bytes written since the last prune
-	publish  sync.Mutex // a new file and the removal of older versions
+	failed   map[string]struct{} // thumbnail paths that failed to decode or make
+	written  int64               // bytes written since the last prune
+	publish  sync.Mutex          // a new file and the removal of older versions
 }
 
 func (p *pageThumbs) init() {
 	p.once.Do(func() {
 		p.sem = make(chan struct{}, pageThumbWorkers)
 		p.inflight = map[string]chan struct{}{}
+		p.failed = map[string]struct{}{}
 	})
+}
+
+// recordFailure remembers that the thumbnail at path cannot be made, so later
+// requests do not decode the page again.
+func (p *pageThumbs) recordFailure(path string) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if len(p.failed) >= maxPageThumbFailed {
+		p.failed = map[string]struct{}{}
+	}
+	p.failed[path] = struct{}{}
 }
 
 // PageThumbnail returns the thumbnail of page n, making it on first use.
@@ -76,6 +96,10 @@ func (s *Service) PageThumbnail(ctx context.Context, bookID string, n int) (Page
 			return PageThumb{File: f, ETag: fmt.Sprintf(`"t-%s-%d-%s"`, bookID, n, v), Version: v}, nil
 		}
 		p.mu.Lock()
+		if _, bad := p.failed[path]; bad {
+			p.mu.Unlock()
+			return PageThumb{}, ErrPageThumbFailed
+		}
 		wait, busy := p.inflight[path]
 		if !busy {
 			wait = make(chan struct{})
@@ -145,10 +169,12 @@ func (s *Service) makePageThumb(ctx context.Context, bookID string, n int, v, pa
 		return err
 	}
 	if len(img) > media.MaxEntryBytes {
+		p.recordFailure(path)
 		return media.ErrTooLarge
 	}
 	jpg, err := media.Thumbnail(img, pageThumbW, pageThumbH, media.FormatJPEG)
 	if err != nil {
+		p.recordFailure(path)
 		return err
 	}
 	dir := filepath.Dir(path)
