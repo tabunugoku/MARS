@@ -63,6 +63,9 @@ type Service struct {
 	// ThumbFormat gives the encoding (JPEG, WebP or AVIF) of thumbnails made
 	// from now on; nil means JPEG. Page thumbnails are always JPEG.
 	ThumbFormat func(ctx context.Context) media.Format
+	// AnalyzeWorkers is how many books of one library are analysed at once;
+	// 0 or less means 1.
+	AnalyzeWorkers int
 
 	scanLocks  sync.Map     // library id -> ctxMutex; one walk+sync at a time per library
 	coverLocks sync.Map     // book id -> ctxMutex; see coverLock
@@ -310,22 +313,9 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 			todo = append(todo, id)
 		}
 		rows.Close()
-		infos := map[string]map[string]scan.ComicInfo{} // series id -> book id -> ComicInfo
-		for i, id := range todo {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			seriesID, ci, err := s.analyzeBook(ctx, l, id)
-			if err != nil {
-				return err // only database errors stop the task; bad files are recorded per book
-			}
-			if ci != nil {
-				if infos[seriesID] == nil {
-					infos[seriesID] = map[string]scan.ComicInfo{}
-				}
-				infos[seriesID][id] = *ci
-			}
-			progress(float64(i+1) / float64(len(todo)))
+		infos, err := s.analyzeBooks(ctx, l, todo, progress)
+		if err != nil {
+			return err
 		}
 		if len(todo) == 0 {
 			return nil
@@ -368,6 +358,74 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 		s.Events.Publish(events.Event{Type: "library", LibraryID: l.id, Data: events.Library{LibraryID: l.id, BooksChanged: len(todo)}})
 		return nil
 	})
+}
+
+// analyzeBooks analyses the books in todo, up to AnalyzeWorkers at a time,
+// and returns the ComicInfo of each book that has one, by series id and then
+// book id. Only a database error stops the run: the first one is returned,
+// and the books still running are cancelled and waited for. Bad files are
+// recorded per book by analyzeBook. progress gets the share of books done;
+// calls are serialised, so the values rise to 1.
+func (s *Service) analyzeBooks(ctx context.Context, l lib, todo []string, progress func(float64)) (map[string]map[string]scan.ComicInfo, error) {
+	workers := min(max(s.AnalyzeWorkers, 1), max(len(todo), 1))
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		mu       sync.Mutex // guards infos, done, firstErr and the progress calls
+		infos    = map[string]map[string]scan.ComicInfo{}
+		done     int
+		firstErr error
+		wg       sync.WaitGroup
+	)
+	jobs := make(chan string)
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for id := range jobs {
+				seriesID, ci, err := s.analyzeBook(wctx, l, id)
+				mu.Lock()
+				if err != nil {
+					if firstErr == nil {
+						firstErr = err
+					}
+					mu.Unlock()
+					cancel()
+					continue
+				}
+				if ci != nil {
+					if infos[seriesID] == nil {
+						infos[seriesID] = map[string]scan.ComicInfo{}
+					}
+					infos[seriesID][id] = *ci
+				}
+				done++
+				progress(float64(done) / float64(len(todo)))
+				mu.Unlock()
+			}
+		}()
+	}
+send:
+	for _, id := range todo {
+		select {
+		case jobs <- id:
+		case <-wctx.Done():
+			break send
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if done < len(todo) {
+		return nil, ctx.Err()
+	}
+	return infos, nil
 }
 
 // version is what the last scan recorded for a book file. Analysis results

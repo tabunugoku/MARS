@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 type zipFile struct {
@@ -19,8 +20,31 @@ type zipArchive struct {
 	byName map[string]*zip.File // first entry for each name
 }
 
+// readObserver, when set, is told how many bytes each read of a zip file
+// returned. See SetReadObserver.
+var readObserver atomic.Pointer[func(n int)]
+
+// SetReadObserver makes every read of a zip archive's file report its byte
+// count to fn until the returned function is called. It is instrumentation
+// for benchmarks and tests; nothing sets it in production.
+func SetReadObserver(fn func(n int)) (restore func()) {
+	prev := readObserver.Swap(&fn)
+	return func() { readObserver.Store(prev) }
+}
+
+// observedReaderAt is the file as zip.Reader sees it, counting reads.
+type observedReaderAt struct{ f *os.File }
+
+func (o observedReaderAt) ReadAt(p []byte, off int64) (int, error) {
+	n, err := o.f.ReadAt(p, off)
+	if fn := readObserver.Load(); fn != nil {
+		(*fn)(n)
+	}
+	return n, err
+}
+
 func openZip(file *os.File, size int64) (Archive, error) {
-	zr, err := zip.NewReader(file, size)
+	zr, err := zip.NewReader(observedReaderAt{file}, size)
 	if err != nil {
 		file.Close()
 		return nil, headerErr(err)
@@ -94,3 +118,15 @@ func (z *zipArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error)
 func (z *zipArchive) RandomAccess() bool { return true }
 
 func (z *zipArchive) Close() error { return z.file.Close() }
+
+// HeaderSkipCheap reports whether an entry can be left part-read: the reader
+// handed to Walk may stop after an entry's header without reading the rest,
+// and the cost is a seek, not decompression. Only zip qualifies. Each zip
+// entry is compressed independently and the central directory records its
+// uncompressed size, so the rest of an entry is never needed to reach the
+// next one. RAR, 7z and PDF do not qualify because their entries share state
+// or must be decoded in order, and skipping them would still decompress.
+func HeaderSkipCheap(a Archive) bool {
+	_, ok := a.(*zipArchive)
+	return ok
+}

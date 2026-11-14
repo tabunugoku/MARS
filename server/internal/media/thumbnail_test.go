@@ -150,3 +150,30 @@ func BenchmarkJPEGPageThumbnail(b *testing.B) {
 		}
 	}
 }
+
+// BenchmarkJPEGPageThumbnailWebP is BenchmarkJPEGPageThumbnail with a WebP
+// thumbnail.
+func BenchmarkJPEGPageThumbnailWebP(b *testing.B) {
+	benchJPEGPageThumbnail(b, FormatWebP)
+}
+
+// BenchmarkJPEGPageThumbnailAVIF is BenchmarkJPEGPageThumbnail with an AVIF
+// thumbnail.
+func BenchmarkJPEGPageThumbnailAVIF(b *testing.B) {
+	benchJPEGPageThumbnail(b, FormatAVIF)
+}
+
+func benchJPEGPageThumbnail(b *testing.B, f Format) {
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, realisticPage(1600, 2400), &jpeg.Options{Quality: 60}); err != nil {
+		b.Fatal(err)
+	}
+	page := buf.Bytes()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := Thumbnail(page, 400, 600, f); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

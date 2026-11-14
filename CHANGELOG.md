@@ -5,6 +5,14 @@ All notable changes to MARS are listed here. Versions follow
 `ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
 (0.x releases get no `X` tag).
 
+## Unreleased
+
+### Changed
+
+- Analysis of CBZ/ZIP books reads only the header of each page except the cover, instead of the whole archive. A damaged page body is now found when the page is opened, not during analysis.
+- Books of one library are analysed in parallel (up to 4 at a time, never more than the task threads).
+- Thumbnails are made about 40% faster: large pages are first shrunk by a box average, then resized.
+
 ## 0.1.0 — 2026-11-14
 
 A preview release. It has every feature of the withdrawn 1.0.0 (listed
