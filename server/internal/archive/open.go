@@ -8,6 +8,13 @@ import (
 	"strings"
 )
 
+// IsPDF reports whether a book file with this name is read as a PDF, by the
+// same extension rule OpenPath uses.
+func IsPDF(name string) bool {
+	f, ok := formatOf(name)
+	return ok && f == PDF
+}
+
 func formatOf(name string) (Format, bool) {
 	switch strings.ToLower(filepath.Ext(name)) {
 	case ".cbz", ".zip":

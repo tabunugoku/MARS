@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync/atomic"
 )
 
 type zipFile struct {
@@ -20,31 +19,8 @@ type zipArchive struct {
 	byName map[string]*zip.File // first entry for each name
 }
 
-// readObserver, when set, is told how many bytes each read of a zip file
-// returned. See SetReadObserver.
-var readObserver atomic.Pointer[func(n int)]
-
-// SetReadObserver makes every read of a zip archive's file report its byte
-// count to fn until the returned function is called. It is instrumentation
-// for benchmarks and tests; nothing sets it in production.
-func SetReadObserver(fn func(n int)) (restore func()) {
-	prev := readObserver.Swap(&fn)
-	return func() { readObserver.Store(prev) }
-}
-
-// observedReaderAt is the file as zip.Reader sees it, counting reads.
-type observedReaderAt struct{ f *os.File }
-
-func (o observedReaderAt) ReadAt(p []byte, off int64) (int, error) {
-	n, err := o.f.ReadAt(p, off)
-	if fn := readObserver.Load(); fn != nil {
-		(*fn)(n)
-	}
-	return n, err
-}
-
 func openZip(file *os.File, size int64) (Archive, error) {
-	zr, err := zip.NewReader(observedReaderAt{file}, size)
+	zr, err := zip.NewReader(file, size)
 	if err != nil {
 		file.Close()
 		return nil, headerErr(err)

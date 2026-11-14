@@ -35,6 +35,11 @@ const pdfRenderLongSide = 2000
 // single-threaded, so each slot is one instance in the pool.
 const pdfRenderSlots = 2
 
+// PDFRenderSlots is the number of PDF pages that can be drawn at once. Callers
+// that run PDF analyses in parallel limit themselves to it, so the wait for an
+// instance happens before a caller's timeout starts.
+const PDFRenderSlots = pdfRenderSlots
+
 // pdfiumMemoryPages caps one instance's WebAssembly memory, in 64 KiB pages:
 // 1 GiB. A page needing more fails to draw instead of growing the process.
 const pdfiumMemoryPages = 16384

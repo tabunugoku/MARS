@@ -137,6 +137,7 @@ func TestAnalyzeBooksWorkersGiveSameRows(t *testing.T) {
 	var snaps []string
 	for _, workers := range []int{1, 4} {
 		s.AnalyzeWorkers = workers
+		s.analysisSlots = slotPool{} // the limit is fixed at first use; each count needs its own
 		var mu sync.Mutex
 		var seen []float64
 		_, err := s.analyzeBooks(ctx, l, todo, func(p float64) {
