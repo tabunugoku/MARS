@@ -13,6 +13,7 @@ import (
 	"io"
 	"log/slog"
 	"path/filepath"
+	"runtime/debug"
 	"slices"
 	"strings"
 	"sync"
@@ -63,6 +64,21 @@ type Service struct {
 	// ThumbFormat gives the encoding (JPEG, WebP or AVIF) of thumbnails made
 	// from now on; nil means JPEG. Page thumbnails are always JPEG.
 	ThumbFormat func(ctx context.Context) media.Format
+	// AnalyzeWorkers is how many books are analysed at once across the whole
+	// service, all libraries and tasks together; 0 or less means 1. It is
+	// read at the first analysis and fixes the size of the limit.
+	AnalyzeWorkers int
+
+	// analysisSlots bounds the books analysed at once (AnalyzeWorkers).
+	// pdfSlots bounds the PDF books among them to archive.PDFRenderSlots,
+	// so a PDF waits for a renderer outside its analysis timeout.
+	analysisSlots slotPool
+	pdfSlots      slotPool
+	pdfSlotSize   int // test override of archive.PDFRenderSlots; 0 means that
+	// analyzeHook, when set, runs as each book's analysis starts, inside its
+	// slot and its panic recovery; the func it returns runs when it ends.
+	// Tests use it to count books in flight or to make one panic.
+	analyzeHook func(bookID string) (done func())
 
 	scanLocks  sync.Map     // library id -> ctxMutex; one walk+sync at a time per library
 	coverLocks sync.Map     // book id -> ctxMutex; see coverLock
@@ -90,6 +106,37 @@ func (s *Service) coverLock(bookID string) ctxMutex {
 func (s *Service) scanLock(id string) ctxMutex {
 	m, _ := s.scanLocks.LoadOrStore(id, newCtxMutex())
 	return m.(ctxMutex)
+}
+
+// slotPool is a counting semaphore. Its size is fixed at the first acquire.
+type slotPool struct {
+	mu sync.Mutex
+	ch chan struct{}
+}
+
+// acquire takes one of size slots, waiting until one is free or ctx ends. The
+// returned func gives the slot back.
+func (p *slotPool) acquire(ctx context.Context, size int) (func(), error) {
+	p.mu.Lock()
+	if p.ch == nil {
+		p.ch = make(chan struct{}, max(size, 1))
+	}
+	ch := p.ch
+	p.mu.Unlock()
+	select {
+	case ch <- struct{}{}:
+		return func() { <-ch }, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+// pdfSlotCount is how many PDF books may be analysed at once.
+func (s *Service) pdfSlotCount() int {
+	if s.pdfSlotSize > 0 {
+		return s.pdfSlotSize
+	}
+	return archive.PDFRenderSlots
 }
 
 type lib struct {
@@ -310,22 +357,9 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 			todo = append(todo, id)
 		}
 		rows.Close()
-		infos := map[string]map[string]scan.ComicInfo{} // series id -> book id -> ComicInfo
-		for i, id := range todo {
-			if err := ctx.Err(); err != nil {
-				return err
-			}
-			seriesID, ci, err := s.analyzeBook(ctx, l, id)
-			if err != nil {
-				return err // only database errors stop the task; bad files are recorded per book
-			}
-			if ci != nil {
-				if infos[seriesID] == nil {
-					infos[seriesID] = map[string]scan.ComicInfo{}
-				}
-				infos[seriesID][id] = *ci
-			}
-			progress(float64(i+1) / float64(len(todo)))
+		infos, err := s.analyzeBooks(ctx, l, todo, progress)
+		if err != nil {
+			return err
 		}
 		if len(todo) == 0 {
 			return nil
@@ -370,6 +404,95 @@ func (s *Service) queueAnalyze(ctx context.Context, libraryID string, deep bool)
 	})
 }
 
+// analyzeBooks analyses the books in todo and returns the ComicInfo of each
+// book that has one, by series id and then book id. This run starts up to
+// AnalyzeWorkers workers, but every book also takes a slot of the service-wide
+// limit (see analyzeOne), so concurrent runs share AnalyzeWorkers between them.
+// Only a database error, a panic or a context end stops the run: the first
+// such error is returned, and the books still running are cancelled and
+// waited for. Bad files are recorded per book by analyzeBook. progress gets
+// the share of books done; calls are serialised, so the values rise to 1.
+func (s *Service) analyzeBooks(ctx context.Context, l lib, todo []string, progress func(float64)) (map[string]map[string]scan.ComicInfo, error) {
+	workers := min(max(s.AnalyzeWorkers, 1), max(len(todo), 1))
+	wctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var (
+		mu       sync.Mutex // guards infos, done, firstErr and the progress calls
+		infos    = map[string]map[string]scan.ComicInfo{}
+		done     int
+		firstErr error
+		wg       sync.WaitGroup
+	)
+	jobs := make(chan string)
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for id := range jobs {
+				seriesID, ci, err := s.analyzeOne(wctx, l, id)
+				mu.Lock()
+				if err != nil {
+					if firstErr == nil {
+						firstErr = err
+					}
+					mu.Unlock()
+					cancel()
+					continue
+				}
+				if ci != nil {
+					if infos[seriesID] == nil {
+						infos[seriesID] = map[string]scan.ComicInfo{}
+					}
+					infos[seriesID][id] = *ci
+				}
+				done++
+				progress(float64(done) / float64(len(todo)))
+				mu.Unlock()
+			}
+		}()
+	}
+send:
+	for _, id := range todo {
+		select {
+		case jobs <- id:
+		case <-wctx.Done():
+			break send
+		}
+	}
+	close(jobs)
+	wg.Wait()
+
+	mu.Lock()
+	defer mu.Unlock()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+	if done < len(todo) {
+		return nil, ctx.Err()
+	}
+	return infos, nil
+}
+
+// analyzeOne runs analyzeBook for one book inside the service-wide analysis
+// limit. A panic in the archive, decoder or thumbnail code becomes an error
+// naming the book, so one bad file cannot take the server down; the error
+// stops the run like a database error.
+func (s *Service) analyzeOne(ctx context.Context, l lib, id string) (seriesID string, ci *scan.ComicInfo, err error) {
+	release, err := s.analysisSlots.acquire(ctx, max(s.AnalyzeWorkers, 1))
+	if err != nil {
+		return "", nil, err
+	}
+	defer release()
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("analyze: book panicked", "book", id, "panic", r, "stack", string(debug.Stack()))
+			seriesID, ci, err = "", nil, fmt.Errorf("analyze book %s: panic: %v", id, r)
+		}
+	}()
+	return s.analyzeBook(ctx, l, id)
+}
+
 // version is what the last scan recorded for a book file. Analysis results
 // are stored only if the row still has the version they were read under, so
 // a slow analysis cannot overwrite a newer scan of a replaced file.
@@ -383,6 +506,9 @@ type version struct {
 // result was discarded). A broken or unsupported file is recorded on the
 // book, not returned as an error.
 func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string, *scan.ComicInfo, error) {
+	if h := s.analyzeHook; h != nil {
+		defer h(bookID)()
+	}
 	var rel, seriesID, lockedJSON string
 	var v version
 	var coverPage int
@@ -394,7 +520,20 @@ func (s *Service) analyzeBook(ctx context.Context, l lib, bookID string) (string
 	if err != nil {
 		return seriesID, nil, s.marked(ctx, l.id, seriesID, bookID, v, "error", err.Error())
 	}
-	a, err := media.AnalyzeCover(ctx, full, coverPage)
+	var a media.Analysis
+	if archive.IsPDF(rel) {
+		// Taken before AnalyzeCover starts its timeout, so a wait for a
+		// renderer does not use up the analysis time.
+		var release func()
+		release, err = s.pdfSlots.acquire(ctx, s.pdfSlotCount())
+		if err != nil {
+			return "", nil, err
+		}
+		a, err = media.AnalyzeCover(ctx, full, coverPage)
+		release()
+	} else {
+		a, err = media.AnalyzeCover(ctx, full, coverPage)
+	}
 	switch {
 	case errors.Is(err, archive.ErrRendererBusy):
 		// Not the file's fault: leave the book as it is (outdated), so a

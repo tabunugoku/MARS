@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"image"
 	"image/jpeg"
-	"math"
 
 	"github.com/gen2brain/avif"
 	"github.com/gen2brain/webp"
@@ -29,17 +28,8 @@ func Thumbnail(img []byte, maxW, maxH int, f Format) ([]byte, error) {
 	defer release()
 
 	b := src.Bounds()
-	w, h := b.Dx(), b.Dy()
-	dw, dh := w, h
-	if w > maxW || h > maxH {
-		scale := math.Min(float64(maxW)/float64(w), float64(maxH)/float64(h))
-		dw = min(maxW, max(1, int(math.Round(float64(w)*scale))))
-		dh = min(maxH, max(1, int(math.Round(float64(h)*scale))))
-	}
-
-	dst := image.NewRGBA(image.Rect(0, 0, dw, dh))
-	xdraw.Draw(dst, dst.Bounds(), image.White, image.Point{}, xdraw.Src)
-	xdraw.CatmullRom.Scale(dst, dst.Bounds(), src, b, xdraw.Over, nil)
+	dw, dh := thumbSize(b.Dx(), b.Dy(), maxW, maxH)
+	dst := scaleThumb(src, dw, dh)
 
 	out, err := encode(dst, f)
 	if err != nil {

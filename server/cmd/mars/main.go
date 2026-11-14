@@ -107,6 +107,10 @@ func run() error {
 		Pages:        &media.PageCache{Dir: cfg.PageCacheDir(), MaxBytes: 2 << 30},
 		PageThumbDir: cfg.PageThumbDir(),
 		Events:       hub,
+
+		// Books of one library are analysed in parallel, up to 4 at once: a
+		// library usually sits on one hard disk, which gains little beyond that.
+		AnalyzeWorkers: min(threads, 4),
 		// Read at most every thumbCacheTTL, so a new size or format applies
 		// without a restart.
 		ThumbSize:   cache.bounds,

@@ -94,3 +94,15 @@ func (z *zipArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error)
 func (z *zipArchive) RandomAccess() bool { return true }
 
 func (z *zipArchive) Close() error { return z.file.Close() }
+
+// HeaderSkipCheap reports whether an entry can be left part-read: the reader
+// handed to Walk may stop after an entry's header without reading the rest,
+// and the cost is a seek, not decompression. Only zip qualifies. Each zip
+// entry is compressed independently and the central directory records its
+// uncompressed size, so the rest of an entry is never needed to reach the
+// next one. RAR, 7z and PDF do not qualify because their entries share state
+// or must be decoded in order, and skipping them would still decompress.
+func HeaderSkipCheap(a Archive) bool {
+	_, ok := a.(*zipArchive)
+	return ok
+}

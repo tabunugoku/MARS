@@ -6,7 +6,7 @@
 
 *Your manga. Your server. Your universe.*
 
-> 現在の版は v0.1.0（プレビュー版）です。v1.0.0 は、大きなライブラリで不具合が見つかったため取り下げました。
+> 現在の版は v0.1.1（プレビュー版）です。v1.0.0 は、大きなライブラリで不具合が見つかったため取り下げました。
 
 ![MARS のホーム画面](docs/screenshots/desktop-home.ja.webp)
 

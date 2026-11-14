@@ -119,6 +119,9 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 		coverIdx = 0
 	}
 	sizer, _ := a.(archive.EntrySizer)
+	// Zip entries are independent, so a non-cover page need only be read as
+	// far as its header; the rest of its bytes are never touched.
+	headerOnly := archive.HeaderSkipCheap(a)
 	var (
 		cover    []byte
 		ciBytes  []byte
@@ -161,7 +164,7 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 		if i == coverIdx {
 			coverBuf = &bytes.Buffer{}
 		}
-		w, h, err := readPageConfig(e, r, coverBuf)
+		w, h, err := readPageConfig(e, r, coverBuf, headerOnly && i != coverIdx)
 		if err != nil {
 			return pageErr(i+1, err)
 		}
@@ -183,11 +186,24 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 }
 
 // readPageConfig reads the header of one page entry and checks its limits.
-// The rest of the entry is drained so the size limit is enforced for the
-// whole entry. When cover is non-nil, every byte read is also kept in it.
-func readPageConfig(e archive.Entry, r io.Reader, cover *bytes.Buffer) (int, int, error) {
+// Unless headerOnly is set, the rest of the entry is drained so the size
+// limit is enforced for the whole entry; headerOnly is for zip entries whose
+// directory size is trusted for the limit (see archive.HeaderSkipCheap) and
+// that are not kept as the cover. When cover is non-nil, every byte read is
+// also kept in it.
+func readPageConfig(e archive.Entry, r io.Reader, cover *bytes.Buffer, headerOnly bool) (int, int, error) {
 	if e.Size > MaxEntryBytes {
 		return 0, 0, ErrTooLarge
+	}
+	if headerOnly && e.Size >= 0 {
+		cfg, err := CheckPixels(bufio.NewReader(r), MaxPixels)
+		if errors.Is(err, ErrTooManyPixels) {
+			return 0, 0, ErrTooLarge
+		}
+		if err != nil {
+			return 0, 0, err
+		}
+		return cfg.Width, cfg.Height, nil
 	}
 	lr := &io.LimitedReader{R: r, N: MaxEntryBytes + 1}
 	var src io.Reader = lr

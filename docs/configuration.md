@@ -127,7 +127,7 @@ The server settings screen is at **Admin > Server settings**. You can change the
 | Setting | Description |
 | --- | --- |
 | Size | Choose small, medium, large, or extra large |
-| Format | Choose JPEG, WebP, or AVIF |
+| Format | Choose JPEG, WebP, or AVIF. JPEG is the fastest to make; WebP takes about 2 times and AVIF about 3 times as long, so a large library is analyzed faster with JPEG (measured on one 1600×2400 page). |
 
 Both settings apply to thumbnails you create from now on. To regenerate existing thumbnails, use **Regenerate thumbnail** on a series or **Regenerate covers** on a library. OPDS and the Komga-compatible API always return JPEG, regardless of format.
 

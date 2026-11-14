@@ -5,7 +5,7 @@ openapi: 3.0.3
 # OpenAPI 3.0.3 because oapi-codegen does not fully support 3.1 yet.
 info:
   title: MARS API
-  version: 0.1.0
+  version: 0.1.1
   description: Self-hosted comic and manga server.
 servers:
   - url: /api/v1

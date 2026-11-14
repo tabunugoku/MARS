@@ -6,7 +6,7 @@ English | [日本語](README.ja.md)
 
 *Your manga. Your server. Your universe.*
 
-> The current version is v0.1.0, a preview. v1.0.0 was withdrawn after problems with large libraries were found.
+> The current version is v0.1.1, a preview. v1.0.0 was withdrawn after problems with large libraries were found.
 
 ![MARS home screen](docs/screenshots/desktop-home.webp)
 

@@ -101,7 +101,7 @@ The image has no shell, so you cannot read files with `docker exec`. Use the log
 | Tag | Meaning |
 | --- | --- |
 | `0.1` | Follows every 0.1.x release. Normally use this tag |
-| `0.1.0` | This version only |
+| `0.1.1` | This version only |
 | `latest` | The newest release. Moves to each new minor and major version |
 
 While MARS is 0.x, a new minor version (such as 0.2) may change behavior. To move to it, change the tag yourself.
