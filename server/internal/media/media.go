@@ -14,7 +14,7 @@ import (
 
 // Limits that keep a hostile or broken file from exhausting the server.
 const (
-	MaxPixels        = 100_000_000 // width*height from the image header, checked before any decode
+	MaxPixels        = 200_000_000 // width*height from the image header, checked before any decode; print masters reach about 115 MP
 	MaxEntryBytes    = 64 << 20    // one page or the ComicInfo.xml read
 	MaxComicInfo     = 1 << 20     // ComicInfo.xml is truncated past this and treated as absent
 	MaxExtractedBook = 2 << 30     // total bytes a page cache extraction may write for one book
