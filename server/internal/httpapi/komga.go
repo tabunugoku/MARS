@@ -681,7 +681,9 @@ var (
 // The header is read first, so a page over komgaConvertMaxPixels is refused
 // before any pixel is decoded. The decode holds the process decode budget
 // until the caller calls release, after it has encoded the image. A context
-// that ends while waiting for the budget returns ctx.Err().
+// that ends while waiting for the budget returns ctx.Err(). A page whose decode
+// needs more memory than the decode limit returns errPageTooLarge; any other
+// decode failure returns errPageFormat.
 func komgaDecodePage(ctx context.Context, data []byte) (image.Image, func(), error) {
 	if len(data) > media.MaxEntryBytes {
 		return nil, nil, errPageTooLarge
@@ -696,6 +698,9 @@ func komgaDecodePage(ctx context.Context, data []byte) (image.Image, func(), err
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, nil, ctx.Err()
+		}
+		if errors.Is(err, media.ErrTooLarge) {
+			return nil, nil, errPageTooLarge
 		}
 		return nil, nil, errPageFormat
 	}

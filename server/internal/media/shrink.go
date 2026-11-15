@@ -64,7 +64,8 @@ func shrinkFactor(w, h, dw, dh int) int {
 // converted once per output pixel), *image.RGBA (output *image.RGBA, its
 // premultiplied values average directly), *image.NRGBA (output *image.NRGBA,
 // colour weighted by alpha so it composites the same as before), and
-// *image.Gray. Any other type returns false.
+// *image.Gray, and *image.CMYK (output *image.RGBA, each pixel converted to
+// RGB before averaging). Any other type returns false.
 func boxShrink(src image.Image, k int) (image.Image, bool) {
 	switch s := src.(type) {
 	case *image.YCbCr:
@@ -75,6 +76,8 @@ func boxShrink(src image.Image, k int) (image.Image, bool) {
 		return shrinkNRGBA(s, k), true
 	case *image.Gray:
 		return shrinkGray(s, k), true
+	case *image.CMYK:
+		return shrinkCMYK(s, k), true
 	}
 	return nil, false
 }
@@ -206,6 +209,40 @@ func shrinkNRGBA(s *image.NRGBA, k int) *image.NRGBA {
 				dst.Pix[j+2] = avgRound(sb, sa)
 			}
 			dst.Pix[j+3] = avgRound(sa, n)
+		}
+	}
+	return dst
+}
+
+// shrinkCMYK shrinks a CMYK image to RGB: each source pixel is converted with
+// color.CMYKToRGB and the RGB channels are averaged. The output is opaque.
+func shrinkCMYK(s *image.CMYK, k int) *image.RGBA {
+	b := s.Bounds()
+	w, h := b.Dx(), b.Dy()
+	ow, oh := (w+k-1)/k, (h+k-1)/k
+	dst := image.NewRGBA(image.Rect(0, 0, ow, oh))
+	for oy := 0; oy < oh; oy++ {
+		y0 := b.Min.Y + oy*k
+		y1 := min(y0+k, b.Max.Y)
+		for ox := 0; ox < ow; ox++ {
+			x0 := b.Min.X + ox*k
+			x1 := min(x0+k, b.Max.X)
+			var r, g, bl int
+			for y := y0; y < y1; y++ {
+				for x := x0; x < x1; x++ {
+					c := s.CMYKAt(x, y)
+					pr, pg, pb := color.CMYKToRGB(c.C, c.M, c.Y, c.K)
+					r += int(pr)
+					g += int(pg)
+					bl += int(pb)
+				}
+			}
+			n := (x1 - x0) * (y1 - y0)
+			j := dst.PixOffset(ox, oy)
+			dst.Pix[j+0] = avgRound(r, n)
+			dst.Pix[j+1] = avgRound(g, n)
+			dst.Pix[j+2] = avgRound(bl, n)
+			dst.Pix[j+3] = 255
 		}
 	}
 	return dst

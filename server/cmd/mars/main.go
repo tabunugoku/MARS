@@ -64,6 +64,12 @@ func run() error {
 		budget := max(limit/3, minDecodeBudget)
 		media.SetDecodeBudget(budget)
 		slog.Info("decode budget", "bytes", budget)
+		// 5/8 leaves room for the server under the 3/4 Go memory target, while
+		// a 114 MP RGBA PNG page (about 570 MB) still decodes in a 1 GiB
+		// container. Without a container limit DefaultDecodeLimit (1 GiB) applies.
+		decodeLimit := max(limit*5/8, minDecodeBudget)
+		media.SetDecodeLimit(decodeLimit)
+		slog.Info("decode limit", "bytes", decodeLimit)
 	}
 
 	cfg, err := config.Load()

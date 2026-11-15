@@ -440,7 +440,7 @@ func (s *server) servePageThumbnail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
-		if r.Context().Err() == nil {
+		if r.Context().Err() == nil && !errors.Is(err, library.ErrPageThumbFailed) {
 			slog.Warn("page thumbnail", "book", r.PathValue("bookId"), "page", n, "err", err)
 		}
 		writeError(r.Context(), w, http.StatusInternalServerError, "server.page_unreadable")

@@ -9,6 +9,12 @@ All notable changes to MARS are listed here. Versions follow
 
 ### Fixed
 
+- CMYK JPEG pages without an Adobe marker (common in print-resolution scans) now get covers and page thumbnails; they failed with "4-component JPEG doesn't have Adobe APP14 metadata".
+- A page whose thumbnail cannot be made is not decoded again on every page-list open (until the book file changes or the server restarts), and the warning is logged once.
+- Books with pages up to 200 megapixels (print masters reach about 115) are analysed; pages over 100 megapixels made the book fail with "image or entry over the size limit".
+- An image is decoded only when the memory it needs, estimated from its header (format, colour type, bit depth, subsampling, progressive or interlaced), fits the decode limit: 5/8 of the container memory limit, or 1 GiB without one. A larger image gets no thumbnail instead of running the server out of memory; the book still opens. In a 1 GiB container this includes progressive JPEGs over about 100 megapixels.
+- Two tasks of the same kind for one library no longer run at once. A scan or analysis requested while one is running now waits as one queued task and starts when the running one ends; before, two analyses of one library could run side by side and read every book twice.
+- A new library is no longer scanned twice when its first scan takes longer than a minute: the scheduler skipped no library whose scan was still running, because its last scan time is set only when the scan ends.
 - A request that the browser drops before it is answered (a page left while loading) is no longer logged as an error ("authenticate ... context canceled").
 
 ## 0.1.1 — 2026-11-14

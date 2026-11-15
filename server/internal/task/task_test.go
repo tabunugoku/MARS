@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -118,5 +119,98 @@ func TestFailureAndPanic(t *testing.T) {
 	}
 	if _, err := q.get(ctx, "nope"); err != ErrNotFound {
 		t.Fatalf("got %v", err)
+	}
+}
+
+// A request for a key that is running in the same library waits: it becomes
+// one queued task that starts only after the running one ends, and further
+// requests fold into it. Another library is not held back.
+func TestSameKeyWaitsForRunning(t *testing.T) {
+	q, ctx := newQueue(t, 3)
+	release := make(chan struct{})
+	var aDone atomic.Bool
+	a, err := q.SubmitKey(ctx, "analyze", "analyze", Text{English: "a"}, "L1", func(ctx context.Context, _ func(float64)) error {
+		<-release
+		aDone.Store(true)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, q, a.ID, "running")
+
+	var bRuns atomic.Int32
+	var bAfterA atomic.Bool
+	follow := func(ctx context.Context, _ func(float64)) error {
+		bRuns.Add(1)
+		bAfterA.Store(aDone.Load())
+		return nil
+	}
+	b, err := q.SubmitKey(ctx, "analyze", "analyze", Text{English: "b"}, "L1", follow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	c, err := q.SubmitKey(ctx, "analyze", "analyze", Text{English: "c"}, "L1", follow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if b.ID == a.ID || c.ID != b.ID {
+		t.Fatalf("ids a=%s b=%s c=%s: want one follow-up shared by b and c", a.ID, b.ID, c.ID)
+	}
+	other, _ := q.SubmitKey(ctx, "analyze", "analyze", Text{English: "o"}, "L0", func(context.Context, func(float64)) error { return nil })
+	waitState(t, q, other.ID, "done")
+
+	time.Sleep(100 * time.Millisecond) // the follow-up must not start meanwhile
+	if got := waitState(t, q, b.ID, "queued"); got.StartedAt != nil {
+		t.Fatalf("follow-up started while the first ran")
+	}
+	close(release)
+	waitState(t, q, a.ID, "done")
+	waitState(t, q, b.ID, "done")
+	if n := bRuns.Load(); n != 1 {
+		t.Fatalf("follow-up ran %d times, want 1", n)
+	}
+	if !bAfterA.Load() {
+		t.Fatal("follow-up ran before the first ended")
+	}
+}
+
+// Cancelling a held follow-up keeps it from running when the first ends.
+func TestCancelHeldFollowUp(t *testing.T) {
+	q, ctx := newQueue(t, 2)
+	release := make(chan struct{})
+	a, _ := q.SubmitKey(ctx, "scan", "scan", Text{English: "a"}, "L1", func(context.Context, func(float64)) error {
+		<-release
+		return nil
+	})
+	waitState(t, q, a.ID, "running")
+	var ran atomic.Bool
+	b, _ := q.SubmitKey(ctx, "scan", "scan", Text{English: "b"}, "L1", func(context.Context, func(float64)) error {
+		ran.Store(true)
+		return nil
+	})
+	if err := q.Cancel(ctx, b.ID); err != nil {
+		t.Fatal(err)
+	}
+	waitState(t, q, b.ID, "cancelled")
+	// A new request after the cancel gets a fresh follow-up, which runs.
+	c, _ := q.SubmitKey(ctx, "scan", "scan", Text{English: "c"}, "L1", func(context.Context, func(float64)) error { return nil })
+	if c.ID == b.ID {
+		t.Fatal("cancelled follow-up was reused")
+	}
+	q.mu.Lock()
+	_, stale := q.live[b.ID]
+	q.mu.Unlock()
+	if stale {
+		t.Fatal("replaced follow-up left in the live set")
+	}
+	close(release)
+	waitState(t, q, c.ID, "done")
+	time.Sleep(50 * time.Millisecond)
+	if ran.Load() {
+		t.Fatal("cancelled follow-up ran")
+	}
+	if tk := waitState(t, q, b.ID, "cancelled"); tk.State != "cancelled" {
+		t.Fatal(tk.State)
 	}
 }
