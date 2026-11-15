@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -199,13 +200,13 @@ func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, lib
 	return q.get(ctx, j.id)
 }
 
-// Busy reports whether a task of kind for libraryID is queued or running
-// (and not cancelled), whatever its key.
-func (q *Queue) Busy(kind, libraryID string) bool {
+// Busy reports whether a task with one of keys for libraryID is queued or
+// running (and not cancelled).
+func (q *Queue) Busy(libraryID string, keys ...string) bool {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	for _, j := range q.live {
-		if j.kind == kind && j.libID == libraryID && j.ctx.Err() == nil {
+		if j.libID == libraryID && j.ctx.Err() == nil && slices.Contains(keys, j.key) {
 			return true
 		}
 	}

@@ -986,11 +986,13 @@ func (s *Service) queueDue(ctx context.Context) {
 	rows.Close()
 	slices.Sort(ids)
 	for _, id := range ids {
-		// A library whose scan is queued or running is not due again: its
-		// last_scan is set only when that scan ends, so a long first scan
-		// (of a library just created) would otherwise be queued a second time
-		// at the next tick.
-		if s.Queue.Busy("scan", id) {
+		// A library whose full scan (normal or deep) is queued or running is
+		// not due again: its last_scan is set only when that scan ends, so a
+		// long first scan (of a library just created) would otherwise be
+		// queued a second time at the next tick. A watcher scan does not
+		// count: it may cover only some folders and leaves last_scan as it
+		// is, so steady watcher work must not hold off the full scan.
+		if s.Queue.Busy(id, "scan", "scan:deep") {
 			continue
 		}
 		if _, err := s.QueueScan(ctx, id); err != nil {

@@ -150,3 +150,68 @@ func TestScheduleSkipsLibraryBeingScanned(t *testing.T) {
 		t.Fatalf("tasks after queueDue = %d, want only the running scan", len(tasks))
 	}
 }
+
+// TestScheduleQueuesFullScanDuringWatcherScan checks that a watcher scan (key
+// scan:watch, possibly only some folders) does not hold off a due full scan.
+func TestScheduleQueuesFullScanDuringWatcherScan(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx,
+		`INSERT INTO libraries (id, name, root, kind, scan_interval, watch, created_at, last_scan) VALUES ('lib', 'lib', ?, 'manga', 'hourly', 1, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')`,
+		t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q, ThumbDir: t.TempDir()}
+
+	release := make(chan struct{})
+	defer close(release)
+	watch, err := q.SubmitKey(ctx, "scan", "scan:watch", task.Text{English: "watch"}, "lib", func(ctx context.Context, _ func(float64)) error {
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		tasks, err := q.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(tasks) == 1 && tasks[0].ID == watch.ID && tasks[0].State == "running" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("watcher scan not running: %+v", tasks)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	s.queueDue(ctx)
+
+	tasks, err := q.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	full := 0
+	for _, tk := range tasks {
+		if tk.ID != watch.ID && tk.Kind == "scan" {
+			full++
+		}
+	}
+	if full != 1 {
+		t.Fatalf("full scans queued during a watcher scan = %d, want 1 (tasks %+v)", full, tasks)
+	}
+}
