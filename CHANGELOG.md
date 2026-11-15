@@ -5,6 +5,12 @@ All notable changes to MARS are listed here. Versions follow
 `ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
 (0.x releases get no `X` tag).
 
+## Unreleased
+
+### Fixed
+
+- Two tasks of the same kind for one library no longer run at once. A scan or analysis requested while one is running now waits as one queued task and starts when the running one ends; before, two analyses of one library could run side by side and read every book twice.
+
 ## 0.1.1 — 2026-11-14
 
 Faster analysis and thumbnails.
