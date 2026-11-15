@@ -5,6 +5,7 @@ package media
 
 import (
 	"errors"
+	"fmt"
 	"image"
 	"io"
 	"time"
@@ -14,7 +15,7 @@ import (
 
 // Limits that keep a hostile or broken file from exhausting the server.
 const (
-	MaxPixels        = 200_000_000 // width*height from the image header, checked before any decode; print masters reach about 115 MP
+	MaxPixels        = 200_000_000 // width*height from the image header, checked before any decode; print masters reach about 115 MP. The memory a decode needs is checked separately (decodeCost, SetDecodeLimit).
 	MaxEntryBytes    = 64 << 20    // one page or the ComicInfo.xml read
 	MaxComicInfo     = 1 << 20     // ComicInfo.xml is truncated past this and treated as absent
 	MaxExtractedBook = 2 << 30     // total bytes a page cache extraction may write for one book
@@ -44,10 +45,11 @@ type Analysis struct {
 }
 
 var (
-	ErrNoPages       = errors.New("media: no images in archive")
-	ErrTooLarge      = errors.New("media: image or entry over the size limit")
-	ErrCacheTooBig   = errors.New("media: book exceeds the extraction limit")
-	ErrTooManyPixels = errors.New("media: image has more pixels than the limit")
+	ErrNoPages        = errors.New("media: no images in archive")
+	ErrTooLarge       = errors.New("media: image or entry over the size limit")
+	ErrCacheTooBig    = errors.New("media: book exceeds the extraction limit")
+	ErrTooManyPixels  = errors.New("media: image has more pixels than the limit")
+	ErrDecodeTooLarge = fmt.Errorf("%w: decoding needs more memory than allowed", ErrTooLarge)
 )
 
 // CheckPixels reads an image's header from r and returns its config. When

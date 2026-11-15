@@ -11,6 +11,8 @@ All notable changes to MARS are listed here. Versions follow
 
 - CMYK JPEG pages without an Adobe marker (common in print-resolution scans) now get covers and page thumbnails; they failed with "4-component JPEG doesn't have Adobe APP14 metadata".
 - A page whose thumbnail cannot be made is not decoded again on every page-list open (until the book file changes or the server restarts), and the warning is logged once.
+- Books with pages up to 200 megapixels (print masters reach about 115) are analysed; pages over 100 megapixels made the book fail with "image or entry over the size limit".
+- An image is decoded only when the memory it needs, estimated from its header (format, colour type, bit depth, subsampling, progressive or interlaced), fits the decode limit: 5/8 of the container memory limit, or 1 GiB without one. A larger image gets no thumbnail instead of running the server out of memory; the book still opens. In a 1 GiB container this includes progressive JPEGs over about 100 megapixels.
 
 ## 0.1.1 — 2026-11-14
 

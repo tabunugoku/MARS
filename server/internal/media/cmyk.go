@@ -17,10 +17,33 @@ var adobeAPP14 = [16]byte{
 // browsers and Pillow read them with the inverted CMYK convention. Malformed
 // input returns false.
 func needsAdobeMarker(img []byte) bool {
+	four := false
+	ok := jpegSegments(img, func(m byte, payload []byte) bool {
+		switch {
+		case isSOF(m):
+			if len(payload) < 6 {
+				return false
+			}
+			if payload[5] == 4 {
+				four = true
+			}
+		case m == 0xEE && bytes.HasPrefix(payload, []byte("Adobe")):
+			return false
+		}
+		return true
+	})
+	return ok && four
+}
+
+// jpegSegments walks the marker segments of a JPEG from SOI up to the SOS or
+// EOI marker, calling visit with each marker and its payload (nil for the
+// standalone markers, which have no length). visit returns false to stop the
+// walk. jpegSegments returns true only when it reaches SOS or EOI; malformed or
+// truncated input, and a visit that stopped the walk, return false.
+func jpegSegments(img []byte, visit func(m byte, payload []byte) bool) bool {
 	if len(img) < 4 || img[0] != 0xFF || img[1] != 0xD8 {
 		return false
 	}
-	four := false
 	i := 2
 	for {
 		if i+1 >= len(img) || img[i] != 0xFF {
@@ -33,12 +56,15 @@ func needsAdobeMarker(img []byte) bool {
 		}
 		i += 2
 		if m == 0xDA || m == 0xD9 { // SOS or EOI
-			return four
+			return true
 		}
 		if m == 0x00 {
 			return false
 		}
 		if m == 0x01 || (m >= 0xD0 && m <= 0xD7) { // standalone: no length
+			if !visit(m, nil) {
+				return false
+			}
 			continue
 		}
 		if i+2 > len(img) {
@@ -48,16 +74,7 @@ func needsAdobeMarker(img []byte) bool {
 		if segLen < 2 || i+segLen > len(img) {
 			return false
 		}
-		payload := img[i+2 : i+segLen]
-		switch {
-		case isSOF(m):
-			if len(payload) < 6 {
-				return false
-			}
-			if payload[5] == 4 {
-				four = true
-			}
-		case m == 0xEE && bytes.HasPrefix(payload, []byte("Adobe")):
+		if !visit(m, img[i+2:i+segLen]) {
 			return false
 		}
 		i += segLen

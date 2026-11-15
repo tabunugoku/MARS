@@ -98,7 +98,7 @@ func TestDecodesRunOneAtATimeOverBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	// The budget holds exactly one such decode.
-	useBudget(t, decodeWeight(cfg, format, 1<<40))
+	useBudget(t, decodeWeight(decodeCost(page, format, cfg, useThumb), 1<<40))
 
 	var wg sync.WaitGroup
 	for i := 0; i < 4; i++ {
@@ -120,17 +120,18 @@ func TestDecodesRunOneAtATimeOverBudget(t *testing.T) {
 }
 
 func TestDecodeWeightClampsToBudget(t *testing.T) {
-	huge := image.Config{Width: 20000, Height: 20000}
-	if got := decodeWeight(huge, "jpeg", 1<<20); got != 1<<20 {
+	if got := decodeWeight(1<<40, 1<<20); got != 1<<20 {
 		t.Errorf("oversized weight = %d, want the budget %d", got, 1<<20)
 	}
-	small := image.Config{Width: 10, Height: 10}
-	if got := decodeWeight(small, "png", 1<<20); got != 10*10*bytesPerPixel {
-		t.Errorf("small weight = %d, want %d", got, 10*10*bytesPerPixel)
+	if got := decodeWeight(10*10*bytesPerPixelFallback, 1<<20); got != 10*10*bytesPerPixelFallback {
+		t.Errorf("small weight = %d, want %d", got, 10*10*bytesPerPixelFallback)
+	}
+	if got := decodeWeight(0, 1<<20); got != 1 {
+		t.Errorf("zero cost weight = %d, want 1", got)
 	}
 }
 
-func TestDecodeWeightUsesAVIFFactor(t *testing.T) {
+func TestDecodeCostUsesAVIFFactor(t *testing.T) {
 	avifPage := encodedAs(t, FormatAVIF, 64, 96)
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(avifPage))
 	if err != nil {
@@ -139,11 +140,11 @@ func TestDecodeWeightUsesAVIFFactor(t *testing.T) {
 	if format != "avif" {
 		t.Fatalf("format = %q, want avif", format)
 	}
-	if got, want := decodeWeight(cfg, format, 1<<40), int64(64*96*bytesPerPixelAVIF); got != want {
-		t.Errorf("AVIF weight = %d, want %d", got, want)
+	if got, want := decodeCost(avifPage, format, cfg, useThumb), int64(64*96*bytesPerPixelAVIF); got != want {
+		t.Errorf("AVIF cost = %d, want %d", got, want)
 	}
-	if got, want := decodeWeight(cfg, "jpeg", 1<<40), int64(64*96*bytesPerPixel); got != want {
-		t.Errorf("non-AVIF weight = %d, want %d", got, want)
+	if got, want := decodeCost(avifPage, "webp", cfg, useThumb), int64(64*96*bytesPerPixelFallback); got != want {
+		t.Errorf("non-AVIF cost = %d, want %d", got, want)
 	}
 }
 

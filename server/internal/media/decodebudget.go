@@ -3,6 +3,7 @@ package media
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"image"
 	"io"
 	"sync"
@@ -11,18 +12,12 @@ import (
 	"golang.org/x/sync/semaphore"
 )
 
-// Bytes per decoded pixel, used to weigh one full decode against the process
-// budget. Measured on a 1600x2400 realistic page: a JPEG page thumbnail
-// allocates about 38 MB (about 10 bytes a pixel) and the same page as AVIF
-// about 193 MB (about 50 bytes a pixel, the wasm decoder). The constants round
-// those figures up.
-const (
-	bytesPerPixel     = 12
-	bytesPerPixelAVIF = 52
-)
-
 // DefaultDecodeBudget is the decode budget when the server does not set one.
 const DefaultDecodeBudget = 256 << 20
+
+// DefaultDecodeLimit is the most memory one decode may need when the server
+// does not set one. See SetDecodeLimit.
+const DefaultDecodeLimit = 1 << 30
 
 // decodeBudget is one budget: its size and the semaphore that holds it.
 type decodeBudget struct {
@@ -33,6 +28,10 @@ type decodeBudget struct {
 // decodeState is the budget in use. SetDecodeBudget replaces it at startup.
 var decodeState atomic.Pointer[decodeBudget]
 
+// decodeLimit is the most memory one decode may need, in bytes, as estimated
+// by decodeCost. SetDecodeLimit replaces it at startup.
+var decodeLimit atomic.Int64
+
 // decodeHolders counts the decodes that hold budget right now, and
 // decodeHoldersPeak is the most that were at once. Tests read them.
 var (
@@ -42,6 +41,7 @@ var (
 
 func init() {
 	decodeState.Store(newDecodeBudget(DefaultDecodeBudget))
+	decodeLimit.Store(DefaultDecodeLimit)
 }
 
 func newDecodeBudget(n int64) *decodeBudget {
@@ -58,16 +58,23 @@ func SetDecodeBudget(n int64) {
 	decodeState.Store(newDecodeBudget(n))
 }
 
-// decodeWeight is the estimated bytes one decode of cfg (in format) needs. A
-// weight over the whole budget is clamped to it, so such an image still runs,
-// alone.
-func decodeWeight(cfg image.Config, format string, budget int64) int64 {
-	bpp := int64(bytesPerPixel)
-	if format == "avif" {
-		bpp = bytesPerPixelAVIF
+// SetDecodeLimit sets the most memory one decode may need, in bytes, as
+// estimated from the image header (decodeCost). An image estimated above it is
+// not decoded: it fails with ErrDecodeTooLarge, before any wait for the budget.
+// A value of zero or less keeps DefaultDecodeLimit. Call it at startup, before
+// any decode.
+func SetDecodeLimit(n int64) {
+	if n <= 0 {
+		n = DefaultDecodeLimit
 	}
-	w := int64(cfg.Width) * int64(cfg.Height) * bpp
-	return min(max(w, 1), budget)
+	decodeLimit.Store(n)
+}
+
+// decodeWeight is the budget weight of a decode that needs cost bytes: cost,
+// at least 1 and at most the whole budget. A cost over the budget is clamped to
+// it, so such an image still runs, alone.
+func decodeWeight(cost, budget int64) int64 {
+	return min(max(cost, 1), budget)
 }
 
 // acquireDecode waits until weight bytes of budget st are free, or ctx ends.
@@ -92,17 +99,30 @@ func acquireDecode(ctx context.Context, st *decodeBudget, weight int64) (func(),
 	}, nil
 }
 
-// DecodeBudgeted decodes img in full under the process decode budget. It waits
-// until the budget has room for the image's estimated size, or until ctx ends.
-// The caller checks the pixel limit first (CheckPixels). On success the caller
-// must call release once the image is no longer used; on error release is nil.
+// DecodeBudgeted decodes img in full under the process decode budget. It first
+// estimates the peak memory that the decode and a thumbnail need (decodeCost).
+// An image over the decode limit (SetDecodeLimit) fails with ErrDecodeTooLarge,
+// which also matches ErrTooLarge, without waiting for the budget. Otherwise it
+// waits until the budget has room for the estimate, or until ctx ends. The
+// caller checks the pixel limit first (CheckPixels). On success the caller must
+// call release once the image is no longer used; on error release is nil.
 func DecodeBudgeted(ctx context.Context, img []byte) (image.Image, func(), error) {
+	return decodeFor(ctx, img, useThumb)
+}
+
+// decodeFor is DecodeBudgeted for a given use: it checks the estimated cost
+// against the decode limit, then waits for the budget and decodes.
+func decodeFor(ctx context.Context, img []byte, use decodeUse) (image.Image, func(), error) {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(img))
 	if err != nil {
 		return nil, nil, err
 	}
+	cost := decodeCost(img, format, cfg, use)
+	if limit := decodeLimit.Load(); cost > limit {
+		return nil, nil, fmt.Errorf("%w: needs about %d MiB, limit %d MiB", ErrDecodeTooLarge, cost>>20, limit>>20)
+	}
 	st := decodeState.Load()
-	release, err := acquireDecode(ctx, st, decodeWeight(cfg, format, st.size))
+	release, err := acquireDecode(ctx, st, decodeWeight(cost, st.size))
 	if err != nil {
 		return nil, nil, err
 	}
