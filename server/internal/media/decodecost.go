@@ -2,6 +2,8 @@ package media
 
 import (
 	"image"
+	"image/color"
+	"math"
 )
 
 // Bytes per decoded pixel for formats the estimate models only roughly. The
@@ -52,7 +54,7 @@ const (
 //	PNG RGBA16                  8.01      11.30   12.06
 func decodeCost(img []byte, format string, cfg image.Config, use decodeUse) int64 {
 	px := int64(cfg.Width) * int64(cfg.Height)
-	d, shrinkable, counted := decodedBytes(img, format, px)
+	d, shrinkable, counted := decodedBytes(img, format, cfg, px)
 	if counted {
 		switch {
 		case use == useJPEG:
@@ -69,7 +71,7 @@ func decodeCost(img []byte, format string, cfg image.Config, use decodeUse) int6
 // decodedBytes returns D, the decoded size of img in bytes for px pixels;
 // whether boxShrink handles the decoded type; and whether the use overhead
 // applies. The overhead does not apply to the fallbacks or to AVIF.
-func decodedBytes(img []byte, format string, px int64) (d int64, shrinkable, counted bool) {
+func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int64, shrinkable, counted bool) {
 	switch format {
 	case "jpeg":
 		progressive, comps, ok := jpegFrame(img)
@@ -86,6 +88,11 @@ func decodedBytes(img []byte, format string, px int64) (d int64, shrinkable, cou
 		samples := px * sum / (hmax * vmax)
 		d = samples
 		if len(comps) == 4 { // CMYK output image
+			d += 4 * px
+		}
+		if len(comps) == 3 && cfg.ColorModel == color.RGBAModel {
+			// An RGB (not YCbCr) JPEG: image/jpeg converts the planes into a
+			// new RGBA image while still holding them.
 			d += 4 * px
 		}
 		if progressive { // int32 coefficient blocks
@@ -129,6 +136,36 @@ func decodedBytes(img []byte, format string, px int64) (d int64, shrinkable, cou
 	default:
 		return bytesPerPixelFallback * px, false, false
 	}
+}
+
+// scaleCost estimates the memory scaleThumb needs on top of the decoded image
+// to fit a w x h image of format into maxW x maxH: the box-shrunk copy is in
+// decodeCost's overhead; this is the CatmullRom pass. x/image/draw allocates a
+// [4]float64 buffer of destination width x source height, and per axis one
+// contribution (16 bytes) per source pixel a destination pixel reads, about
+// 4*scale+2 of them for each destination pixel. The source is the shrunk copy
+// when boxShrink takes the decoded type, else the full image. This term grows
+// with the source height and, for an extreme aspect ratio (a 1-pixel-wide
+// strip, which boxShrink cannot reduce), it is what refuses the image.
+// maxW or maxH of zero or less (no thumbnail) costs nothing.
+func scaleCost(img []byte, format string, cfg image.Config, maxW, maxH int) int64 {
+	if maxW <= 0 || maxH <= 0 || cfg.Width <= 0 || cfg.Height <= 0 {
+		return 0
+	}
+	_, shrinkable, _ := decodedBytes(img, format, cfg, 0)
+	dw, dh := thumbSize(cfg.Width, cfg.Height, maxW, maxH)
+	sw, sh := cfg.Width, cfg.Height
+	if k := shrinkFactor(sw, sh, dw, dh); k >= 2 && shrinkable {
+		sw, sh = (sw+k-1)/k, (sh+k-1)/k
+	}
+	taps := func(d, s int) float64 {
+		return float64(d) * (4*math.Max(float64(s)/float64(d), 1) + 2)
+	}
+	tmp := 32 * float64(dw) * float64(sh)
+	contribs := 16 * (taps(dw, sw) + taps(dh, sh))
+	sources := 32 * float64(dw+dh)
+	dst := 4 * float64(dw) * float64(dh)
+	return int64(math.Ceil(tmp + contribs + sources + dst))
 }
 
 // pngHeader reads the fields decodeCost needs from the IHDR chunk, at fixed

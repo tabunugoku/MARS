@@ -10,6 +10,7 @@ import (
 	"image/gif"
 	"image/jpeg"
 	"image/png"
+	"os"
 	"testing"
 )
 
@@ -198,6 +199,75 @@ func TestDecodeLimitRefusesBeforeBudget(t *testing.T) {
 	_, release, err = DecodeBudgeted(ctx, page)
 	if err != nil {
 		t.Fatalf("with the default limit: %v", err)
+	}
+	release()
+}
+
+// An RGB (not YCbCr) JPEG: image/jpeg decodes it into a new RGBA image while it
+// still holds the three planes, so it costs 7 bytes a pixel, not 3. The
+// fixture is a 64x48 4:4:4 JPEG without JFIF whose components are R, G and B.
+func TestDecodeCostRGBJPEG(t *testing.T) {
+	d, err := os.ReadFile("testdata/rgb-no-jfif.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(d))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, _, err := image.Decode(bytes.NewReader(d))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.(*image.RGBA); !ok {
+		t.Fatalf("fixture decodes as %T, want *image.RGBA", m)
+	}
+	px := int64(cfg.Width * cfg.Height)
+	if got, want := decodeCost(d, format, cfg, useThumb), 8*px; got != want {
+		t.Errorf("thumb cost = %d, want %d", got, want)
+	}
+	if got, want := decodeCost(d, format, cfg, useJPEG), 12*px; got != want {
+		t.Errorf("ToJPEG cost = %d, want %d", got, want)
+	}
+}
+
+// scaleCost follows the CatmullRom pass: a page is scaled from its box-shrunk
+// copy and costs little, while a 1-pixel-wide strip cannot be shrunk and its
+// scaler buffers grow with its height.
+func TestScaleCost(t *testing.T) {
+	grayPNG := encodePNG(t, image.NewGray(image.Rect(0, 0, 4, 4)))
+	page := image.Config{Width: 4000, Height: 6000}
+	if got := scaleCost(grayPNG, "png", page, 400, 600); got <= 0 || got > 32<<20 {
+		t.Errorf("page scale cost = %d, want under 32 MB (the 800x1200 shrunk copy)", got)
+	}
+	if got := scaleCost(grayPNG, "png", page, 0, 0); got != 0 {
+		t.Errorf("no thumbnail: scale cost = %d, want 0", got)
+	}
+	strip := image.Config{Width: 1, Height: 200_000}
+	// tmp 32*1*200000 plus about 4*333+2 contributions per output row.
+	if got := scaleCost(grayPNG, "png", strip, 400, 600); got < 32*200_000+16*600*1300 {
+		t.Errorf("strip scale cost = %d, want at least %d", got, 32*200_000+16*600*1300)
+	}
+}
+
+// A strip whose decode is tiny is refused by its scaler cost alone.
+func TestThumbnailRefusesExtremeStrip(t *testing.T) {
+	t.Cleanup(func() { SetDecodeLimit(DefaultDecodeLimit) })
+	strip := encodePNG(t, image.NewGray(image.Rect(0, 0, 1, 200_000)))
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(strip))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c := decodeCost(strip, format, cfg, useThumb); c > 1<<20 {
+		t.Fatalf("decode cost %d: the test needs a cheap decode", c)
+	}
+	SetDecodeLimit(8 << 20)
+	if _, err := Thumbnail(strip, 400, 600, FormatJPEG); !errors.Is(err, ErrDecodeTooLarge) {
+		t.Fatalf("Thumbnail err = %v, want ErrDecodeTooLarge", err)
+	}
+	_, release, err := DecodeBudgeted(context.Background(), strip)
+	if err != nil {
+		t.Fatalf("DecodeBudgeted (no scaling) err = %v", err)
 	}
 	release()
 }

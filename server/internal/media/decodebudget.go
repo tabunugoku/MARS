@@ -100,24 +100,27 @@ func acquireDecode(ctx context.Context, st *decodeBudget, weight int64) (func(),
 }
 
 // DecodeBudgeted decodes img in full under the process decode budget. It first
-// estimates the peak memory that the decode and a thumbnail need (decodeCost).
+// estimates the peak memory that the decode and an encode of the result need
+// (decodeCost).
 // An image over the decode limit (SetDecodeLimit) fails with ErrDecodeTooLarge,
 // which also matches ErrTooLarge, without waiting for the budget. Otherwise it
 // waits until the budget has room for the estimate, or until ctx ends. The
 // caller checks the pixel limit first (CheckPixels). On success the caller must
 // call release once the image is no longer used; on error release is nil.
 func DecodeBudgeted(ctx context.Context, img []byte) (image.Image, func(), error) {
-	return decodeFor(ctx, img, useThumb)
+	return decodeFor(ctx, img, useThumb, image.Point{})
 }
 
 // decodeFor is DecodeBudgeted for a given use: it checks the estimated cost
-// against the decode limit, then waits for the budget and decodes.
-func decodeFor(ctx context.Context, img []byte, use decodeUse) (image.Image, func(), error) {
+// against the decode limit, then waits for the budget and decodes. thumb, when
+// not zero, is the thumbnail bounds the image will be scaled into, whose
+// scaler buffers count too (scaleCost).
+func decodeFor(ctx context.Context, img []byte, use decodeUse, thumb image.Point) (image.Image, func(), error) {
 	cfg, format, err := image.DecodeConfig(bytes.NewReader(img))
 	if err != nil {
 		return nil, nil, err
 	}
-	cost := decodeCost(img, format, cfg, use)
+	cost := decodeCost(img, format, cfg, use) + scaleCost(img, format, cfg, thumb.X, thumb.Y)
 	if limit := decodeLimit.Load(); cost > limit {
 		return nil, nil, fmt.Errorf("%w: needs about %d MiB, limit %d MiB", ErrDecodeTooLarge, cost>>20, limit>>20)
 	}

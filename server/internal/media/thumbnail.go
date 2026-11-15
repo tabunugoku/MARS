@@ -22,7 +22,7 @@ func Thumbnail(img []byte, maxW, maxH int, f Format) ([]byte, error) {
 	if maxW <= 0 || maxH <= 0 {
 		return nil, fmt.Errorf("media: thumbnail bounds %dx%d", maxW, maxH)
 	}
-	src, release, err := decodeChecked(context.Background(), img, useThumb)
+	src, release, err := decodeChecked(context.Background(), img, useThumb, image.Pt(maxW, maxH))
 	if err != nil {
 		return nil, fmt.Errorf("media: thumbnail: %w", err)
 	}
@@ -44,7 +44,7 @@ func Thumbnail(img []byte, maxW, maxH int, f Format) ([]byte, error) {
 // composited onto white. The pixel limit is checked before any decode, and the
 // memory the decode needs (useJPEG) is checked against the decode limit.
 func ToJPEG(img []byte) ([]byte, error) {
-	src, release, err := decodeChecked(context.Background(), img, useJPEG)
+	src, release, err := decodeChecked(context.Background(), img, useJPEG, image.Point{})
 	if err != nil {
 		return nil, fmt.Errorf("media: to jpeg: %w", err)
 	}
@@ -64,13 +64,13 @@ func ToJPEG(img []byte) ([]byte, error) {
 // guard, under the decode budget and the decode limit (decodeFor). An image
 // over MaxPixels, or over the decode limit, is ErrTooLarge. The caller calls
 // release once the image is no longer used.
-func decodeChecked(ctx context.Context, img []byte, use decodeUse) (image.Image, func(), error) {
+func decodeChecked(ctx context.Context, img []byte, use decodeUse, thumb image.Point) (image.Image, func(), error) {
 	if _, err := CheckPixels(bytes.NewReader(img), MaxPixels); errors.Is(err, ErrTooManyPixels) {
 		return nil, nil, ErrTooLarge
 	} else if err != nil {
 		return nil, nil, err
 	}
-	return decodeFor(ctx, img, use)
+	return decodeFor(ctx, img, use, thumb)
 }
 
 // encode writes m in format f. AVIF uses speed 8 (of 0 to 10), the chosen
