@@ -9,6 +9,7 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 
@@ -71,6 +72,10 @@ type job struct {
 	fn     Func
 	ctx    context.Context
 	cancel context.CancelFunc
+	// next is a task of the same key and library submitted while this one
+	// ran. It is held back from the workers and queued when this one ends,
+	// so the two never run at once. Guarded by Queue.mu.
+	next *job
 }
 
 // Queue owns the workers. Create it with New, then call Run.
@@ -130,7 +135,8 @@ func (q *Queue) Run(ctx context.Context) error {
 
 // Submit queues fn. When a task of the same kind for the same library is
 // still queued (not yet running), that task is returned instead, so repeated
-// scan requests do not pile up.
+// scan requests do not pile up. When one is running, the new task waits for it
+// to end (see SubmitKey).
 func (q *Queue) Submit(ctx context.Context, kind string, label Text, libraryID string, fn Func) (Task, error) {
 	return q.SubmitKey(ctx, kind, kind, label, libraryID, fn)
 }
@@ -138,13 +144,27 @@ func (q *Queue) Submit(ctx context.Context, kind string, label Text, libraryID s
 // SubmitKey is Submit that deduplicates on key instead of kind, for work of
 // one kind that must not be folded into another queued task of that kind
 // (a deep analysis into a normal one, one series' thumbnails into another's).
+//
+// Tasks of one key and library never run at once. A request while one is
+// running becomes a queued task that is handed to the workers only when the
+// running one ends, so its work still happens (the books a newer scan added
+// are analysed) without two runs doing the same work side by side. Later
+// requests fold into that queued task like any other.
 func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, libraryID string, fn Func) (Task, error) {
 	q.mu.Lock()
+	var running *job
 	for _, j := range q.live {
 		if j.key == key && j.libID == libraryID && libraryID != "" {
-			if t, err := q.get(ctx, j.id); err == nil && t.State == "queued" {
+			t, err := q.get(ctx, j.id)
+			if err != nil {
+				continue
+			}
+			switch t.State {
+			case "queued":
 				q.mu.Unlock()
 				return t, nil
+			case "running":
+				running = j
 			}
 		}
 	}
@@ -162,16 +182,45 @@ func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, lib
 		return Task{}, err
 	}
 	q.live[j.id] = j
+	if running != nil {
+		// Held until running ends. An earlier follow-up, if any, was
+		// cancelled (a queued one would have been returned above) and never
+		// reaches a worker now, so it leaves the live set here.
+		if old := running.next; old != nil {
+			delete(q.live, old.id)
+		}
+		running.next = j
+	}
 	q.mu.Unlock()
 	q.publish(ctx, j.id)
 
+	if running == nil {
+		q.enqueue(j)
+	}
+	return q.get(ctx, j.id)
+}
+
+// Busy reports whether a task with one of keys for libraryID is queued or
+// running (and not cancelled).
+func (q *Queue) Busy(libraryID string, keys ...string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, j := range q.live {
+		if j.libID == libraryID && j.ctx.Err() == nil && slices.Contains(keys, j.key) {
+			return true
+		}
+	}
+	return false
+}
+
+// enqueue hands j to the workers.
+func (q *Queue) enqueue(j *job) {
 	select {
 	case q.jobs <- j:
 	default:
 		// The buffer is full: hand it over without blocking the caller.
 		go func() { q.jobs <- j }()
 	}
-	return q.get(ctx, j.id)
 }
 
 // Cancel stops a queued or running task. Cancelling a finished task is a
@@ -215,8 +264,14 @@ func (q *Queue) run(parent context.Context, j *job) {
 	defer func() {
 		q.mu.Lock()
 		delete(q.live, j.id)
+		next := j.next
+		j.next = nil
 		q.mu.Unlock()
 		j.cancel()
+		if next != nil {
+			// A cancelled one is dropped by its own run.
+			q.enqueue(next)
+		}
 	}()
 	if j.ctx.Err() != nil {
 		return // cancelled while queued; Cancel already marked it
