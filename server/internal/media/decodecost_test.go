@@ -324,3 +324,76 @@ func TestPNGConversionsShareTheBudget(t *testing.T) {
 		t.Fatalf("second conversion err = %v, want it to wait for the budget", err)
 	}
 }
+
+// withFrame returns a copy of a baseline JPEG whose frame header says w x h
+// and the given sampling bytes (h<<4|v) for its three components. Only the
+// header is meant to be read: the scan data no longer matches.
+func withFrame(t *testing.T, base []byte, w, h int, sampling [3]byte) []byte {
+	t.Helper()
+	out := bytes.Clone(base)
+	i := bytes.Index(out, []byte{0xFF, 0xC0})
+	if i < 0 || out[i+9] != 3 {
+		t.Fatal("no 3-component SOF0 in the base JPEG")
+	}
+	binary.BigEndian.PutUint16(out[i+5:], uint16(h))
+	binary.BigEndian.PutUint16(out[i+7:], uint16(w))
+	for k, b := range sampling {
+		out[i+11+3*k] = b
+	}
+	return out
+}
+
+// A non-standard sampling layout makes image/jpeg ("flex mode") store all
+// three planes at full resolution, so it costs 3 bytes a pixel however small
+// its sampled planes are. Codex's example: Y 4x1, Cb 1x4, Cr 1x1 on a
+// 16000 x 12480 page is about 571 MiB of planes, and is refused by a 320 MiB
+// limit before any decode.
+func TestDecodeCostFlexSampling(t *testing.T) {
+	t.Cleanup(func() { SetDecodeLimit(DefaultDecodeLimit) })
+	base := encodeJPEG(t, image.NewRGBA(image.Rect(0, 0, 64, 48)))
+	flex := withFrame(t, base, 16000, 12480, [3]byte{0x41, 0x14, 0x11})
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(flex))
+	if err != nil {
+		t.Fatal(err)
+	}
+	px := int64(16000 * 12480)
+	if got, want := decodeCost(flex, format, cfg, useThumb), 3*px+px; got != want {
+		t.Errorf("flex cost = %d, want %d (three full planes + thumbnail)", got, want)
+	}
+	SetDecodeLimit(320 << 20)
+	if _, err := Thumbnail(flex, 400, 600, FormatJPEG); !errors.Is(err, ErrDecodeTooLarge) {
+		t.Fatalf("flex Thumbnail err = %v, want ErrDecodeTooLarge", err)
+	}
+}
+
+// jpegDecodedBytes mirrors image/jpeg's allocations, padding included.
+func TestJPEGDecodedBytes(t *testing.T) {
+	cases := []struct {
+		name        string
+		w, h        int64
+		comps       [][2]int
+		progressive bool
+		rgb         bool
+		want        int64
+	}{
+		{"gray, padded to 8", 10, 10, [][2]int{{1, 1}}, false, false, 16 * 16},
+		{"gray progressive", 16, 16, [][2]int{{1, 1}}, true, false, 256 + 4*256},
+		{"4:2:0 padded to MCUs", 17, 17, [][2]int{{2, 2}, {1, 1}, {1, 1}}, false, false, 32*32 + 2*16*16},
+		{"4:1:1", 64, 16, [][2]int{{4, 1}, {1, 1}, {1, 1}}, false, false, 64*16 + 2*16*16},
+		{"4:4:4 RGB", 16, 16, [][2]int{{1, 1}, {1, 1}, {1, 1}}, false, true, 3*256 + 4*256},
+		{"flex: Cb differs from Cr", 32, 32, [][2]int{{2, 2}, {1, 2}, {1, 1}}, false, false, 3 * 32 * 32},
+		{"flex: Y not largest", 32, 32, [][2]int{{1, 1}, {2, 2}, {2, 2}}, false, false, 3 * 32 * 32},
+		{"flex: ratio 3", 48, 16, [][2]int{{3, 1}, {1, 1}, {1, 1}}, false, false, 3 * 48 * 16},
+		{"4:2:0 progressive", 16, 16, [][2]int{{2, 2}, {1, 1}, {1, 1}}, true, false, 256 + 2*64 + (4+1+1)*256},
+		{"CMYK", 8, 8, [][2]int{{1, 1}, {1, 1}, {1, 1}, {1, 1}}, false, false, 3*64 + 64 + 4*64},
+	}
+	for _, c := range cases {
+		got, ok := jpegDecodedBytes(c.w, c.h, c.comps, c.progressive, c.rgb)
+		if !ok || got != c.want {
+			t.Errorf("%s: got %d (ok %v), want %d", c.name, got, ok, c.want)
+		}
+	}
+	if _, ok := jpegDecodedBytes(8, 8, [][2]int{{1, 1}, {1, 1}}, false, false); ok {
+		t.Error("two components: want ok=false")
+	}
+}

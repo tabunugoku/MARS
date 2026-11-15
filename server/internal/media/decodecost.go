@@ -95,25 +95,9 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 		if !ok {
 			return bytesPerPixelFallback * px, false, false
 		}
-		hmax, vmax := int64(1), int64(1)
-		var sum int64
-		for _, c := range comps {
-			hmax = max(hmax, int64(c[0]))
-			vmax = max(vmax, int64(c[1]))
-			sum += int64(c[0]) * int64(c[1])
-		}
-		samples := px * sum / (hmax * vmax)
-		d = samples
-		if len(comps) == 4 { // CMYK output image
-			d += 4 * px
-		}
-		if len(comps) == 3 && cfg.ColorModel == color.RGBAModel {
-			// An RGB (not YCbCr) JPEG: image/jpeg converts the planes into a
-			// new RGBA image while still holding them.
-			d += 4 * px
-		}
-		if progressive { // int32 coefficient blocks
-			d += 4 * samples
+		d, ok = jpegDecodedBytes(int64(cfg.Width), int64(cfg.Height), comps, progressive, cfg.ColorModel == color.RGBAModel)
+		if !ok {
+			return bytesPerPixelFallback * px, false, false
 		}
 		return d, true, true
 	case "png":
@@ -153,6 +137,72 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 	default:
 		return bytesPerPixelFallback * px, false, false
 	}
+}
+
+// jpegDecodedBytes is what image/jpeg (Go 1.27) allocates to decode a w x h
+// JPEG whose components have the sampling factors comps, mirroring its makeImg
+// and processSOS:
+//   - one component: a gray image padded to 8x8 blocks;
+//   - three or four: a YCbCr image padded to whole MCUs. A standard ratio
+//     (4:4:4, 4:4:0, 4:2:2, 4:2:0, 4:1:1, 4:1:0, Y holding the largest
+//     factors and Cb equal to Cr) keeps the chroma planes subsampled; any
+//     other layout ("flex mode") stores all three planes at full resolution;
+//   - four (CMYK): a K plane (counted at full padded size) and the CMYK output;
+//   - RGB (rgb, three components that are not YCbCr): the RGBA output;
+//   - progressive: an int32 coefficient block (256 bytes) per 8x8 block of
+//     each component, at its sampled size.
+//
+// ok is false for a component count image/jpeg does not read (2, or over 4).
+func jpegDecodedBytes(w, h int64, comps [][2]int, progressive, rgb bool) (int64, bool) {
+	ceilDiv := func(a, b int64) int64 { return (a + b - 1) / b }
+	n := len(comps)
+	if n != 1 && n != 3 && n != 4 {
+		return 0, false
+	}
+	hmax, vmax := int64(1), int64(1)
+	for _, c := range comps {
+		hmax = max(hmax, int64(c[0]))
+		vmax = max(vmax, int64(c[1]))
+	}
+	var d int64
+	if n == 1 {
+		// image/jpeg ignores the sampling factors of a single component.
+		d = 8 * ceilDiv(w, 8) * 8 * ceilDiv(h, 8)
+		if progressive {
+			d += 4 * d
+		}
+		return d, true
+	}
+	mxx, myy := ceilDiv(w, 8*hmax), ceilDiv(h, 8*vmax)
+	wp, hp := 8*hmax*mxx, 8*vmax*myy
+	y, cb, cr := comps[0], comps[1], comps[2]
+	flex := cb != cr || int64(y[0]) != hmax || int64(y[1]) != vmax
+	hr, vr := int64(1), int64(1)
+	if !flex {
+		hr, vr = hmax/int64(cb[0]), vmax/int64(cb[1])
+		switch hr<<4 | vr {
+		case 0x11, 0x12, 0x21, 0x22, 0x41, 0x42:
+		default:
+			flex = true
+		}
+	}
+	if flex {
+		d = 3 * wp * hp
+	} else {
+		d = wp*hp + 2*ceilDiv(wp, hr)*ceilDiv(hp, vr)
+	}
+	if n == 4 {
+		d += wp*hp + 4*w*h
+	}
+	if n == 3 && rgb {
+		d += 4 * w * h
+	}
+	if progressive {
+		for _, c := range comps {
+			d += mxx * myy * int64(c[0]) * int64(c[1]) * 256
+		}
+	}
+	return d, true
 }
 
 // scaleCost estimates the memory scaleThumb needs on top of the decoded image
