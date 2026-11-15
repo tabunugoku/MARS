@@ -397,3 +397,70 @@ func TestJPEGDecodedBytes(t *testing.T) {
 		t.Error("two components: want ok=false")
 	}
 }
+
+// lateAdobe returns base with an Adobe APP14 segment (transform 0) inserted
+// just before EOI, after the scan, where DecodeConfig never looks.
+func lateAdobe(t *testing.T, base []byte) []byte {
+	t.Helper()
+	if !bytes.HasSuffix(base, []byte{0xFF, 0xD9}) {
+		t.Fatal("base JPEG does not end with EOI")
+	}
+	out := bytes.Clone(base[:len(base)-2])
+	out = append(out, adobeAPP14[:]...)
+	return append(out, 0xFF, 0xD9)
+}
+
+// withJFIF returns base with a JFIF APP0 segment right after SOI.
+func withJFIF(base []byte) []byte {
+	app0 := []byte{0xFF, 0xE0, 0x00, 0x10, 'J', 'F', 'I', 'F', 0x00, 1, 1, 0, 0, 1, 0, 1, 0, 0}
+	out := append(bytes.Clone(base[:2]), app0...)
+	return append(out, base[2:]...)
+}
+
+// An Adobe transform-0 marker after the scan makes image/jpeg decode a
+// three-component JPEG as RGB and convert it into a new RGBA image, though
+// DecodeConfig (which stops at the first scan) reports YCbCr. The estimate
+// reads the late marker and counts the RGBA output; a JFIF marker turns it
+// back to YCbCr, as in the decoder. The fixture is a 64x48 4:4:4 JPEG without
+// JFIF or Adobe markers.
+func TestDecodeCostLateAdobeMarker(t *testing.T) {
+	base, err := os.ReadFile("testdata/ycc444-no-jfif.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	late := lateAdobe(t, base)
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(late))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ColorModel == color.RGBAModel {
+		t.Fatal("DecodeConfig already reports RGB: the fixture does not test a late marker")
+	}
+	m, _, err := image.Decode(bytes.NewReader(late))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := m.(*image.RGBA); !ok {
+		t.Fatalf("late Adobe JPEG decodes as %T, want *image.RGBA", m)
+	}
+	px := int64(cfg.Width * cfg.Height)
+	if got, want := decodeCost(late, format, cfg, useThumb), 3*px+4*px+px; got != want {
+		t.Errorf("late Adobe cost = %d, want %d (planes + RGBA + thumbnail)", got, want)
+	}
+	if got, want := decodeCost(base, format, cfg, useThumb), 3*px+px; got != want {
+		t.Errorf("plain 4:4:4 cost = %d, want %d", got, want)
+	}
+
+	jfif := withJFIF(late)
+	if m, _, err := image.Decode(bytes.NewReader(jfif)); err != nil {
+		t.Fatal(err)
+	} else if _, ok := m.(*image.YCbCr); !ok {
+		t.Fatalf("JFIF + late Adobe decodes as %T, want *image.YCbCr", m)
+	}
+	if jpegIsRGB(jfif) {
+		t.Error("JFIF + late Adobe: jpegIsRGB = true, want false")
+	}
+	if !jpegIsRGB(late) || jpegIsRGB(base) {
+		t.Error("jpegIsRGB: want true with the late marker only")
+	}
+}

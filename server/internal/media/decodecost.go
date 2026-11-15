@@ -1,6 +1,7 @@
 package media
 
 import (
+	"bytes"
 	"image"
 	"image/color"
 	"math"
@@ -95,7 +96,10 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 		if !ok {
 			return bytesPerPixelFallback * px, false, false
 		}
-		d, ok = jpegDecodedBytes(int64(cfg.Width), int64(cfg.Height), comps, progressive, cfg.ColorModel == color.RGBAModel)
+		// DecodeConfig stops at the first scan, but markers after it still
+		// decide whether the decoder converts to RGBA: read them all.
+		rgb := cfg.ColorModel == color.RGBAModel || (len(comps) == 3 && jpegIsRGB(img))
+		d, ok = jpegDecodedBytes(int64(cfg.Width), int64(cfg.Height), comps, progressive, rgb)
 		if !ok {
 			return bytesPerPixelFallback * px, false, false
 		}
@@ -137,6 +141,68 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 	default:
 		return bytesPerPixelFallback * px, false, false
 	}
+}
+
+// jpegIsRGB reports whether image/jpeg will decode the three-component JPEG
+// img as RGB (and convert it into a new RGBA image). It mirrors the decoder's
+// isRGB, which runs after the whole file is read: the last APP0 decides JFIF
+// (then never RGB), else the last Adobe APP14 with transform 0 means RGB, else
+// components named R, G and B do. Unlike DecodeConfig, which stops at the first
+// scan, it walks the markers after each scan too, skipping the entropy-coded
+// data (where a 0xFF byte is followed by 0x00 or a restart marker).
+func jpegIsRGB(img []byte) bool {
+	if len(img) < 4 || img[0] != 0xFF || img[1] != 0xD8 {
+		return false
+	}
+	jfif, adobeValid, adobeTransform, idsRGB := false, false, byte(0), false
+	sawFrame := false
+	for i := 2; i+1 < len(img); {
+		if img[i] != 0xFF {
+			j := bytes.IndexByte(img[i:], 0xFF)
+			if j < 0 {
+				break
+			}
+			i += j
+			continue
+		}
+		m := img[i+1]
+		switch {
+		case m == 0xFF: // fill byte
+			i++
+			continue
+		case m == 0x00, m == 0x01, m >= 0xD0 && m <= 0xD8: // stuffed byte, TEM, RSTn, SOI
+			i += 2
+			continue
+		case m == 0xD9: // EOI
+			i = len(img)
+			continue
+		}
+		if i+4 > len(img) {
+			break
+		}
+		n := int(img[i+2])<<8 | int(img[i+3])
+		if n < 2 || i+2+n > len(img) {
+			break
+		}
+		p := img[i+4 : i+2+n]
+		switch {
+		case m == 0xE0 && len(p) >= 5:
+			jfif = string(p[:5]) == "JFIF\x00"
+		case m == 0xEE && len(p) >= 12 && string(p[:5]) == "Adobe":
+			adobeValid, adobeTransform = true, p[11]
+		case isSOF(m) && !sawFrame && len(p) >= 6+9 && p[5] == 3:
+			sawFrame = true
+			idsRGB = p[6] == 'R' && p[9] == 'G' && p[12] == 'B'
+		}
+		i += 2 + n
+	}
+	switch {
+	case jfif:
+		return false
+	case adobeValid && adobeTransform == 0:
+		return true
+	}
+	return idsRGB
 }
 
 // jpegDecodedBytes is what image/jpeg (Go 1.27) allocates to decode a w x h
