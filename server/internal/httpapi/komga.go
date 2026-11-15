@@ -174,6 +174,9 @@ var komgaSeriesStatuses = map[string]SeriesStatus{
 
 // komgaFail answers an unexpected error.
 func (s *server) komgaFail(w http.ResponseWriter, r *http.Request, err error) {
+	if clientGone(r.Context(), err) {
+		return
+	}
 	slog.Error("komga", "path", r.URL.Path, "err", err)
 	writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 }

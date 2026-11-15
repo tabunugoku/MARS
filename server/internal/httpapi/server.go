@@ -47,6 +47,14 @@ type server struct{ Deps }
 var _ StrictServerInterface = (*server)(nil)
 
 // New returns the API handler, rooted at "/" (mount it under /api/v1).
+// clientGone reports whether err only says that the request's client went
+// away (it closed the connection or navigated on), so the work stopped. That
+// is not a server fault: nothing is logged and no answer is written, since no
+// one reads it.
+func clientGone(ctx context.Context, err error) bool {
+	return errors.Is(err, context.Canceled) && ctx.Err() != nil
+}
+
 func New(d Deps) http.Handler {
 	s := &server{d}
 	strict := NewStrictHandlerWithOptions(s, []StrictMiddlewareFunc{requireAdmin}, StrictHTTPServerOptions{
@@ -58,6 +66,9 @@ func New(d Deps) http.Handler {
 			writeError(r.Context(), w, http.StatusBadRequest, "bad_request.malformed")
 		},
 		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			if clientGone(r.Context(), err) {
+				return
+			}
 			slog.Error("api", "path", r.URL.Path, "err", err)
 			writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		},
