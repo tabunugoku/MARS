@@ -94,14 +94,14 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 	case "jpeg":
 		progressive, comps, ok := jpegFrame(img)
 		if !ok {
-			return bytesPerPixelFallback * px, false, false
+			return jpegWorstBytes(int64(cfg.Width), int64(cfg.Height)), false, false
 		}
 		// DecodeConfig stops at the first scan, but markers after it still
 		// decide whether the decoder converts to RGBA: read them all.
 		rgb := cfg.ColorModel == color.RGBAModel || (len(comps) == 3 && jpegIsRGB(img))
 		d, ok = jpegDecodedBytes(int64(cfg.Width), int64(cfg.Height), comps, progressive, rgb)
 		if !ok {
-			return bytesPerPixelFallback * px, false, false
+			return jpegWorstBytes(int64(cfg.Width), int64(cfg.Height)), false, false
 		}
 		return d, true, true
 	case "png":
@@ -141,6 +141,17 @@ func decodedBytes(img []byte, format string, cfg image.Config, px int64) (d int6
 	default:
 		return bytesPerPixelFallback * px, false, false
 	}
+}
+
+// jpegWorstBytes bounds what image/jpeg can allocate for a w x h JPEG whose
+// frame header the estimate could not read: a progressive four-component image
+// whose components all hold the largest sampling factors (4x4), so 3 planes
+// (flex mode stores them at full resolution), a K plane, the CMYK output and
+// four coefficient planes of 4 bytes a pixel each: 24 bytes a pixel over the
+// size padded to 32-pixel MCUs, plus one for a thumbnail.
+func jpegWorstBytes(w, h int64) int64 {
+	wp, hp := (w+31)/32*32, (h+31)/32*32
+	return 24*wp*hp + w*h
 }
 
 // jpegIsRGB reports whether image/jpeg will decode the three-component JPEG

@@ -46,8 +46,14 @@ func jpegSegments(img []byte, visit func(m byte, payload []byte) bool) bool {
 	}
 	i := 2
 	for {
-		if i+1 >= len(img) || img[i] != 0xFF {
+		if i+1 >= len(img) {
 			return false
+		}
+		if img[i] != 0xFF {
+			// Extraneous bytes between segments: image/jpeg (like libjpeg)
+			// skips them silently, so the walk does too.
+			i++
+			continue
 		}
 		m := img[i+1]
 		if m == 0xFF { // fill byte before a marker
@@ -58,8 +64,8 @@ func jpegSegments(img []byte, visit func(m byte, payload []byte) bool) bool {
 		if m == 0xDA || m == 0xD9 { // SOS or EOI
 			return true
 		}
-		if m == 0x00 {
-			return false
+		if m == 0x00 { // 0xFF 0x00 outside a scan: extraneous, skipped
+			continue
 		}
 		if m == 0x01 || (m >= 0xD0 && m <= 0xD7) { // standalone: no length
 			if !visit(m, nil) {

@@ -464,3 +464,79 @@ func TestDecodeCostLateAdobeMarker(t *testing.T) {
 		t.Error("jpegIsRGB: want true with the late marker only")
 	}
 }
+
+// withJunkBeforeSOF returns base with one extraneous byte before its frame
+// header, which image/jpeg skips silently.
+func withJunkBeforeSOF(t *testing.T, base []byte) []byte {
+	t.Helper()
+	i := -1
+	for _, m := range []byte{0xC0, 0xC2} {
+		if j := bytes.Index(base, []byte{0xFF, m}); j >= 0 {
+			i = j
+			break
+		}
+	}
+	if i < 0 {
+		t.Fatal("no SOF0/SOF2 in the base JPEG")
+	}
+	out := append(bytes.Clone(base[:i]), 0x00)
+	return append(out, base[i:]...)
+}
+
+// Extraneous bytes before the frame header no longer hide it: the estimate
+// reads past them as the decoder does. A progressive Adobe CMYK page of
+// 16000 x 12000 with a junk byte before SOF costs 24 bytes a pixel and is
+// refused by the 2560 MiB limit of a 4 GiB container before any decode.
+func TestDecodeCostJunkBeforeFrame(t *testing.T) {
+	t.Cleanup(func() { SetDecodeLimit(DefaultDecodeLimit) })
+	base, err := os.ReadFile("testdata/cmyk-adobe.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	junk := withJunkBeforeSOF(t, base)
+	if _, _, err := image.Decode(bytes.NewReader(junk)); err != nil {
+		t.Fatalf("image/jpeg rejects the junk byte: %v", err)
+	}
+	prog := bytes.Clone(junk)
+	i := bytes.Index(prog, []byte{0xFF, 0xC0})
+	if i < 0 {
+		t.Fatal("no SOF0 in the CMYK fixture")
+	}
+	prog[i+1] = 0xC2
+	binary.BigEndian.PutUint16(prog[i+5:], 12000)
+	binary.BigEndian.PutUint16(prog[i+7:], 16000)
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(prog))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if progressive, comps, ok := jpegFrame(prog); !ok || !progressive || len(comps) != 4 {
+		t.Fatalf("jpegFrame behind junk = %v, %v, %v; want progressive 4 components", progressive, comps, ok)
+	}
+	px := int64(16000 * 12000)
+	if got, want := decodeCost(prog, format, cfg, useThumb), 24*px+px; got != want {
+		t.Errorf("junk + progressive CMYK cost = %d, want %d", got, want)
+	}
+	SetDecodeLimit(2560 << 20)
+	if _, err := Thumbnail(prog, 400, 600, FormatJPEG); !errors.Is(err, ErrDecodeTooLarge) {
+		t.Fatalf("Thumbnail err = %v, want ErrDecodeTooLarge", err)
+	}
+
+	// The CMYK fix of needsAdobeMarker sees through the junk too.
+	noAdobe, err := os.ReadFile("testdata/cmyk-no-adobe.jpg")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !needsAdobeMarker(withJunkBeforeSOF(t, noAdobe)) {
+		t.Error("needsAdobeMarker missed a CMYK frame behind a junk byte")
+	}
+}
+
+// A JPEG whose frame header cannot be read at all is estimated at the worst
+// layout image/jpeg can allocate, not at the generic 12 bytes a pixel.
+func TestDecodeCostUnreadableJPEGFrame(t *testing.T) {
+	cfg := image.Config{Width: 100, Height: 100}
+	got := decodeCost([]byte{0xFF, 0xD8, 0xFF, 0xD9}, "jpeg", cfg, useThumb)
+	if want := int64(24*128*128 + 100*100); got != want {
+		t.Errorf("unreadable frame cost = %d, want %d", got, want)
+	}
+}
