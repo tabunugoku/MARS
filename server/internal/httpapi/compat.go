@@ -131,6 +131,9 @@ func (s *server) compatUser(w http.ResponseWriter, r *http.Request, cache *basic
 			return u, true, false
 		}
 		if !errors.Is(err, auth.ErrUnauthorized) {
+			if clientGone(ctx, err) {
+				return u, false, true
+			}
 			slog.Error("compat auth", "err", err)
 			writeError(ctx, w, http.StatusInternalServerError, "server.error")
 			return u, false, true

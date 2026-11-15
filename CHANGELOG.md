@@ -5,6 +5,12 @@ All notable changes to MARS are listed here. Versions follow
 `ghcr.io/tabunugoku/mars` with the tags `X.Y.Z`, `X.Y`, `X` and `latest`
 (0.x releases get no `X` tag).
 
+## Unreleased
+
+### Fixed
+
+- A request that the browser drops before it is answered (a page left while loading) is no longer logged as an error ("authenticate ... context canceled").
+
 ## 0.1.1 — 2026-11-14
 
 Faster analysis and thumbnails.

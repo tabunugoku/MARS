@@ -121,6 +121,9 @@ func (s *server) authenticate(next http.Handler) http.Handler {
 			}
 		}
 		if err != nil && !errors.Is(err, auth.ErrUnauthorized) {
+			if clientGone(ctx, err) {
+				return
+			}
 			slog.Error("authenticate", "err", err)
 			writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 			return
@@ -148,7 +151,7 @@ func (s *server) refresh(ctx context.Context, w http.ResponseWriter, r *http.Req
 	if err := s.DB.QueryRowContext(ctx, `SELECT remember FROM sessions WHERE token_hash = ?`, auth.HashToken(token)).Scan(&remember); err != nil || remember {
 		return
 	}
-	if _, err := s.Auth.RefreshSession(ctx, token, shortSession); err != nil {
+	if _, err := s.Auth.RefreshSession(ctx, token, shortSession); err != nil && !clientGone(ctx, err) {
 		slog.Warn("session refresh", "err", err)
 	}
 }

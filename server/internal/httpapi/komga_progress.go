@@ -253,6 +253,9 @@ func (s *server) komgaTachiReadList(ctx context.Context, id string) (bool, []Boo
 
 // komgaTachiFail answers an unexpected error.
 func komgaTachiFail(ctx context.Context, w http.ResponseWriter, err error) {
+	if clientGone(ctx, err) {
+		return
+	}
 	slog.Error("komga progress", "err", err)
 	writeError(ctx, w, http.StatusInternalServerError, "server.error")
 }
