@@ -17,38 +17,8 @@ var adobeAPP14 = [16]byte{
 // browsers and Pillow read them with the inverted CMYK convention. Malformed
 // input returns false.
 func needsAdobeMarker(img []byte) bool {
-	if len(img) < 4 || img[0] != 0xFF || img[1] != 0xD8 {
-		return false
-	}
 	four := false
-	i := 2
-	for {
-		if i+1 >= len(img) || img[i] != 0xFF {
-			return false
-		}
-		m := img[i+1]
-		if m == 0xFF { // fill byte before a marker
-			i++
-			continue
-		}
-		i += 2
-		if m == 0xDA || m == 0xD9 { // SOS or EOI
-			return four
-		}
-		if m == 0x00 {
-			return false
-		}
-		if m == 0x01 || (m >= 0xD0 && m <= 0xD7) { // standalone: no length
-			continue
-		}
-		if i+2 > len(img) {
-			return false
-		}
-		segLen := int(img[i])<<8 | int(img[i+1])
-		if segLen < 2 || i+segLen > len(img) {
-			return false
-		}
-		payload := img[i+2 : i+segLen]
+	ok := jpegSegments(img, func(m byte, payload []byte) bool {
 		switch {
 		case isSOF(m):
 			if len(payload) < 6 {
@@ -58,6 +28,59 @@ func needsAdobeMarker(img []byte) bool {
 				four = true
 			}
 		case m == 0xEE && bytes.HasPrefix(payload, []byte("Adobe")):
+			return false
+		}
+		return true
+	})
+	return ok && four
+}
+
+// jpegSegments walks the marker segments of a JPEG from SOI up to the SOS or
+// EOI marker, calling visit with each marker and its payload (nil for the
+// standalone markers, which have no length). visit returns false to stop the
+// walk. jpegSegments returns true only when it reaches SOS or EOI; malformed or
+// truncated input, and a visit that stopped the walk, return false.
+func jpegSegments(img []byte, visit func(m byte, payload []byte) bool) bool {
+	if len(img) < 4 || img[0] != 0xFF || img[1] != 0xD8 {
+		return false
+	}
+	i := 2
+	for {
+		if i+1 >= len(img) {
+			return false
+		}
+		if img[i] != 0xFF {
+			// Extraneous bytes between segments: image/jpeg (like libjpeg)
+			// skips them silently, so the walk does too.
+			i++
+			continue
+		}
+		m := img[i+1]
+		if m == 0xFF { // fill byte before a marker
+			i++
+			continue
+		}
+		i += 2
+		if m == 0xDA || m == 0xD9 { // SOS or EOI
+			return true
+		}
+		if m == 0x00 { // 0xFF 0x00 outside a scan: extraneous, skipped
+			continue
+		}
+		if m == 0x01 || (m >= 0xD0 && m <= 0xD7) { // standalone: no length
+			if !visit(m, nil) {
+				return false
+			}
+			continue
+		}
+		if i+2 > len(img) {
+			return false
+		}
+		segLen := int(img[i])<<8 | int(img[i+1])
+		if segLen < 2 || i+segLen > len(img) {
+			return false
+		}
+		if !visit(m, img[i+2:i+segLen]) {
 			return false
 		}
 		i += segLen
