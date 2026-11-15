@@ -7,6 +7,10 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+## 0.1.2 — 2026-11-15
+
+Fixes for large and CMYK pages, decode memory and duplicate tasks.
+
 ### Fixed
 
 - CMYK JPEG pages without an Adobe marker (common in print-resolution scans) now get covers and page thumbnails; they failed with "4-component JPEG doesn't have Adobe APP14 metadata".
