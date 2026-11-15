@@ -10,6 +10,7 @@ All notable changes to MARS are listed here. Versions follow
 ### Fixed
 
 - Two tasks of the same kind for one library no longer run at once. A scan or analysis requested while one is running now waits as one queued task and starts when the running one ends; before, two analyses of one library could run side by side and read every book twice.
+- A new library is no longer scanned twice when its first scan takes longer than a minute: the scheduler skipped no library whose scan was still running, because its last scan time is set only when the scan ends.
 
 ## 0.1.1 — 2026-11-14
 

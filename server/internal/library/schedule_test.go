@@ -90,3 +90,63 @@ func TestScheduleStartupQueuesOnlyDueLibraries(t *testing.T) {
 		t.Errorf("queued = %v, want overdue and fresh", got)
 	}
 }
+
+// TestScheduleSkipsLibraryBeingScanned checks that a library whose scan is
+// still running is not queued again by the scheduler, even though it has never
+// finished a scan (the first scan of a new library takes longer than a tick).
+func TestScheduleSkipsLibraryBeingScanned(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn, err := db.Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx,
+		`INSERT INTO libraries (id, name, root, kind, scan_interval, watch, created_at) VALUES ('new', 'new', ?, 'manga', 'daily', 0, '2026-01-01T00:00:00Z')`,
+		t.TempDir()); err != nil {
+		t.Fatal(err)
+	}
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q, ThumbDir: t.TempDir()}
+
+	release := make(chan struct{})
+	defer close(release)
+	first, err := q.SubmitKey(ctx, "scan", "scan", task.Text{English: "first"}, "new", func(ctx context.Context, _ func(float64)) error {
+		select {
+		case <-release:
+		case <-ctx.Done():
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		tasks, err := q.List(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(tasks) == 1 && tasks[0].ID == first.ID && tasks[0].State == "running" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("first scan not running: %+v", tasks)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	s.queueDue(ctx)
+
+	tasks, err := q.List(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tasks) != 1 {
+		t.Fatalf("tasks after queueDue = %d, want only the running scan", len(tasks))
+	}
+}

@@ -986,6 +986,13 @@ func (s *Service) queueDue(ctx context.Context) {
 	rows.Close()
 	slices.Sort(ids)
 	for _, id := range ids {
+		// A library whose scan is queued or running is not due again: its
+		// last_scan is set only when that scan ends, so a long first scan
+		// (of a library just created) would otherwise be queued a second time
+		// at the next tick.
+		if s.Queue.Busy("scan", id) {
+			continue
+		}
 		if _, err := s.QueueScan(ctx, id); err != nil {
 			slog.Error("schedule scan", "library", id, "err", err)
 		}

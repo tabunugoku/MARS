@@ -199,6 +199,19 @@ func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, lib
 	return q.get(ctx, j.id)
 }
 
+// Busy reports whether a task of kind for libraryID is queued or running
+// (and not cancelled), whatever its key.
+func (q *Queue) Busy(kind, libraryID string) bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for _, j := range q.live {
+		if j.kind == kind && j.libID == libraryID && j.ctx.Err() == nil {
+			return true
+		}
+	}
+	return false
+}
+
 // enqueue hands j to the workers.
 func (q *Queue) enqueue(j *job) {
 	select {
