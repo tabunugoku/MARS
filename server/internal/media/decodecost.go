@@ -21,8 +21,20 @@ const (
 type decodeUse int
 
 const (
-	useThumb decodeUse = iota // a thumbnail (Thumbnail, DecodeBudgeted)
+	useThumb decodeUse = iota // a thumbnail (Thumbnail)
 	useJPEG                   // ToJPEG, which draws into a full-size RGBA
+	usePNG                    // DecodeBudgeted: the Komga PNG conversion
+)
+
+// pngRowBuffers is the bytes per pixel of image width that a conversion to
+// PNG holds besides the decoded image: image/png's encoder keeps six filter
+// rows (five candidates and the previous row) and a PNG source is read through
+// two rows, each up to 8 bytes a pixel (16-bit RGBA). They do not depend on the
+// height, so a very wide, one-row image costs far more than its pixels.
+// pngFixedBuffers covers the zlib and bufio state of the encoder.
+const (
+	pngRowBuffers   = (6 + 2) * 8
+	pngFixedBuffers = 1 << 20
 )
 
 // decodeCost estimates the peak bytes that decoding img (in format, with header
@@ -55,6 +67,11 @@ const (
 func decodeCost(img []byte, format string, cfg image.Config, use decodeUse) int64 {
 	px := int64(cfg.Width) * int64(cfg.Height)
 	d, shrinkable, counted := decodedBytes(img, format, cfg, px)
+	if use == usePNG {
+		// The encoder reads the decoded image as it is: no full-size copy,
+		// only the row buffers, whatever the source format.
+		return max(d+pngRowBuffers*(int64(cfg.Width)+1)+pngFixedBuffers, 1)
+	}
 	if counted {
 		switch {
 		case use == useJPEG:

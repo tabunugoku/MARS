@@ -99,16 +99,16 @@ func acquireDecode(ctx context.Context, st *decodeBudget, weight int64) (func(),
 	}, nil
 }
 
-// DecodeBudgeted decodes img in full under the process decode budget. It first
-// estimates the peak memory that the decode and an encode of the result need
-// (decodeCost).
-// An image over the decode limit (SetDecodeLimit) fails with ErrDecodeTooLarge,
+// DecodeBudgeted decodes img in full under the process decode budget, for a
+// caller that encodes the result as PNG (the Komga page conversion). It first
+// estimates the peak memory of the decode and the PNG encoder's row buffers
+// (decodeCost, usePNG); the budget is held for both until release. An image over the decode limit (SetDecodeLimit) fails with ErrDecodeTooLarge,
 // which also matches ErrTooLarge, without waiting for the budget. Otherwise it
 // waits until the budget has room for the estimate, or until ctx ends. The
 // caller checks the pixel limit first (CheckPixels). On success the caller must
 // call release once the image is no longer used; on error release is nil.
 func DecodeBudgeted(ctx context.Context, img []byte) (image.Image, func(), error) {
-	return decodeFor(ctx, img, useThumb, image.Point{})
+	return decodeFor(ctx, img, usePNG, image.Point{})
 }
 
 // decodeFor is DecodeBudgeted for a given use: it checks the estimated cost

@@ -3,6 +3,7 @@ package media
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"hash/crc32"
 	"image"
@@ -12,6 +13,7 @@ import (
 	"image/png"
 	"os"
 	"testing"
+	"time"
 )
 
 var (
@@ -270,4 +272,55 @@ func TestThumbnailRefusesExtremeStrip(t *testing.T) {
 		t.Fatalf("DecodeBudgeted (no scaling) err = %v", err)
 	}
 	release()
+}
+
+// A conversion to PNG (DecodeBudgeted, used by Komga) holds the encoder's row
+// buffers, which grow with the width alone: a 32,000,000 x 1 RGBA PNG decodes
+// to 128 MB but needs about 2 GB more, so it is refused.
+func TestPNGConversionCost(t *testing.T) {
+	t.Cleanup(func() { SetDecodeLimit(DefaultDecodeLimit) })
+	wide := encodePNG(t, image.NewNRGBA(image.Rect(0, 0, 64, 1)))
+	binary.BigEndian.PutUint32(wide[16:], 32_000_000)
+	binary.BigEndian.PutUint32(wide[29:], crc32.ChecksumIEEE(wide[12:29]))
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(wide))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := decodeCost(wide, format, cfg, usePNG)
+	if want := int64(4*32_000_000 + pngRowBuffers*(32_000_000+1) + pngFixedBuffers); got != want {
+		t.Errorf("wide PNG conversion cost = %d, want %d", got, want)
+	}
+	SetDecodeLimit(640 << 20)
+	if _, _, err := DecodeBudgeted(context.Background(), wide); !errors.Is(err, ErrDecodeTooLarge) {
+		t.Fatalf("wide PNG conversion err = %v, want ErrDecodeTooLarge", err)
+	}
+
+	// A page: the rows are small next to the pixels.
+	page := image.Config{Width: 4000, Height: 6000}
+	if got, want := decodeCost(encodeJPEG(t, image.NewRGBA(image.Rect(0, 0, 16, 16))), "jpeg", page, usePNG),
+		int64(4000*6000*3/2+pngRowBuffers*4001+pngFixedBuffers); got != want {
+		t.Errorf("page conversion cost = %d, want %d", got, want)
+	}
+}
+
+// Conversions are admitted by their full cost, row buffers included: with a
+// budget for one and a half, a second wide conversion waits for the first.
+func TestPNGConversionsShareTheBudget(t *testing.T) {
+	wide := encodePNG(t, image.NewNRGBA(image.Rect(0, 0, 20_000, 1)))
+	cfg, format, err := image.DecodeConfig(bytes.NewReader(wide))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cost := decodeCost(wide, format, cfg, usePNG)
+	useBudget(t, cost*3/2)
+	_, release, err := DecodeBudgeted(context.Background(), wide)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer release()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	if _, _, err := DecodeBudgeted(ctx, wide); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("second conversion err = %v, want it to wait for the budget", err)
+	}
 }
