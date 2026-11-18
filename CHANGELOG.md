@@ -7,6 +7,10 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+### Changed
+
+- The MARS name in the sidebar and on the sign-in and setup pages is now the MARS wordmark: Unbounded cut once like a gutter between manga panels.
+
 ## 0.1.2 — 2026-11-15
 
 Fixes for large and CMYK pages, decode memory and duplicate tasks.

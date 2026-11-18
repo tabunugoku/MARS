@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router";
 import { api, errorMessage } from "@/api";
 import { AppMark } from "@/components/brand/app-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import Input from "@/components/ui/input";
 import { typeClass } from "@/lib/type-scale";
@@ -83,9 +84,7 @@ export function SetupForm() {
     <form onSubmit={submit} noValidate className="flex w-full max-w-[360px] flex-col gap-6">
       <div className="flex items-center gap-2">
         <AppMark size={40} className="-ml-1" />
-        <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-          MARS
-        </span>
+        <Wordmark height={20} label="MARS" />
       </div>
 
       <div className="flex flex-col gap-2">

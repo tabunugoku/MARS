@@ -18,8 +18,6 @@ import type { IconComponent } from "@/lib/icon-context";
 import { type RefObject, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api, useApi } from "@/api";
 import { defineMessages, useT } from "@/i18n";
-import { fontWeights } from "@/lib/font-weight";
-import { typeClass } from "@/lib/type-scale";
 import {
   House,
   Bookmarks,
@@ -38,6 +36,7 @@ import {
 import { useTheme } from "./theme";
 import { LibraryGlyph } from "./library-glyph";
 import { AppMark } from "@/components/brand/app-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { motion } from "motion/react";
 
 const I = (c: unknown) => c as IconComponent;
@@ -214,9 +213,7 @@ export function AppSidebar() {
       <SidebarHeader className="pl-4">
         <Link to="/" className="flex h-9 items-center gap-2 px-2" aria-label={t("homeLabel")}>
           <AppMark size={28} className="-ml-1" />
-          <span className={typeClass("subtitle")} style={{ fontVariationSettings: fontWeights.semibold }}>
-            MARS
-          </span>
+          <Wordmark height={17} />
         </Link>
         <form
           ref={searchForm}

@@ -1,0 +1,133 @@
+"""Builds the MARS wordmark SVGs from Unbounded (SIL OFL 1.1).
+
+The font is not in the repository. Get Unbounded[wght].ttf from
+github.com/google/fonts (ofl/unbounded) and run:
+
+    python brand/build_wordmark.py path/to/Unbounded[wght].ttf
+
+The letters become paths, so the SVGs need no font. See brand/README.md
+for the design rules these numbers implement.
+"""
+import math
+import sys
+from pathlib import Path
+
+from fontTools.pens.svgPathPen import SVGPathPen
+from fontTools.pens.transformPen import TransformPen
+from fontTools.ttLib import TTFont
+from fontTools.varLib.instancer import instantiateVariableFont
+
+WEIGHT = 600
+TEXT = "MARS"
+TRACKING = 70          # font units added after each letter
+KERN = {"RS": -40}     # optical corrections, font units
+CUT_ANGLE = 2.5          # degrees, rising to the right
+CUT_HEIGHT = 0.5       # of the cap height, where the cut crosses the centre
+SHIFT = 70             # font units the lower part slides along the cut
+GUTTER = 70            # font units, the gap of the one-colour version
+PAD = 60               # font units of margin around the letters
+
+STAR = "#f3c9bd"       # the icon's star dots
+PLANET = "#e8542f"     # the icon's planet
+
+OUT = Path(__file__).resolve().parent
+TS_OUT = OUT.parent / "web/src/components/brand/wordmark-paths.ts"
+
+
+def glyph_paths(font_path):
+    font = instantiateVariableFont(TTFont(font_path), {"wght": WEIGHT})
+    gs = font.getGlyphSet()
+    cmap = font.getBestCmap()
+    cap = font["OS/2"].sCapHeight
+    parts, x = [], 0
+    for i, ch in enumerate(TEXT):
+        name = cmap[ord(ch)]
+        pen = SVGPathPen(gs)
+        # font units are y-up; flip so the baseline sits at y = cap
+        gs[name].draw(TransformPen(pen, (1, 0, 0, -1, x, cap)))
+        parts.append(pen.getCommands())
+        x += gs[name].width + TRACKING + KERN.get(TEXT[i:i + 2], 0)
+    width = x - TRACKING  # no tracking after the last letter
+    return parts, width, cap
+
+
+def cut_line(width, cap):
+    """Point and unit direction of the cut, in letter coordinates (y down)."""
+    a = math.radians(CUT_ANGLE)
+    return (width / 2, cap * (1 - CUT_HEIGHT)), (math.cos(a), -math.sin(a))
+
+
+def half_plane(p, d, side, offset, reach):
+    """Polygon covering one side of the line through p along d, moved by
+    offset along the normal. side +1 is below the line (y down), -1 above."""
+    nx, ny = -d[1], d[0]  # normal pointing down
+    if ny < 0:
+        nx, ny = -nx, -ny
+    ox, oy = p[0] + nx * offset * side, p[1] + ny * offset * side
+    a = (ox - d[0] * reach, oy - d[1] * reach)
+    b = (ox + d[0] * reach, oy + d[1] * reach)
+    c = (b[0] + nx * reach * side, b[1] + ny * reach * side)
+    e = (a[0] + nx * reach * side, a[1] + ny * reach * side)
+    return " ".join(f"{x:.1f},{y:.1f}" for x, y in (a, b, c, e))
+
+
+def svg(width, height, body, title):
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width:.0f} {height:.0f}" '
+        f'role="img" aria-label="{title}">\n<title>{title}</title>\n{body}\n</svg>\n'
+    )
+
+
+def build(font_path):
+    parts, width, cap = glyph_paths(font_path)
+    letters = "".join(f'<path d="{d}"/>' for d in parts)
+    p, d = cut_line(width, cap)
+    reach = width * 2
+    sx, sy = d[0] * SHIFT, d[1] * SHIFT
+    w = width + SHIFT + 2 * PAD
+    h = cap + 2 * PAD + abs(sy)
+    origin = f'translate({PAD} {PAD + abs(sy):.1f})'
+
+    two = (
+        f'<defs><clipPath id="mars-top"><polygon points="{half_plane(p, d, -1, 0, reach)}"/></clipPath>'
+        f'<clipPath id="mars-bottom"><polygon points="{half_plane(p, d, 1, 0, reach)}"/></clipPath></defs>\n'
+        f'<g transform="{origin}">'
+        f'<g clip-path="url(#mars-top)" fill="{STAR}">{letters}</g>'
+        f'<g transform="translate({sx:.1f} {sy:.1f})"><g clip-path="url(#mars-bottom)" fill="{PLANET}">{letters}</g></g>'
+        f'</g>'
+    )
+    (OUT / "mars-wordmark.svg").write_text(svg(w, h, two, "MARS"), encoding="utf-8")
+
+    g = GUTTER / 2
+    mono = (
+        f'<defs><clipPath id="mars-top"><polygon points="{half_plane(p, d, -1, g, reach)}"/></clipPath>'
+        f'<clipPath id="mars-bottom"><polygon points="{half_plane(p, d, 1, g, reach)}"/></clipPath></defs>\n'
+        f'<g transform="{origin}" fill="currentColor">'
+        f'<g clip-path="url(#mars-top)">{letters}</g><g clip-path="url(#mars-bottom)">{letters}</g>'
+        f'</g>'
+    )
+    (OUT / "mars-wordmark-mono.svg").write_text(svg(w, h, mono, "MARS"), encoding="utf-8")
+
+    plain = f'<g transform="{origin}" fill="currentColor">{letters}</g>'
+    (OUT / "mars-wordmark-small.svg").write_text(svg(w, h, plain, "MARS"), encoding="utf-8")
+    consts = {
+        "WORDMARK_VIEWBOX": f"0 0 {w:.0f} {h:.0f}",
+        "WORDMARK_ORIGIN": origin,
+        "WORDMARK_SHIFT": f"translate({sx:.1f} {sy:.1f})",
+        "WORDMARK_TOP": half_plane(p, d, -1, 0, reach),
+        "WORDMARK_BOTTOM": half_plane(p, d, 1, 0, reach),
+    }
+    lines = ["// Generated by brand/build_wordmark.py from Unbounded (SIL OFL 1.1). Do not edit."]
+    lines += [f'export const {k} = "{v}";' for k, v in consts.items()]
+    lines.append("export const WORDMARK_LETTERS = [")
+    lines += [f'  "{d}",' for d in parts]
+    lines.append("];")
+    ts = "\n".join(lines) + "\n"
+    TS_OUT.write_text(ts, encoding="utf-8")
+    print(f"wrote 3 SVGs and {TS_OUT.name}, viewBox {w:.0f} x {h:.0f}, letters {width} units wide")
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit(__doc__)
+    build(sys.argv[1])
