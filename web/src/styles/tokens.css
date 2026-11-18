@@ -18,6 +18,7 @@
   --brand-foreground: oklch(0.99 0 0);
   --brand-soft: oklch(0.55 0.19 33 / 10%);
   --here: oklch(0.56 0.15 250);           /* sunset blue ≈ #1577C8 — "you are here" only */
+  --wordmark-ink: oklch(0.2 0.014 40);    /* the logo above its cut: the text colour */
   --fluid-accent: oklch(0.55 0.19 33);
   --destructive: oklch(0.52 0.21 15);     /* crimson, kept apart from the oxide brand */
   --dot: oklch(0.3 0.028 40 / 11%);       /* screentone on surfaces */
@@ -51,6 +52,7 @@
   --brand-foreground: oklch(0.99 0 0);
   --brand-soft: oklch(0.64 0.19 35 / 16%);
   --here: oklch(0.74 0.13 245);           /* ≈ #5DB2F7 */
+  --wordmark-ink: #f3c9bd;                /* the icon's star dust */
   --fluid-accent: oklch(0.64 0.19 35);
   --destructive: oklch(0.66 0.2 12);      /* crimson, kept apart from the oxide brand */
   --dot: oklch(1 0 0 / 7%);

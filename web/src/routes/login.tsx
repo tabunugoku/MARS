@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { api, errorMessage, safeNext, useApi, type LoginScreen } from "@/api";
 import { AppMark } from "@/components/brand/app-mark";
+import { Wordmark } from "@/components/brand/wordmark";
 import { PlanetOrbit } from "@/components/brand/planet-orbit";
 import { Cover } from "@/components/media/cover";
 import { Block } from "@/components/media/skeletons";
@@ -103,9 +104,7 @@ function SignInForm() {
       <div className="flex items-center gap-2">
         <AppMark size={40} className="-ml-1" />
         <span className="flex flex-col">
-          <span className={typeClass("title")} style={{ fontVariationSettings: fontWeights.semibold }}>
-            MARS
-          </span>
+          <Wordmark height={20} label="MARS" className="mb-1" />
           <span className={cn(typeClass("caption"), "text-muted-foreground")}>{t("tagline")}</span>
         </span>
       </div>
