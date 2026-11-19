@@ -553,6 +553,9 @@ func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id 
 		writeError(r.Context(), w, http.StatusInternalServerError, "server.cover_unreadable")
 		return
 	}
+	// The URL's ?v= names the stored file (see thumbURL). It is compared
+	// before a JPEG copy may replace p below.
+	versioned := r.URL.Query().Get("v") == library.ThumbVersion(filepath.Base(p))
 	if jpegOnly && !isJPEGName(p) {
 		p, err = s.jpegThumbnail(r.Context(), p)
 		if err != nil {
@@ -575,9 +578,16 @@ func (s *server) sendThumbnail(w http.ResponseWriter, r *http.Request, kind, id 
 	h := w.Header()
 	h.Set("Content-Type", media.ContentTypeForName(p))
 	h.Set("X-Content-Type-Options", "nosniff")
-	// Thumbnails are regenerated in place, so revalidate instead of
-	// caching forever; ServeContent answers 304 from Last-Modified.
-	h.Set("Cache-Control", "private, no-cache")
+	// A changed thumbnail is always written under a new file name
+	// (library.writeThumb / newThumbName), so a URL whose ?v= names the
+	// served file always means the same bytes and may be cached for good.
+	// A URL without a matching ?v= (the series falling back, an old link)
+	// revalidates; ServeContent answers 304 from Last-Modified.
+	if versioned {
+		h.Set("Cache-Control", "private, max-age=31536000, immutable")
+	} else {
+		h.Set("Cache-Control", "private, no-cache")
+	}
 	http.ServeContent(w, r, "", st.ModTime(), f)
 }
 

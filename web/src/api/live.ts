@@ -5,7 +5,7 @@
 // as it is.
 import { useEffect, useRef, useState } from "react";
 import { getLocale, subscribeLocale } from "@/i18n";
-import { bumpCover, retryCovers } from "@/lib/cover-retry";
+import { queueCoverBump, retryCovers } from "@/lib/cover-retry";
 import type { components } from "./schema";
 
 type S = components["schemas"];
@@ -42,18 +42,14 @@ let closeTimer: ReturnType<typeof setTimeout> | undefined;
 
 const enabled = () => import.meta.env.VITE_API !== "mock" && typeof EventSource !== "undefined";
 
-let coverTimer: ReturnType<typeof setTimeout> | undefined;
-
 function emit(e: LiveEvent) {
-  if (e.type === "book" && e.data.bookId) bumpCover(e.data.bookId, e.data.seriesId);
+  // A scan that makes many thumbnails sends one book event per book: the
+  // bumps are folded, so each cover changes once. Text covers retry through
+  // their own revision subscription, so no timer is needed here.
+  if (e.type === "book" && e.data.bookId) queueCoverBump(e.data.bookId, e.data.seriesId);
   for (const l of [...listeners]) l(e);
-  // New thumbnails: covers that had none try again, at most every 2 s.
-  if ((e.type === "book" || e.type === "reconnect") && !coverTimer) {
-    coverTimer = setTimeout(() => {
-      coverTimer = undefined;
-      retryCovers();
-    }, 2000);
-  }
+  // Events may have been missed while the stream was down: text covers try once more.
+  if (e.type === "reconnect") retryCovers();
 }
 
 function setUp(v: boolean) {
