@@ -94,6 +94,9 @@ type Service struct {
 	// (see deleteLock).
 	deleteMu   ctxMutex
 	deleteOnce sync.Once
+	// deleteQueueMu makes QueueDelete look for a live delete task and submit
+	// one as a single step, so two requests cannot both submit one.
+	deleteQueueMu sync.Mutex
 }
 
 // coverLock orders the writers of a book's cover: an analysis, a cover
@@ -942,14 +945,15 @@ var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time
 // minute. Each check queues a scan of every library that is due: one never
 // scanned, or one whose scan interval has passed since last_scan. A library
 // with interval "off" is not scanned. Libraries are not
-// scanned just because the server starts. Each check also queues the removal
-// of a library still marked deleting, when none is queued or running (see
-// queueDeletes). Schedule returns when ctx is done.
+// scanned just because the server starts. The first check also resumes the
+// removal of every library still marked deleting, and each later check queues
+// the removal of a deleting library that has no delete task row at all (see
+// resumeDeletes and queueOrphanDeletes). Schedule returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
 	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
 		slog.Error("reanalyse PDFs", "err", err)
 	}
-	s.queueDeletes(ctx)
+	s.resumeDeletes(ctx)
 	s.queueDue(ctx)
 	t := time.NewTicker(time.Minute)
 	defer t.Stop()
@@ -958,7 +962,7 @@ func (s *Service) Schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			s.queueDeletes(ctx)
+			s.queueOrphanDeletes(ctx)
 			s.queueDue(ctx)
 		}
 	}

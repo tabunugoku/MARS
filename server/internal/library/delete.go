@@ -27,9 +27,13 @@ func (s *Service) deleteLock() ctxMutex {
 }
 
 // QueueDelete queues the removal of a library. The caller has already set its
-// deleting flag, which hides the library at once; the task then removes the
-// rows in batches (see deleteLibrary) and the library row last. The queue
-// key is per library, so a second request folds into the first.
+// deleting flag, which hides the library at once. One delete task removes every
+// library marked deleting, one after another (see drainDeletes), so while a
+// delete task is queued or running this returns that task and submits nothing:
+// it reaches this library because the flag is already set. Otherwise a task
+// for this library is submitted, with the queue key per library as before.
+// The check and the submit run under deleteQueueMu, so two requests cannot
+// both submit a task.
 func (s *Service) QueueDelete(ctx context.Context, libraryID string) (task.Task, error) {
 	var name string
 	err := s.DB.QueryRowContext(ctx, `SELECT name FROM libraries WHERE id = ? AND deleting = 1`, libraryID).Scan(&name)
@@ -40,20 +44,70 @@ func (s *Service) QueueDelete(ctx context.Context, libraryID string) (task.Task,
 		return task.Task{}, err
 	}
 	label := task.Text{Code: "task.delete_library", Arg: name, English: "Delete " + name}
+
+	s.deleteQueueMu.Lock()
+	defer s.deleteQueueMu.Unlock()
+	live, ok, err := s.Queue.Live(ctx, "delete")
+	if err != nil {
+		return task.Task{}, err
+	}
+	if ok {
+		return live, nil
+	}
 	return s.Queue.SubmitKey(ctx, "delete", "delete:"+libraryID, label, libraryID, func(ctx context.Context, progress func(float64)) error {
-		return s.deleteLibrary(ctx, libraryID, progress)
+		return s.drainDeletes(ctx, libraryID, progress)
 	})
 }
 
-// queueDeletes queues the removal of every library still marked deleting, so
-// a deletion cut short by a restart goes on, and one whose task ended without
-// removing the library is tried again (see Schedule). A library with a delete
-// queued or running is skipped: that task is doing the work. Run resets the
-// tasks left by a restart before Schedule calls this, so none is left behind.
-func (s *Service) queueDeletes(ctx context.Context) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM libraries l WHERE deleting = 1 AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.library_id = l.id AND t.kind = 'delete' AND t.state IN ('queued','running')) ORDER BY id`)
+// drainDeletes is the work of a delete task. It removes libraryID, then every
+// library still marked deleting, one at a time, until none is left. One task
+// serves all of them, so deletes waiting for their turn do not hold the task
+// workers that scans and analyses need. A library marked after this task's
+// last check is not seen here; queueOrphanDeletes queues it on a later tick.
+// It returns at the first error, so a library that keeps failing is not retried
+// in a loop within this task.
+func (s *Service) drainDeletes(ctx context.Context, libraryID string, progress func(float64)) error {
+	if err := s.deleteLibrary(ctx, libraryID, progress); err != nil {
+		return err
+	}
+	for {
+		var next string
+		err := s.DB.QueryRowContext(ctx, `SELECT id FROM libraries WHERE deleting = 1 ORDER BY id LIMIT 1`).Scan(&next)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.deleteLibrary(ctx, next, progress); err != nil {
+			return err
+		}
+	}
+}
+
+// resumeDeletes queues the removal of every library still marked deleting. It
+// runs once, when Schedule starts, so a deletion cut short by a restart goes on.
+// The first QueueDelete submits the task and the rest fold into it. Run resets
+// the tasks left by a restart before Schedule calls this, so none is left behind.
+func (s *Service) resumeDeletes(ctx context.Context) {
+	s.queueDeletes(ctx, `SELECT id FROM libraries WHERE deleting = 1 ORDER BY id`)
+}
+
+// queueOrphanDeletes is the check on each tick. It queues only a library marked
+// deleting that has no delete task row at all: the case where the handler's
+// queue request failed, or the library was marked after the draining task's
+// last check. A library whose delete task was cancelled or failed keeps its row,
+// so it is not restarted until the next server start, as before.
+func (s *Service) queueOrphanDeletes(ctx context.Context) {
+	s.queueDeletes(ctx, `SELECT id FROM libraries l WHERE deleting = 1 AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.library_id = l.id AND t.kind = 'delete') ORDER BY id`)
+}
+
+// queueDeletes runs the query, which lists library ids, and queues each one's
+// delete (see QueueDelete).
+func (s *Service) queueDeletes(ctx context.Context, query string) {
+	rows, err := s.DB.QueryContext(ctx, query)
 	if err != nil {
-		slog.Error("resume deletes", "err", err)
+		slog.Error("queue deletes", "err", err)
 		return
 	}
 	var ids []string
@@ -61,7 +115,7 @@ func (s *Service) queueDeletes(ctx context.Context) {
 		var id string
 		if err := rows.Scan(&id); err != nil {
 			rows.Close()
-			slog.Error("resume deletes", "err", err)
+			slog.Error("queue deletes", "err", err)
 			return
 		}
 		ids = append(ids, id)
@@ -70,7 +124,7 @@ func (s *Service) queueDeletes(ctx context.Context) {
 	for _, id := range ids {
 		// ErrNotFound: the library went while the list was read.
 		if _, err := s.QueueDelete(ctx, id); err != nil && !errors.Is(err, ErrNotFound) {
-			slog.Error("resume delete", "library", id, "err", err)
+			slog.Error("queue delete", "library", id, "err", err)
 		}
 	}
 }

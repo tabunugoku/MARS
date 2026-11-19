@@ -4,17 +4,34 @@ import (
 	"context"
 	"database/sql"
 	"strings"
-	"sync"
 	"time"
 )
 
-// writeMu takes turns between the long writers (Batch and Unit) in Go instead
+// writeSem takes turns between the long writers (Batch and Unit) in Go instead
 // of leaving them to race for SQLite's write lock. That lock is not fair: a
 // writer that busy_timeout keeps waiting loses nearly every race to
 // back-to-back batches. A writer releases it before it rests, so the short
 // writers that do not take it (a progress write, touching a user, an API
 // request) get SQLite's lock during the rest.
-var writeMu sync.Mutex
+//
+// It is a one-slot channel rather than a sync.Mutex so that a writer waiting
+// for its turn can give up when its context ends. A mutex would hold a
+// cancelled request (or a stopped task) in line until the lock came free.
+var writeSem = make(chan struct{}, 1)
+
+// lockWrite takes the write turn. It returns ctx's error when ctx ends first,
+// and then the turn is not held.
+func lockWrite(ctx context.Context) error {
+	select {
+	case writeSem <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// unlockWrite gives the write turn back.
+func unlockWrite() { <-writeSem }
 
 // Batch runs a long job of small writes as a series of short write
 // transactions, so other writers (a reader saving progress) wait at most
@@ -25,16 +42,16 @@ var writeMu sync.Mutex
 // A job written through Batch must be safe to stop at any commit and to
 // run again: an interrupted scan is finished by the next one.
 //
-// From its first Tx until Flush or Close, a Batch holds writeMu. So a
+// From its first Tx until Flush or Close, a Batch holds writeSem. So a
 // goroutine must not call Unit or begin another Batch while its own Batch has
-// an open transaction: it would wait for a lock it holds itself.
+// an open transaction: it would wait for a turn it holds itself.
 type Batch struct {
 	DB            *sql.DB
 	MaxStatements int           // units per transaction; 0 means 1000
 	MaxDuration   time.Duration // 0 means 50ms
 
 	tx      *sql.Tx
-	locked  bool // holds writeMu while tx is open
+	locked  bool // holds writeSem while tx is open
 	begun   time.Time
 	units   int
 	stmts   map[string]*sql.Stmt
@@ -43,13 +60,16 @@ type Batch struct {
 }
 
 // Tx returns the open transaction, beginning one if needed. The transaction
-// holds writeMu until Flush or Close.
+// holds writeSem until Flush or Close. If ctx ends while the turn is awaited,
+// Tx returns ctx's error and nothing is begun.
 func (b *Batch) Tx(ctx context.Context) (*sql.Tx, error) {
 	if b.tx == nil {
-		writeMu.Lock()
+		if err := lockWrite(ctx); err != nil {
+			return nil, err
+		}
 		tx, err := b.DB.BeginTx(ctx, nil)
 		if err != nil {
-			writeMu.Unlock()
+			unlockWrite()
 			return nil, err
 		}
 		b.tx, b.locked, b.begun, b.units, b.stmts = tx, true, time.Now(), 0, map[string]*sql.Stmt{}
@@ -115,11 +135,11 @@ func (b *Batch) Flush() error {
 	return nil
 }
 
-// unlock releases writeMu if this Batch holds it.
+// unlock gives back writeSem if this Batch holds it.
 func (b *Batch) unlock() {
 	if b.locked {
 		b.locked = false
-		writeMu.Unlock()
+		unlockWrite()
 	}
 }
 
@@ -145,12 +165,15 @@ func Unit(ctx context.Context, d *sql.DB, fn func(tx *sql.Tx) error) error {
 	})
 }
 
-// unitTx runs fn in one transaction and commits it. It holds writeMu from the
+// unitTx runs fn in one transaction and commits it. It holds writeSem from the
 // begin to the commit or rollback, and returns how long the transaction was
 // open. The rest is left to the caller, so the lock is free while it runs.
+// If ctx ends while the turn is awaited, it returns ctx's error.
 func unitTx(ctx context.Context, d *sql.DB, fn func(tx *sql.Tx) error) (time.Duration, error) {
-	writeMu.Lock()
-	defer writeMu.Unlock()
+	if err := lockWrite(ctx); err != nil {
+		return 0, err
+	}
+	defer unlockWrite()
 	tx, err := d.BeginTx(ctx, nil)
 	if err != nil {
 		return 0, err

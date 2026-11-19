@@ -298,8 +298,8 @@ func TestDeleteKeepsItsTaskRow(t *testing.T) {
 	}
 }
 
-// A library left marked deleting with no task for it (the task failed, or its
-// queue request never got through) is queued again by the next tick.
+// A library left marked deleting with no task row for it (its queue request
+// never got through) is queued again by the next tick.
 func TestScheduleRequeuesOrphanDelete(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -310,10 +310,74 @@ func TestScheduleRequeuesOrphanDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &Service{DB: conn, Queue: q}
-	s.queueDeletes(ctx) // one tick of Schedule
+	s.queueOrphanDeletes(ctx) // one tick of Schedule
 	waitUntil(t, "the orphan delete to remove the library", func() bool {
 		return countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = 'gone'`) == 0
 	})
+}
+
+// A delete the admin cancelled keeps its task row, so a tick does not queue the
+// library again: it stays marked deleting until the next server start.
+func TestCancelledDeleteIsNotRequeuedByTick(t *testing.T) {
+	ctx := context.Background()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "gone", 1, 1, 1)
+	// No Run: the task stays queued until it is cancelled.
+	q := task.New(conn, 2)
+	s := &Service{DB: conn, Queue: q}
+	tk, err := s.QueueDelete(ctx, "gone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := q.Cancel(ctx, tk.ID); err != nil {
+		t.Fatal(err)
+	}
+	s.queueOrphanDeletes(ctx)
+	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE kind = 'delete'`); n != 1 {
+		t.Errorf("delete task rows after a tick = %d, want 1 (the cancelled one)", n)
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state = 'cancelled'`, tk.ID); n != 1 {
+		t.Errorf("the cancelled delete task is not cancelled")
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = 'gone'`); n != 1 {
+		t.Errorf("the library of a cancelled delete was removed or re-queued: %d rows", n)
+	}
+}
+
+// Libraries marked deleting and queued one after another share one delete task:
+// while the removal runs, no two delete tasks are queued or running at once, and
+// all three libraries go. Each delete batch is slowed so the task outlasts the
+// three requests in most runs; the task count is not asserted, since a request
+// can come after the task has ended.
+func TestDeletesShareOneTask(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	for _, id := range []string{"a", "b", "c"} {
+		seedDeleteLibrary(t, conn, id, 1, 2, 3)
+	}
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q, deleteBatch: 1}
+	s.deleteHook = func() { time.Sleep(2 * time.Millisecond) }
+	for _, id := range []string{"a", "b", "c"} {
+		if _, err := s.QueueDelete(ctx, id); err != nil && !errors.Is(err, ErrNotFound) {
+			t.Fatalf("QueueDelete(%s): %v", id, err)
+		}
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for countRows(t, conn, `SELECT count(*) FROM libraries`) > 0 {
+		if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE kind = 'delete' AND state IN ('queued','running')`); n > 1 {
+			t.Fatalf("%d delete tasks queued or running at once, want at most 1", n)
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("libraries still there after 10 seconds")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Logf("delete task rows for three libraries: %d", countRows(t, conn, `SELECT count(*) FROM tasks WHERE kind = 'delete'`))
 }
 
 // The rows that a delete and its cascades look up by library, series or book

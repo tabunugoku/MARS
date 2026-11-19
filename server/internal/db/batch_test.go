@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
@@ -75,4 +76,32 @@ func TestBatchAndUnitReleaseTheWriteLock(t *testing.T) {
 		return nil
 	})
 	within(t, "a unit after a failed unit", unit)
+}
+
+// A writer waiting for the write turn gives up when its context ends. While an
+// open batch holds the turn, a unit with a short deadline must return that
+// deadline at once, not wait for the batch.
+func TestUnitGivesUpWaitingForTurnWhenCtxEnds(t *testing.T) {
+	ctx := context.Background()
+	d, err := Open(ctx, filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+
+	b := &Batch{DB: d}
+	if _, err := b.Tx(ctx); err != nil {
+		t.Fatal(err)
+	}
+	defer b.Close()
+
+	uctx, cancel := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancel()
+	within(t, "a unit waiting behind an open batch", func() error {
+		err := Unit(uctx, d, func(*sql.Tx) error { return nil })
+		if !errors.Is(err, context.DeadlineExceeded) {
+			return errors.New("unit error is not the context's deadline: " + fmt.Sprint(err))
+		}
+		return nil
+	})
 }

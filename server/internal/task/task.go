@@ -201,6 +201,29 @@ func (q *Queue) SubmitKey(ctx context.Context, kind, key string, label Text, lib
 	return q.get(ctx, j.id)
 }
 
+// Live returns a queued or running task of kind, if there is one that has not
+// been cancelled. A task cancelled while it is still unwinding is not live:
+// work submitted now must not fold into it. ok is false when there is none.
+func (q *Queue) Live(ctx context.Context, kind string) (t Task, ok bool, err error) {
+	q.mu.Lock()
+	id := ""
+	for _, j := range q.live {
+		if j.kind == kind && j.ctx.Err() == nil {
+			id = j.id
+			break
+		}
+	}
+	q.mu.Unlock()
+	if id == "" {
+		return Task{}, false, nil
+	}
+	t, err = q.get(ctx, id)
+	if err != nil {
+		return Task{}, false, err
+	}
+	return t, true, nil
+}
+
 // Busy reports whether a task with one of keys for libraryID is queued or
 // running (and not cancelled).
 func (q *Queue) Busy(libraryID string, keys ...string) bool {
@@ -313,17 +336,19 @@ func (q *Queue) run(parent context.Context, j *job) {
 		if time.Since(last) < 500*time.Millisecond && p < 1 {
 			return
 		}
+		// last is set before the write, so a write that fails as busy also
+		// waits out the throttle before the next attempt.
+		last = time.Now()
 		p = min(max(p, 0), 1)
 		if _, err := q.db.ExecContext(db, `UPDATE tasks SET progress = ? WHERE id = ?`, p, j.id); err != nil {
 			// A busy database (a delete or scan holds it) skips this write
-			// without a warning. Progress is cosmetic, and the next call
-			// catches up: last is not reset, so that call is not throttled.
+			// without a warning. Progress is cosmetic and the next write
+			// catches up.
 			if !cdb.IsBusy(err) {
 				slog.Warn("task progress", "id", j.id, "err", err)
 			}
 			return
 		}
-		last = time.Now()
 		if startErr == nil && q.Events != nil {
 			t := started
 			t.Progress = p
