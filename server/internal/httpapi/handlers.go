@@ -16,6 +16,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tabunugoku/mars/server/internal/db"
 	"github.com/tabunugoku/mars/server/internal/ids"
 	"github.com/tabunugoku/mars/server/internal/library"
 	"github.com/tabunugoku/mars/server/internal/media"
@@ -281,24 +282,39 @@ func (s *server) UpdateLibrary(ctx context.Context, req UpdateLibraryRequestObje
 func (s *server) DeleteLibrary(ctx context.Context, req DeleteLibraryRequestObject) (DeleteLibraryResponseObject, error) {
 	// Marking the library hides it at once; its rows go in the background,
 	// in small batches, so other writers do not wait for the whole library
-	// (see library.Service.QueueDelete).
-	tx, err := s.DB.BeginTx(ctx, nil)
+	// (see library.Service.QueueDelete). A busy database retries the mark whole.
+	found := false
+	err := db.RetryBusy(ctx, func() error {
+		found = false
+		tx, err := s.DB.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback()
+		res, err := tx.ExecContext(ctx, `UPDATE libraries SET deleting = 1 WHERE id = ? AND deleting = 0`, req.LibraryId)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return nil
+		}
+		found = true
+		return tx.Commit()
+	})
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
-	res, err := tx.ExecContext(ctx, `UPDATE libraries SET deleting = 1 WHERE id = ? AND deleting = 0`, req.LibraryId)
-	if err != nil {
-		return nil, err
-	}
-	if n, _ := res.RowsAffected(); n == 0 {
+	if !found {
 		return DeleteLibrary404JSONResponse{notFound(ctx, "not_found.library")}, nil
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
-	if _, err := s.Library.QueueDelete(ctx, req.LibraryId); err != nil {
-		return nil, err
+	// The library is hidden now, so the request has done its job even when
+	// the task cannot be queued here: the scheduler queues it within a minute
+	// (see library.Service.Schedule). The failure is logged, not returned.
+	if err := db.RetryBusy(ctx, func() error {
+		_, err := s.Library.QueueDelete(ctx, req.LibraryId)
+		return err
+	}); err != nil {
+		slog.Warn("queue library delete", "library", req.LibraryId, "err", err)
 	}
 	return DeleteLibrary204Response{}, nil
 }

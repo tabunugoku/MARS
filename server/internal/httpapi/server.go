@@ -69,7 +69,7 @@ func New(d Deps) http.Handler {
 			if clientGone(r.Context(), err) {
 				return
 			}
-			slog.Error("api", "path", r.URL.Path, "err", err)
+			slog.Error("api", "method", r.Method, "path", r.URL.Path, "err", err)
 			writeError(r.Context(), w, http.StatusInternalServerError, "server.error")
 		},
 	})
