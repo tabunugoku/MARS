@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -166,6 +167,20 @@ func TestBookUploadThumbnail(t *testing.T) {
 	if r, g, bl := thumbColor(t, e.admin, b.ThumbnailUrl); !isGreen(r, g, bl) {
 		t.Fatalf("uploaded thumbnail not green: %d %d %d", r, g, bl)
 	}
+	// The URL's version names the stored file, so it is cached for good; an
+	// unversioned or wrong-version request must revalidate.
+	if !strings.HasPrefix(b.ThumbnailUrl, url+"?v=") {
+		t.Fatalf("thumbnail url without a version: %q", b.ThumbnailUrl)
+	}
+	if cc := e.admin.do("GET", b.ThumbnailUrl, nil).Header().Get("Cache-Control"); cc != "private, max-age=31536000, immutable" {
+		t.Fatalf("versioned thumbnail cache-control %q", cc)
+	}
+	if cc := e.admin.do("GET", url, nil).Header().Get("Cache-Control"); cc != "private, no-cache" {
+		t.Fatalf("unversioned thumbnail cache-control %q", cc)
+	}
+	if cc := e.admin.do("GET", url+"?v=0", nil).Header().Get("Cache-Control"); cc != "private, no-cache" {
+		t.Fatalf("wrong version thumbnail cache-control %q", cc)
+	}
 
 	// Re-analysis keeps the upload.
 	e.admin.json("POST", "/api/v1/libraries/"+l.Id+"/scan?deep=true", nil, 202, nil)
@@ -228,6 +243,10 @@ func TestCoverBookChoice(t *testing.T) {
 	}
 	if r, _, b := thumbColor(t, e.admin, got.ThumbnailUrl); !isBlue(r, 0, b) {
 		t.Fatalf("chosen cover not blue: %d %d", r, b)
+	}
+	// A series cover is versioned like a book's: cached for good under its URL.
+	if cc := e.admin.do("GET", got.ThumbnailUrl, nil).Header().Get("Cache-Control"); cc != "private, max-age=31536000, immutable" {
+		t.Fatalf("series thumbnail cache-control %q", cc)
 	}
 
 	// Deleting the chosen book reports no cover book and falls back to the first.

@@ -11,6 +11,10 @@ All notable changes to MARS are listed here. Versions follow
 
 - The MARS name in the sidebar and on the sign-in and setup pages is now the MARS wordmark: Unbounded cut once like a gutter between manga panels.
 
+### Fixed
+
+- Covers no longer blink while thumbnails are being made. A book without a thumbnail keeps its title and number until the thumbnail exists, a new cover replaces the old one only once it has loaded, and a series cover is loaded again once per burst of changes instead of once per book. Versioned thumbnail URLs are now cached by the browser.
+
 ## 0.1.2 — 2026-11-15
 
 Fixes for large and CMYK pages, decode memory and duplicate tasks.
