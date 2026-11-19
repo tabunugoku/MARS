@@ -7,6 +7,10 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+## 0.1.3 — 2026-11-20
+
+Archives inside archives are read as one book, deleting libraries no longer locks the database, and covers no longer blink.
+
 ### Added
 
 - A CBZ, CBR or CB7 that holds other CBZ, CBR or CB7 files (one per volume) is read as one book: the inner archives' pages follow in file name order. Only one level is read. Books that failed with "no images in archive" need **Re-analyze** in Admin > Media management.
