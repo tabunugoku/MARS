@@ -40,6 +40,16 @@ function mayHavePicture(src: string): boolean {
   return !!src && !(src.startsWith("/") && /\/thumbnail$/.test(coverKey(src)) && !/[?&]v=/.test(src));
 }
 
+/** What a cover starts with for src: its picture (or null for the text), and
+ *  the URL that is not requested again. Used by the first render and by the
+ *  reset when the list hands this component another cover. */
+function startState(src: string): { shown: string | null; failed: string | null } {
+  return {
+    shown: mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null,
+    failed: src && !mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null,
+  };
+}
+
 /** One shared observer for every cover: a callback per element, told whether
  *  the element is near the viewport. Created on first use. */
 const nearCallbacks = new Map<Element, (near: boolean) => void>();
@@ -89,10 +99,10 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
   const url = withRevision(src, rev);
   // The picture on screen, or null for the text. The first render shows the
   // picture at once: the browser loads it natively.
-  const [shown, setShown] = useState<string | null>(() => (mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null));
+  const [shown, setShown] = useState<string | null>(() => startState(src).shown);
   // A URL whose picture failed (or that has none, see mayHavePicture) is not
   // requested again until a retry.
-  const [failed, setFailed] = useState<string | null>(() => (src && !mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null));
+  const [failed, setFailed] = useState<string | null>(() => startState(src).failed);
   // Counts the retries of a text cover (see below).
   const [attempt, setAttempt] = useState(0);
   // The list may hand this component another cover's path (a rotating hero,
@@ -100,10 +110,11 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
   // picture, or the text. The previous cover's picture must never stay up.
   const [owner, setOwner] = useState(path);
   if (owner !== path) {
+    const start = startState(src);
     setOwner(path);
     setRev(coverRevision(src));
-    setShown(mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null);
-    setFailed(src && !mayHavePicture(src) ? withRevision(src, coverRevision(src)) : null);
+    setShown(start.shown);
+    setFailed(start.failed);
   }
   // A text cover tries again when the live stream reconnects (see cover-retry.ts).
   // Subscribed again after each retry, which is the only way it is called.
@@ -137,7 +148,11 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
       () => {
         if (!cancelled) setShown(url);
       },
-      () => {},
+      () => {
+        // decode() can reject for a picture that did load (Safari, very large
+        // images): show it, as the image is there. Otherwise keep the display.
+        if (!cancelled && img.complete && img.naturalWidth > 0) setShown(url);
+      },
     );
     return () => {
       cancelled = true;

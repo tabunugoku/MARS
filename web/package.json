@@ -8,6 +8,7 @@
     "dev:mock": "vite --mode mock",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "test": "node --test src/lib/*.test.ts",
     "preview": "vite preview",
     "localize:fluid": "node scripts/localize-fluid.mjs",
     "i18n:check": "node scripts/i18n-check.mjs",
