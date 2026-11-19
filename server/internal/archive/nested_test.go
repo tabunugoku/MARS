@@ -10,7 +10,10 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"slices"
+	"sync"
 	"testing"
+	"time"
 )
 
 // nestedFile is one entry of a fixture zip.
@@ -308,5 +311,189 @@ func TestNestedCorruptVolume(t *testing.T) {
 	}
 	if _, err := ListEntries(context.Background(), a); !errors.Is(err, ErrUnsupported) {
 		t.Errorf("ListEntries err = %v, want ErrUnsupported", err)
+	}
+}
+
+func TestNestedMacOSResourceForksAreNotVolumes(t *testing.T) {
+	SetTempDir(t.TempDir())
+	v1 := nestedZip(t, []nestedFile{{"001.jpg", []byte("v1")}})
+	v2 := nestedZip(t, []nestedFile{{"002.jpg", []byte("v2")}})
+	junk := []byte("not a zip archive")
+	book := nestedZip(t, []nestedFile{
+		{"vol1.zip", v1}, {"vol2.zip", v2}, {"__MACOSX/._vol1.zip", junk},
+	})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	// The fork is an ordinary outer entry: listed, but never opened as a volume.
+	wantSizes := map[string]int64{
+		"vol1.zip/001.jpg": 2, "vol2.zip/002.jpg": 2, "__MACOSX/._vol1.zip": int64(len(junk)),
+	}
+	es, err := ListEntries(context.Background(), a)
+	if err != nil {
+		t.Fatalf("ListEntries: %v", err)
+	}
+	if got := nestedSizes(es); !maps.Equal(got, wantSizes) {
+		t.Errorf("Entries = %v, want %v", got, wantSizes)
+	}
+	wantBytes := map[string]string{"vol1.zip/001.jpg": "v1", "vol2.zip/002.jpg": "v2"}
+	if got := nestedRead(t, a); !maps.Equal(got, wantBytes) {
+		t.Errorf("Walk = %v, want %v", got, wantBytes)
+	}
+}
+
+func TestNestedVolumeComicInfoIsLeftOut(t *testing.T) {
+	SetTempDir(t.TempDir())
+	vol := nestedZip(t, []nestedFile{
+		{"ComicInfo.xml", []byte("<ComicInfo>vol1</ComicInfo>")}, {"001.jpg", []byte("v1")},
+	})
+	book := nestedZip(t, []nestedFile{
+		{"vol1.zip", vol}, {"ComicInfo.xml", []byte("<ComicInfo>book</ComicInfo>")},
+	})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	// A volume's ComicInfo.xml describes that volume, not the book, so only the
+	// outer one is listed and walked.
+	wantSizes := map[string]int64{"ComicInfo.xml": int64(len("<ComicInfo>book</ComicInfo>")), "vol1.zip/001.jpg": 2}
+	if got := nestedSizes(a.Entries()); !maps.Equal(got, wantSizes) {
+		t.Errorf("Entries = %v, want %v", got, wantSizes)
+	}
+	wantBytes := map[string]string{"ComicInfo.xml": "<ComicInfo>book</ComicInfo>", "vol1.zip/001.jpg": "v1"}
+	if got := nestedRead(t, a); !maps.Equal(got, wantBytes) {
+		t.Errorf("Walk = %v, want %v", got, wantBytes)
+	}
+}
+
+// countingArchive counts the full walks of the archive it wraps.
+type countingArchive struct {
+	Archive
+	walks int
+}
+
+func (c *countingArchive) Walk(fn func(e Entry, r io.Reader) error) error {
+	c.walks++
+	return c.Archive.Walk(fn)
+}
+
+func TestNestedSolidOuterIsNotWalkedTwice(t *testing.T) {
+	SetTempDir(t.TempDir())
+	vol := nestedZip(t, []nestedFile{{"001.jpg", []byte("a")}})
+	book := nestedZip(t, []nestedFile{{"v1.zip", vol}, {"v2.zip", vol}})
+	outer, _, err := openPlain(context.Background(), PathOf(nestedBook(t, "book.zip", book)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counted := &countingArchive{Archive: outer}
+	w, ok := newNestedArchive(context.Background(), counted)
+	if !ok {
+		t.Fatal("outer archive with volumes was not wrapped")
+	}
+	defer w.Close()
+
+	if _, err := ListEntries(context.Background(), w); err != nil {
+		t.Fatal(err)
+	}
+	if counted.walks != 1 {
+		t.Fatalf("listing walked the outer archive %d times, want 1", counted.walks)
+	}
+	counted.walks = 0
+	wantBytes := map[string]string{"v1.zip/001.jpg": "a", "v2.zip/001.jpg": "a"}
+	if got := nestedRead(t, w); !maps.Equal(got, wantBytes) {
+		t.Errorf("Walk = %v, want %v", got, wantBytes)
+	}
+	if counted.walks != 0 {
+		t.Errorf("walk after the listing read the outer archive %d times, want 0", counted.walks)
+	}
+}
+
+func TestNestedHeaderSkipCheap(t *testing.T) {
+	SetTempDir(t.TempDir())
+	vol := nestedZip(t, []nestedFile{{"001.jpg", []byte("a")}})
+	zipBook := nestedZip(t, []nestedFile{{"v1.zip", vol}})
+	zipIn := nestedOpen(t, nestedBook(t, "zip-in-zip.zip", zipBook))
+	defer zipIn.Close()
+	if !HeaderSkipCheap(zipIn) {
+		t.Error("HeaderSkipCheap = false for a zip holding CBZ volumes, want true")
+	}
+
+	rarVol := buildRar4([]rarFixtureEntry{{name: "001.jpg", data: []byte("rar-001")}})
+	rarBook := nestedZip(t, []nestedFile{{"x.cbr", rarVol}})
+	rarIn := nestedOpen(t, nestedBook(t, "rar-in-zip.zip", rarBook))
+	defer rarIn.Close()
+	if HeaderSkipCheap(rarIn) {
+		t.Error("HeaderSkipCheap = true for a zip holding a RAR volume, want false")
+	}
+}
+
+func TestNestedHeaderOnlyWalk(t *testing.T) {
+	SetTempDir(t.TempDir())
+	v1 := nestedZip(t, []nestedFile{{"001.jpg", []byte("first-volume-page")}, {"002.jpg", []byte("second-page")}})
+	v2 := nestedZip(t, []nestedFile{{"001.jpg", []byte("v2-page")}})
+	book := nestedZip(t, []nestedFile{{"v1.zip", v1}, {"v2.zip", v2}})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	// fn reads only the first two bytes of every page. The rest of each zip
+	// entry is left unread, and the walk must still reach every entry.
+	var names []string
+	err := a.Walk(func(e Entry, r io.Reader) error {
+		head := make([]byte, 2)
+		if _, err := io.ReadFull(r, head); err != nil {
+			return err
+		}
+		names = append(names, e.Name+"="+string(head))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+	want := []string{"v1.zip/001.jpg=fi", "v1.zip/002.jpg=se", "v2.zip/001.jpg=v2"}
+	if !slices.Equal(names, want) {
+		t.Errorf("walked %v, want %v", names, want)
+	}
+}
+
+func TestNestedSpillSlotsBoundConcurrentSpills(t *testing.T) {
+	SetTempDir(t.TempDir())
+	// Fill both slots as if two other books were spilling.
+	spillSlots <- struct{}{}
+	spillSlots <- struct{}{}
+	var once sync.Once
+	releaseSlots := func() {
+		once.Do(func() {
+			<-spillSlots
+			<-spillSlots
+		})
+	}
+	defer releaseSlots()
+
+	vol := nestedZip(t, []nestedFile{{"001.jpg", []byte("a")}})
+	book := nestedZip(t, []nestedFile{{"v1.zip", vol}})
+	path := nestedBook(t, "book.zip", book)
+
+	// The wrapper's context is the one OpenPathContext stores, so a short
+	// deadline bounds the wait for a slot.
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	blocked, _, err := OpenPathContext(ctx, PathOf(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer blocked.Close()
+	if _, err := ListEntries(context.Background(), blocked); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("ListEntries with both slots taken: err = %v, want context.DeadlineExceeded", err)
+	}
+
+	// With the slots free again, a new book spills and lists.
+	releaseSlots()
+	fresh := nestedOpen(t, path)
+	defer fresh.Close()
+	es, err := ListEntries(context.Background(), fresh)
+	if err != nil {
+		t.Fatalf("ListEntries after release: %v", err)
+	}
+	if len(es) != 1 || es[0].Name != "v1.zip/001.jpg" {
+		t.Errorf("Entries = %v, want v1.zip/001.jpg", es)
 	}
 }
