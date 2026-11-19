@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { coverKey, coverRevision, onCoverRetry, onCoverRevision } from "@/lib/cover-retry";
 import { cn } from "@/lib/utils";
 import { defineMessages, useT } from "@/i18n";
@@ -38,6 +38,34 @@ function withRevision(src: string, rev: number): string {
  *  (a bump or a reconnect asks again, see cover-retry.ts). */
 function mayHavePicture(src: string): boolean {
   return !!src && !(src.startsWith("/") && /\/thumbnail$/.test(coverKey(src)) && !/[?&]v=/.test(src));
+}
+
+/** One shared observer for every cover: a callback per element, told whether
+ *  the element is near the viewport. Created on first use. */
+const nearCallbacks = new Map<Element, (near: boolean) => void>();
+let nearObserver: IntersectionObserver | null = null;
+
+/** Calls cb with whether el is near the viewport (300px margin). Without
+ *  IntersectionObserver the element counts as near. Returns the cleanup. */
+function observeNear(el: Element, cb: (near: boolean) => void): () => void {
+  if (typeof IntersectionObserver === "undefined") {
+    cb(true);
+    return () => {};
+  }
+  if (!nearObserver) {
+    nearObserver = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) nearCallbacks.get(e.target)?.(e.isIntersecting);
+      },
+      { rootMargin: "300px" },
+    );
+  }
+  nearCallbacks.set(el, cb);
+  nearObserver.observe(el);
+  return () => {
+    nearObserver?.unobserve(el);
+    nearCallbacks.delete(el);
+  };
 }
 
 /** The one cover primitive. Fixed 2:3 box so grids never shift while art loads. */
@@ -89,10 +117,19 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
         : undefined,
     [shown, src, attempt],
   );
+  // Whether the cover is near the viewport. Off-screen covers do not preload,
+  // so a library-wide thumbnail bump fetches only what the reader can see.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [near, setNear] = useState(!!priority);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    return observeNear(el, setNear);
+  }, []);
   // Loads the current URL in the background. A failed load keeps what is
   // shown; a stale one (a newer URL, or unmount) is dropped.
   useEffect(() => {
-    if (!url || url === shown || url === failed) return;
+    if (!near || !url || url === shown || url === failed) return;
     let cancelled = false;
     const img = new Image();
     img.src = url;
@@ -105,10 +142,11 @@ export const Cover = memo(function Cover({ src, title, label, progress, unread, 
     return () => {
       cancelled = true;
     };
-  }, [url, shown, failed, attempt]);
+  }, [near, url, shown, failed, attempt]);
   const picture = src ? shown : null;
   return (
     <div
+      ref={boxRef}
       className={cn("relative aspect-[2/3] w-full overflow-hidden rounded-[6px] bg-muted", className)}
       style={{ boxShadow: "var(--cover-shadow)" }}
     >
