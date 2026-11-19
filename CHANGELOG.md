@@ -11,6 +11,12 @@ All notable changes to MARS are listed here. Versions follow
 
 - The MARS name in the sidebar and on the sign-in and setup pages is now the MARS wordmark: Unbounded cut once like a gutter between manga panels.
 
+### Fixed
+
+- Deleting several libraries at once no longer makes other writes fail with "database is locked (SQLITE_BUSY)". Deletes now run one after another in smaller batches, long writes take turns, and new indexes let each batch find its rows without reading whole tables. In a test with 37,000 books and 7.4 million page rows, six libraries were deleted in about 30 seconds while another write waited 25 ms at most (2.2 s before).
+- A library delete whose task could not be queued (the database was busy) is now queued again by the scheduler within a minute. Before, the library stayed hidden but undeleted until the server restarted.
+- A finished library delete stays in the task list; before, its task row was removed with the library.
+
 ## 0.1.2 — 2026-11-15
 
 Fixes for large and CMYK pages, decode memory and duplicate tasks.
