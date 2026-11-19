@@ -34,12 +34,7 @@ var imageTypes = map[string]string{
 // isIgnored reports whether an entry is never a page or ComicInfo: macOS
 // resource forks (__MACOSX/) and dot-files such as ._p1.jpg or .hidden.png.
 func isIgnored(name string) bool {
-	for _, seg := range strings.Split(name, "/") {
-		if seg == "__MACOSX" {
-			return true
-		}
-	}
-	return strings.HasPrefix(path.Base(name), ".")
+	return archive.IgnoredEntry(name)
 }
 
 // pageMediaType returns the media type for an entry that counts as a page.

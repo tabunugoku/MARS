@@ -1,15 +1,16 @@
 package archive
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
-	"sync/atomic"
 )
 
 // A book file may hold other archives, one per volume (work.zip holding
@@ -50,19 +51,81 @@ const (
 	// maxSpillTotal caps all spills of one wrapper. It matches
 	// media.MaxDecompressed, the work one pass over a book may do.
 	maxSpillTotal = 4 << 30
+	// maxSpillDisk caps the spilled bytes of all books together. It is two
+	// wrappers' worth of maxSpillTotal: a few large books spill at once, and the
+	// temp dir stays bounded however many books are open.
+	maxSpillDisk = 2 * maxSpillTotal
+	// maxKeptEntry and maxKeptTotal bound the small plain outer entries that
+	// list keeps in memory (a root ComicInfo.xml, a cover). A walk after the
+	// listing then need not decompress a solid RAR or 7z archive a second time.
+	maxKeptEntry = 1 << 20
+	maxKeptTotal = 8 << 20
 )
 
-// spillSlots bounds how many books hold spilled volumes on disk at once. A
-// nestedArchive takes one slot before its first spill and gives it back in
-// Close, so at most two books spill at once and the disk use stays within
-// 2 x maxSpillTotal. Without it, many books opened together would each spill
-// up to the cap.
-var spillSlots = make(chan struct{}, 2)
+// The spilled bytes of all books together. Each wrapper charges what it spills
+// and gives it back in Close. diskWake is closed and replaced on every release,
+// so a waiter wakes and checks the budget again.
+var (
+	diskMu   sync.Mutex
+	diskUsed int64
+	diskWake = make(chan struct{})
+)
 
-// ignoredEntry reports whether an entry is never a volume or a page: a macOS
-// resource fork under __MACOSX/, or a dot-file such as ._vol1.zip. It is the
-// same rule as media.isIgnored, which archive cannot import.
-func ignoredEntry(name string) bool {
+// reserveDisk charges n bytes of spill to the budget before a copy. It waits
+// while the spills would pass maxSpillDisk, unless nothing is spilled at all,
+// so one volume larger than the free space still goes ahead when the disk is
+// otherwise idle. It returns ctx's error if ctx ends first.
+//
+// A budget, not a count of books, is what keeps the disk bounded here: many
+// ordinary books, with volumes of tens or hundreds of MB, proceed at once, and
+// nothing is reserved for a book that never spills.
+func reserveDisk(ctx context.Context, n int64) error {
+	for {
+		diskMu.Lock()
+		if diskUsed == 0 || diskUsed+n <= maxSpillDisk {
+			diskUsed += n
+			diskMu.Unlock()
+			return nil
+		}
+		wake := diskWake
+		diskMu.Unlock()
+		select {
+		case <-wake:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+// releaseDisk gives n bytes back to the budget and wakes the waiters.
+func releaseDisk(n int64) { settleDisk(n, 0) }
+
+// settleDisk replaces a reservation of reserved bytes with kept bytes. It never
+// waits: a copy that ran past its declared size has to be charged anyway.
+func settleDisk(reserved, kept int64) {
+	diskMu.Lock()
+	defer diskMu.Unlock()
+	diskUsed += kept - reserved
+	if kept < reserved {
+		close(diskWake)
+		diskWake = make(chan struct{})
+	}
+}
+
+// diskBytes returns the bytes charged to the budget now. Tests use it to check
+// that a wrapper gives back everything it took.
+func diskBytes() int64 {
+	diskMu.Lock()
+	defer diskMu.Unlock()
+	return diskUsed
+}
+
+// IgnoredEntry reports whether an entry is never a volume or a page: a macOS
+// resource fork under __MACOSX/, or a dot-file such as ._vol1.zip. A directory
+// is judged by its own name. media.isIgnored uses the same rule, so the book
+// and its listing agree on which entries exist.
+func IgnoredEntry(name string) bool {
+	name = strings.TrimSuffix(name, "/")
 	for _, seg := range strings.Split(name, "/") {
 		if seg == "__MACOSX" {
 			return true
@@ -83,37 +146,41 @@ func isVolumeComicInfo(name string) bool {
 // archive. PDF is never one, neither is any other extension, and an ignored
 // entry such as a macOS resource fork is an ordinary outer entry.
 func isInnerArchive(name string) bool {
-	if ignoredEntry(name) {
+	if IgnoredEntry(name) {
 		return false
 	}
 	f, ok := formatOf(name)
 	return ok && (f == CBZ || f == CBR || f == CB7)
 }
 
+// errBadVolume marks a volume that spilled but does not parse as an archive. A
+// listing or walk skips such a volume, so a damaged or encrypted volume costs
+// its own pages only. The cause stays in the chain for the book's error when no
+// volume can be read at all.
+var errBadVolume = errors.New("archive: volume does not parse")
+
 // spilled is one volume after its first use. A parse failure is kept, so each
 // later use fails the same way without parsing the volume again.
 type spilled struct {
 	path string  // temp file, removed by Close; empty once removed
 	arc  Archive // nil when err is set
-	err  error
+	err  error   // wraps errBadVolume when the volume does not parse
 }
 
 // nestedArchive reads the volumes of an outer archive as one book. It is
 // returned by OpenPathContext only when the outer archive holds a volume.
 type nestedArchive struct {
 	outer  Archive
-	ctx    context.Context // stored at open; bounds spilling and listing
-	order  []string        // outer entry names of the volumes, in outer order
-	volume map[string]bool // the same names, as a set
+	ctx    context.Context  // stored at open; bounds spilling and listing
+	order  []string         // outer entry names of the volumes, in outer order
+	volume map[string]bool  // the same names, as a set
+	size   map[string]int64 // declared size of each volume, 0 when unknown
 
-	mu    sync.Mutex // guards inner and spilt
-	inner map[string]*spilled
-	spilt int64 // bytes spilled so far, against maxSpillTotal
-
-	// slotMu serializes taking the slot. slot is read without it in Close, so
-	// Close never waits behind a load that is waiting for a slot.
-	slotMu sync.Mutex
-	slot   atomic.Bool
+	mu      sync.Mutex // guards inner, spilt, charged and kept
+	inner   map[string]*spilled
+	spilt   int64             // bytes spilled so far, against maxSpillTotal
+	charged int64             // disk bytes this wrapper holds in the budget
+	kept    map[string][]byte // small plain outer entries, set by list
 
 	listMu  sync.Mutex // guards the listing below
 	listed  bool
@@ -128,52 +195,57 @@ func newNestedArchive(ctx context.Context, a Archive) (w *nestedArchive, ok bool
 		outer:  a,
 		ctx:    ctx,
 		volume: make(map[string]bool),
+		size:   make(map[string]int64),
 		inner:  make(map[string]*spilled),
 	}
 	for _, e := range a.Entries() {
 		if isInnerArchive(e.Name) {
 			w.order = append(w.order, e.Name)
 			w.volume[e.Name] = true
+			w.size[e.Name] = e.Size
 		}
 	}
 	return w, len(w.order) > 0
 }
 
-// reserveSlot takes the slot from spillSlots once, before the first spill. It
-// waits for a free slot, and gives up with the wrapper's context error if that
-// ends first. It holds no lock of w.mu, so Close is never blocked by the wait
-// and cannot deadlock with it.
-func (w *nestedArchive) reserveSlot() error {
-	w.slotMu.Lock()
-	defer w.slotMu.Unlock()
-	if w.slot.Load() {
-		return nil
-	}
-	select {
-	case spillSlots <- struct{}{}:
-		w.slot.Store(true)
-		return nil
-	case <-w.ctx.Done():
-		return w.ctx.Err()
-	}
-}
-
-// load returns volume name, spilling r to a temp file on first use. A parse
-// failure is cached. A failed copy is not: it may be the caller's budget that
-// ran out, which says nothing about the volume, so a later walk may succeed.
-func (w *nestedArchive) load(name string, r io.Reader) (*spilled, error) {
-	// A volume that is already cached was spilled, so its slot is taken and
-	// this returns at once. Only the first spill can wait.
-	if err := w.reserveSlot(); err != nil {
-		return nil, err
-	}
+// load returns volume name, spilling r to a temp file on first use. size is the
+// volume's declared size, or 0 when unknown. A parse failure is cached. A failed
+// copy or a parse cut short by the context is not: it may be the caller's budget
+// or context that ran out, which says nothing about the volume, so a later use
+// may succeed.
+func (w *nestedArchive) load(name string, size int64, r io.Reader) (*spilled, error) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
 	if sp, ok := w.inner[name]; ok {
+		w.mu.Unlock()
 		return sp, sp.err
 	}
 	left := min(maxInnerBytes, maxSpillTotal-w.spilt)
+	w.mu.Unlock()
 	if left <= 0 {
+		return nil, ErrTooMuchData
+	}
+
+	// The reservation is the declared size when known, so a small volume
+	// charges little, and the cap otherwise. It waits without w.mu held, since
+	// Close and other volumes need that lock while this one waits.
+	reserve := left
+	if size > 0 && size < reserve {
+		reserve = size
+	}
+	if err := reserveDisk(w.ctx, reserve); err != nil {
+		return nil, err
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if sp, ok := w.inner[name]; ok {
+		// Another goroutine spilled this volume while we waited.
+		releaseDisk(reserve)
+		return sp, sp.err
+	}
+	left = min(maxInnerBytes, maxSpillTotal-w.spilt)
+	if left <= 0 {
+		releaseDisk(reserve)
 		return nil, ErrTooMuchData
 	}
 
@@ -183,6 +255,7 @@ func (w *nestedArchive) load(name string, r io.Reader) (*spilled, error) {
 	// pattern character.
 	f, err := os.CreateTemp(dir, "nested-*"+strings.ToLower(filepath.Ext(name)))
 	if err != nil {
+		releaseDisk(reserve)
 		return nil, err
 	}
 	// The budget reader stops the copy at left bytes and checks w.ctx on every
@@ -193,19 +266,29 @@ func (w *nestedArchive) load(name string, r io.Reader) (*spilled, error) {
 	}
 	if err != nil {
 		os.Remove(f.Name())
+		releaseDisk(reserve)
 		return nil, err
 	}
 	w.spilt += n
+	// The bytes written stay charged. The rest of the reservation goes back now,
+	// so the budget reflects what is on disk rather than what was hoped for.
+	settleDisk(reserve, n)
 
 	// The plain opener, never the nested one: a volume inside a volume is an
 	// ordinary entry.
 	a, _, err := openPlain(w.ctx, Path{Root: dir, Rel: filepath.Base(f.Name())})
 	if err != nil {
 		os.Remove(f.Name())
-		sp := &spilled{err: headerErr(err)}
+		releaseDisk(n)
+		if w.ctx.Err() != nil {
+			// The context cut the parse short, so it says nothing about the volume.
+			return nil, w.ctx.Err()
+		}
+		sp := &spilled{err: fmt.Errorf("%w: %w", errBadVolume, headerErr(err))}
 		w.inner[name] = sp
 		return nil, sp.err
 	}
+	w.charged += n
 	sp := &spilled{path: f.Name(), arc: a}
 	w.inner[name] = sp
 	return sp, nil
@@ -228,19 +311,37 @@ func (w *nestedArchive) openVolume(vol string) (*spilled, error) {
 		return nil, err
 	}
 	defer rc.Close()
-	return w.load(vol, rc)
+	return w.load(vol, w.size[vol], rc)
+}
+
+// walkStep is one step of a walk over the spills: a volume to walk, or a small
+// plain outer entry that list kept (sp is nil and data holds its bytes).
+type walkStep struct {
+	e    Entry
+	sp   *spilled
+	data []byte
 }
 
 // walkLimited walks the outer entries, and each volume's entries in place of
 // the volume, renamed "volume/entry". A SkipRest from fn stops both the volume
-// and the outer archive, and walkLimited returns nil.
+// and the outer archive, and walkLimited returns nil. A volume that does not
+// parse is skipped; if no volume can be read at all, the first parse error is
+// returned, so the book fails with its reason.
 func (w *nestedArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) error) error {
-	// A book whose volumes are already spilled is walked from those spills. The
-	// outer archive is solid in RAR and 7z, so reading it again costs a full
-	// decompression pass that the listing has already paid for.
-	if names, sps, ok := w.spilledInOrder(); ok {
-		for i, name := range names {
-			err := walkVolume(name, sps[i], b, fn)
+	// A book that list has already read is walked from the spills and the kept
+	// entries. The outer archive is solid in RAR and 7z, so reading it again
+	// costs a full decompression pass that the listing has already paid for.
+	if steps, ok := w.spilledInOrder(); ok {
+		volumes, plain := 0, 0
+		for _, st := range steps {
+			var err error
+			if st.sp == nil {
+				plain++
+				err = fn(st.e, b.reader(bytes.NewReader(st.data)))
+			} else {
+				volumes++
+				err = walkVolume(st.e.Name, st.sp, b, fn)
+			}
 			if errors.Is(err, SkipRest) {
 				return nil
 			}
@@ -248,20 +349,50 @@ func (w *nestedArchive) walkLimited(b *budget, fn func(e Entry, r io.Reader) err
 				return err
 			}
 		}
+		if volumes == 0 && plain == 0 {
+			return w.unreadable()
+		}
 		return nil
 	}
-	return walkArchive(w.outer, b, func(e Entry, r io.Reader) error {
-		if !w.volume[e.Name] {
-			return fn(e, r)
+
+	volumes, plain, stopped := 0, 0, false
+	err := walkArchive(w.outer, b, func(e Entry, r io.Reader) error {
+		// Ignored entries and directories never hold a page, so they are not read,
+		// the same as in the spilled walk and in list.
+		if IgnoredEntry(e.Name) || strings.HasSuffix(e.Name, "/") {
+			return nil
 		}
-		// r is already counted against b by the outer walk, so it is spilled
-		// as it is; counting it again would charge the budget twice.
-		sp, err := w.load(e.Name, r)
-		if err != nil {
-			return err
+		var err error
+		if w.volume[e.Name] {
+			// r is already counted against b by the outer walk, so it is spilled
+			// as it is; counting it again would charge the budget twice.
+			var sp *spilled
+			sp, err = w.load(e.Name, w.size[e.Name], r)
+			if errors.Is(err, errBadVolume) {
+				return nil
+			}
+			if err == nil {
+				volumes++
+				err = walkVolume(e.Name, sp, b, fn)
+			}
+		} else {
+			plain++
+			err = fn(e, r)
 		}
-		return walkVolume(e.Name, sp, b, fn)
+		if errors.Is(err, SkipRest) {
+			stopped = true
+		}
+		return err
 	})
+	if err != nil {
+		return err
+	}
+	// Plain outer entries may still be pages, so only a book with nothing but
+	// unreadable volumes fails.
+	if volumes == 0 && plain == 0 && !stopped {
+		return w.unreadable()
+	}
+	return nil
 }
 
 // walkVolume walks the entries of volume sp, each renamed "volume/entry". A
@@ -289,29 +420,58 @@ func walkVolume(volume string, sp *spilled, b *budget, fn func(e Entry, r io.Rea
 	return nil
 }
 
-// spilledInOrder returns the volumes in outer order with their spills, and ok,
-// when a walk need not read the outer archive. That holds when every outer
-// entry is a volume or one fn would never want (an ignored or directory entry),
-// and every volume is already spilled without error. Otherwise ok is false and
-// the caller walks the outer archive as before.
-func (w *nestedArchive) spilledInOrder() (names []string, sps []*spilled, ok bool) {
+// spilledInOrder returns the walk's steps in outer order, and ok, when a walk
+// need not read the outer archive. That holds when every outer entry is a
+// volume that is spilled (or unreadable, and so skipped), an ignored or
+// directory entry, or a small plain entry that list kept. Otherwise ok is false
+// and the caller walks the outer archive.
+func (w *nestedArchive) spilledInOrder() (steps []walkStep, ok bool) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	for _, e := range w.outer.Entries() {
+		if IgnoredEntry(e.Name) || strings.HasSuffix(e.Name, "/") {
+			continue
+		}
 		if !w.volume[e.Name] {
-			if ignoredEntry(e.Name) || strings.HasSuffix(e.Name, "/") {
-				continue
+			data, kept := w.kept[e.Name]
+			if !kept {
+				return nil, false
 			}
-			return nil, nil, false
+			steps = append(steps, walkStep{e: e, data: data})
+			continue
 		}
 		sp := w.inner[e.Name]
-		if sp == nil || sp.err != nil {
-			return nil, nil, false
+		if sp == nil {
+			return nil, false
 		}
-		names = append(names, e.Name)
-		sps = append(sps, sp)
+		if sp.err != nil {
+			continue // unreadable: skipped, as the outer walk does
+		}
+		steps = append(steps, walkStep{e: Entry{Name: e.Name}, sp: sp})
 	}
-	return names, sps, true
+	return steps, true
+}
+
+// unreadable returns the parse error of the first volume in outer order when
+// no volume could be read, and nil otherwise. A book whose volumes all fail
+// gets that reason rather than an empty listing.
+func (w *nestedArchive) unreadable() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	var first error
+	for _, name := range w.order {
+		sp, ok := w.inner[name]
+		if !ok {
+			continue
+		}
+		if sp.err == nil {
+			return nil
+		}
+		if first == nil {
+			first = sp.err
+		}
+	}
+	return first
 }
 
 // walkArchive is walkLimited where the archive supports it. Plain archives
@@ -371,12 +531,35 @@ func (w *nestedArchive) list() ([]Entry, error) {
 	// Each volume is spilled so its entry list can be read, but its pages are
 	// not decompressed. The outer walk is the only pass over the book, and the
 	// budget bounds the spilling and the solid-archive skipping.
+	//
+	// Small plain entries are kept on the same pass. Otherwise a walk after the
+	// listing would have to read the outer archive again for them, which costs a
+	// full decompression pass on a solid archive.
+	kept := make(map[string][]byte)
+	var keptTotal int64
 	var nested []Entry
 	err := walkArchive(w.outer, newBudget(Limit{Ctx: w.ctx, MaxBytes: maxSpillTotal}), func(e Entry, r io.Reader) error {
-		if !w.volume[e.Name] {
+		if IgnoredEntry(e.Name) || strings.HasSuffix(e.Name, "/") {
 			return nil
 		}
-		sp, err := w.load(e.Name, r)
+		if !w.volume[e.Name] {
+			// One byte past the cap tells a too-large entry apart without reading it
+			// all; such an entry is not kept.
+			data, err := io.ReadAll(io.LimitReader(r, maxKeptEntry+1))
+			if err != nil {
+				return err
+			}
+			if len(data) <= maxKeptEntry && keptTotal+int64(len(data)) <= maxKeptTotal {
+				kept[e.Name] = data
+				keptTotal += int64(len(data))
+			}
+			return nil
+		}
+		sp, err := w.load(e.Name, w.size[e.Name], r)
+		if errors.Is(err, errBadVolume) {
+			// A damaged volume is left out, and the rest of the book is listed.
+			return nil
+		}
 		if err != nil {
 			return err
 		}
@@ -389,10 +572,29 @@ func (w *nestedArchive) list() ([]Entry, error) {
 		}
 		return nil
 	})
+	w.mu.Lock()
+	w.kept = kept
+	w.mu.Unlock()
 	if err != nil {
 		return plain, err
 	}
+	if len(nested) == 0 && !hasPlain(plain) {
+		if bad := w.unreadable(); bad != nil {
+			return plain, bad
+		}
+	}
 	return append(plain, nested...), nil
+}
+
+// hasPlain reports whether any outer entry that is not a volume could be a
+// page: one that is neither ignored nor a directory.
+func hasPlain(es []Entry) bool {
+	for _, e := range es {
+		if !IgnoredEntry(e.Name) && !strings.HasSuffix(e.Name, "/") {
+			return true
+		}
+	}
+	return false
 }
 
 // volumeOf splits name into a volume and the entry inside it. The longest
@@ -423,14 +625,9 @@ func (w *nestedArchive) Open(name string) (io.ReadCloser, error) {
 // into the book file.
 func (w *nestedArchive) RandomAccess() bool { return false }
 
-// Close closes the volumes, removes their temp files and closes the outer
-// archive. It returns the first error.
+// Close closes the volumes, removes their temp files, gives their bytes back to
+// the disk budget, and closes the outer archive. It returns the first error.
 func (w *nestedArchive) Close() error {
-	// The slot is given back before w.mu, which a load waiting for a slot does
-	// not hold, so this never waits behind that wait.
-	if w.slot.Swap(false) {
-		<-spillSlots
-	}
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	var first error
@@ -450,6 +647,9 @@ func (w *nestedArchive) Close() error {
 			}
 		}
 	}
+	releaseDisk(w.charged)
+	w.charged = 0
+	w.kept = nil
 	keep(w.outer.Close())
 	return first
 }

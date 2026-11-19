@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sync"
 	"testing"
 	"time"
 )
@@ -454,26 +453,28 @@ func TestNestedHeaderOnlyWalk(t *testing.T) {
 	}
 }
 
-func TestNestedSpillSlotsBoundConcurrentSpills(t *testing.T) {
+func TestNestedDiskBudgetWaitsWithContext(t *testing.T) {
 	SetTempDir(t.TempDir())
-	// Fill both slots as if two other books were spilling.
-	spillSlots <- struct{}{}
-	spillSlots <- struct{}{}
-	var once sync.Once
-	releaseSlots := func() {
-		once.Do(func() {
-			<-spillSlots
-			<-spillSlots
-		})
-	}
-	defer releaseSlots()
-
 	vol := nestedZip(t, []nestedFile{{"001.jpg", []byte("a")}})
 	book := nestedZip(t, []nestedFile{{"v1.zip", vol}})
 	path := nestedBook(t, "book.zip", book)
 
+	// Fill the whole disk allowance, as if other books had spilled it all.
+	filled := maxSpillDisk - diskBytes()
+	if err := reserveDisk(context.Background(), filled); err != nil {
+		t.Fatal(err)
+	}
+	released := false
+	release := func() {
+		if !released {
+			released = true
+			releaseDisk(filled)
+		}
+	}
+	defer release()
+
 	// The wrapper's context is the one OpenPathContext stores, so a short
-	// deadline bounds the wait for a slot.
+	// deadline bounds the wait for disk.
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer cancel()
 	blocked, _, err := OpenPathContext(ctx, PathOf(path))
@@ -481,12 +482,12 @@ func TestNestedSpillSlotsBoundConcurrentSpills(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer blocked.Close()
-	if _, err := ListEntries(context.Background(), blocked); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("ListEntries with both slots taken: err = %v, want context.DeadlineExceeded", err)
+	if _, err := blocked.(*nestedArchive).EntriesContext(ctx); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("EntriesContext with the disk budget full: err = %v, want context.DeadlineExceeded", err)
 	}
 
-	// With the slots free again, a new book spills and lists.
-	releaseSlots()
+	// With the budget free again, a new book spills and lists.
+	release()
 	fresh := nestedOpen(t, path)
 	defer fresh.Close()
 	es, err := ListEntries(context.Background(), fresh)
@@ -495,5 +496,122 @@ func TestNestedSpillSlotsBoundConcurrentSpills(t *testing.T) {
 	}
 	if len(es) != 1 || es[0].Name != "v1.zip/001.jpg" {
 		t.Errorf("Entries = %v, want v1.zip/001.jpg", es)
+	}
+}
+
+func TestNestedCloseReturnsDiskBytes(t *testing.T) {
+	SetTempDir(t.TempDir())
+	vol := nestedZip(t, []nestedFile{{"001.jpg", []byte("a")}})
+	book := nestedZip(t, []nestedFile{{"v1.zip", vol}})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+
+	base := diskBytes()
+	if _, err := ListEntries(context.Background(), a); err != nil {
+		t.Fatal(err)
+	}
+	if diskBytes() <= base {
+		t.Fatal("the spilled volume was not charged to the disk budget")
+	}
+	if err := a.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got := diskBytes(); got != base {
+		t.Errorf("disk bytes after Close = %d, want %d", got, base)
+	}
+}
+
+func TestNestedUnparsableVolumeChargesNothing(t *testing.T) {
+	SetTempDir(t.TempDir())
+	junk := bytes.Repeat([]byte("not a zip archive "), 64)
+	book := nestedZip(t, []nestedFile{{"bad.zip", junk}})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	base := diskBytes()
+	if _, err := ListEntries(context.Background(), a); !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("ListEntries err = %v, want ErrUnsupported", err)
+	}
+	if got := diskBytes(); got != base {
+		t.Errorf("disk bytes after a failed parse = %d, want %d", got, base)
+	}
+}
+
+func TestNestedUnreadableVolumeCostsOnlyItsPages(t *testing.T) {
+	SetTempDir(t.TempDir())
+	junk := bytes.Repeat([]byte("not a zip archive "), 64)
+	vol2 := nestedZip(t, []nestedFile{{"001.jpg", []byte("v2")}})
+	book := nestedZip(t, []nestedFile{{"vol1.zip", junk}, {"vol2.zip", vol2}})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	es, err := ListEntries(context.Background(), a)
+	if err != nil {
+		t.Fatalf("ListEntries: %v", err)
+	}
+	if got := nestedSizes(es); !maps.Equal(got, map[string]int64{"vol2.zip/001.jpg": 2}) {
+		t.Errorf("Entries = %v, want only vol2.zip/001.jpg", got)
+	}
+	want := map[string]string{"vol2.zip/001.jpg": "v2"}
+	if got := nestedRead(t, a); !maps.Equal(got, want) {
+		t.Errorf("Walk = %v, want %v", got, want)
+	}
+}
+
+func TestNestedOnlyUnreadableVolumesFailWithReason(t *testing.T) {
+	SetTempDir(t.TempDir())
+	junk := bytes.Repeat([]byte("not a zip archive "), 64)
+	book := nestedZip(t, []nestedFile{{"vol1.zip", junk}})
+	a := nestedOpen(t, nestedBook(t, "book.zip", book))
+	defer a.Close()
+
+	w := a.(*nestedArchive)
+	if _, err := w.EntriesContext(context.Background()); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("EntriesContext err = %v, want ErrUnsupported", err)
+	}
+	if err := w.Walk(func(e Entry, r io.Reader) error { return nil }); !errors.Is(err, ErrUnsupported) {
+		t.Errorf("Walk err = %v, want ErrUnsupported", err)
+	}
+}
+
+func TestNestedSmallOuterEntriesAreKept(t *testing.T) {
+	SetTempDir(t.TempDir())
+	v1 := nestedZip(t, []nestedFile{{"001.jpg", []byte("v1")}})
+	v2 := nestedZip(t, []nestedFile{{"001.jpg", []byte("v2")}})
+	book := nestedZip(t, []nestedFile{
+		{"ComicInfo.xml", []byte("<ComicInfo>book</ComicInfo>")}, {"vol1.zip", v1}, {"vol2.zip", v2},
+	})
+	outer, _, err := openPlain(context.Background(), PathOf(nestedBook(t, "book.zip", book)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	counted := &countingArchive{Archive: outer}
+	w, ok := newNestedArchive(context.Background(), counted)
+	if !ok {
+		t.Fatal("outer archive with volumes was not wrapped")
+	}
+	defer w.Close()
+
+	if _, err := w.EntriesContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	counted.walks = 0
+	var got []string
+	err = w.Walk(func(e Entry, r io.Reader) error {
+		b, err := io.ReadAll(r)
+		if err != nil {
+			return err
+		}
+		got = append(got, e.Name+"="+string(b))
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("Walk: %v", err)
+	}
+	want := []string{"ComicInfo.xml=<ComicInfo>book</ComicInfo>", "vol1.zip/001.jpg=v1", "vol2.zip/001.jpg=v2"}
+	if !slices.Equal(got, want) {
+		t.Errorf("walked %v, want %v", got, want)
+	}
+	if counted.walks != 0 {
+		t.Errorf("walk after the listing read the outer archive %d times, want 0", counted.walks)
 	}
 }
