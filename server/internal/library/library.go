@@ -850,26 +850,32 @@ func (s *Service) OpenPage(ctx context.Context, bookID string, n int) (Page, err
 		if err != nil {
 			return Page{}, err
 		}
-		var entrySize int64 = -1
-		for _, e := range a.Entries() {
-			if e.Name == entry {
-				entrySize = e.Size
-				break
+		// A CBZ that holds other archives is read through the page cache like
+		// RAR and 7z, since its volumes are spilled and a seek is not enough.
+		if !a.RandomAccess() {
+			a.Close()
+		} else {
+			var entrySize int64 = -1
+			for _, e := range a.Entries() {
+				if e.Name == entry {
+					entrySize = e.Size
+					break
+				}
 			}
+			if entrySize < 0 || entrySize > media.MaxEntryBytes {
+				a.Close()
+				return Page{}, media.ErrTooLarge
+			}
+			rc, err := a.Open(entry)
+			if err != nil {
+				a.Close()
+				return Page{}, err
+			}
+			return Page{
+				Body: io.LimitReader(rc, entrySize), Size: entrySize, MediaType: mediaType, ETag: etag, Version: v,
+				Close: func() error { rc.Close(); return a.Close() },
+			}, nil
 		}
-		if entrySize < 0 || entrySize > media.MaxEntryBytes {
-			a.Close()
-			return Page{}, media.ErrTooLarge
-		}
-		rc, err := a.Open(entry)
-		if err != nil {
-			a.Close()
-			return Page{}, err
-		}
-		return Page{
-			Body: io.LimitReader(rc, entrySize), Size: entrySize, MediaType: mediaType, ETag: etag, Version: v,
-			Close: func() error { rc.Close(); return a.Close() },
-		}, nil
 	}
 
 	pages, err := s.pages(ctx, bookID)

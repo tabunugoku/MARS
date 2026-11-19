@@ -88,3 +88,17 @@ func FormatOf(name string) (f Format, ok bool) { return formatOf(name) }
 
 // Open opens the book file at path, choosing the reader by extension.
 func Open(path string) (Archive, Format, error) { return open(path) }
+
+// ListEntries is a.Entries() for callers that must see an error: an archive
+// that holds other archives reads them to list their entries, which can fail.
+func ListEntries(ctx context.Context, a Archive) ([]Entry, error) {
+	if el, ok := a.(entriesContexter); ok {
+		return el.EntriesContext(ctx)
+	}
+	return a.Entries(), nil
+}
+
+// entriesContexter is implemented by archives whose listing can fail.
+type entriesContexter interface {
+	EntriesContext(ctx context.Context) ([]Entry, error)
+}

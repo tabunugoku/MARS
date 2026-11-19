@@ -15,6 +15,12 @@ MARS reads the book files in the folders you register as libraries, and creates 
 
 Files whose extensions are not in the table above are not treated as books.
 
+### Archives inside archives
+
+A CBZ, CBR, or CB7 file that holds other CBZ, CBR, or CB7 files is read as one book. For example, `work.zip` can contain `vol1.zip` and `vol2.zip`. The pages of the inner archives follow each other in file name order. Only one level is read: an archive inside an inner archive is not opened.
+
+Books that failed with "no images in archive" before this was supported need to be analyzed again. Select **Re-analyze** for the book under **Admin > Media management**.
+
 ### PDF handling
 
 MARS displays PDFs as follows:

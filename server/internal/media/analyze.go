@@ -84,7 +84,11 @@ func AnalyzeCover(ctx context.Context, path archive.Path, coverPage int) (Analys
 	mediaTypes := make(map[string]string)
 	var names []string
 	ciName, ciRoot := "", false
-	for _, e := range a.Entries() {
+	entries, err := archive.ListEntries(ctx, a)
+	if err != nil {
+		return Analysis{}, err
+	}
+	for _, e := range entries {
 		if isComicInfo(e.Name) {
 			root := !strings.Contains(e.Name, "/")
 			if ciName == "" || (root && !ciRoot) {

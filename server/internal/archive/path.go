@@ -39,8 +39,22 @@ func OpenPath(p Path) (Archive, Format, error) {
 }
 
 // OpenPathContext is OpenPath that gives up with ctx's error when ctx ends.
-// Parsing a PDF can take a while, so ctx reaches the PDF reader too.
+// Parsing a PDF can take a while, so ctx reaches the PDF reader too. A CBZ,
+// CBR or CB7 that holds other archives is read as one book (see nested.go).
 func OpenPathContext(ctx context.Context, p Path) (Archive, Format, error) {
+	a, f, err := openPlain(ctx, p)
+	if err != nil || f == PDF {
+		return a, f, err
+	}
+	if w, ok := newNestedArchive(ctx, a); ok {
+		return w, f, nil
+	}
+	return a, f, nil
+}
+
+// openPlain opens the book at p with the reader for its extension. Entries that
+// are archives stay ordinary entries here.
+func openPlain(ctx context.Context, p Path) (Archive, Format, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, "", err
 	}
