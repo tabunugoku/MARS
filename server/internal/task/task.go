@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	cdb "github.com/tabunugoku/mars/server/internal/db"
 	"github.com/tabunugoku/mars/server/internal/events"
 	"github.com/tabunugoku/mars/server/internal/ids"
 )
@@ -312,11 +313,17 @@ func (q *Queue) run(parent context.Context, j *job) {
 		if time.Since(last) < 500*time.Millisecond && p < 1 {
 			return
 		}
-		last = time.Now()
 		p = min(max(p, 0), 1)
 		if _, err := q.db.ExecContext(db, `UPDATE tasks SET progress = ? WHERE id = ?`, p, j.id); err != nil {
-			slog.Warn("task progress", "id", j.id, "err", err)
+			// A busy database (a delete or scan holds it) skips this write
+			// without a warning. Progress is cosmetic, and the next call
+			// catches up: last is not reset, so that call is not throttled.
+			if !cdb.IsBusy(err) {
+				slog.Warn("task progress", "id", j.id, "err", err)
+			}
+			return
 		}
+		last = time.Now()
 		if startErr == nil && q.Events != nil {
 			t := started
 			t.Progress = p

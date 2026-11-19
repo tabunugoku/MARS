@@ -4,8 +4,17 @@ import (
 	"context"
 	"database/sql"
 	"strings"
+	"sync"
 	"time"
 )
+
+// writeMu takes turns between the long writers (Batch and Unit) in Go instead
+// of leaving them to race for SQLite's write lock. That lock is not fair: a
+// writer that busy_timeout keeps waiting loses nearly every race to
+// back-to-back batches. A writer releases it before it rests, so the short
+// writers that do not take it (a progress write, touching a user, an API
+// request) get SQLite's lock during the rest.
+var writeMu sync.Mutex
 
 // Batch runs a long job of small writes as a series of short write
 // transactions, so other writers (a reader saving progress) wait at most
@@ -15,12 +24,17 @@ import (
 //
 // A job written through Batch must be safe to stop at any commit and to
 // run again: an interrupted scan is finished by the next one.
+//
+// From its first Tx until Flush or Close, a Batch holds writeMu. So a
+// goroutine must not call Unit or begin another Batch while its own Batch has
+// an open transaction: it would wait for a lock it holds itself.
 type Batch struct {
 	DB            *sql.DB
 	MaxStatements int           // units per transaction; 0 means 1000
 	MaxDuration   time.Duration // 0 means 50ms
 
 	tx      *sql.Tx
+	locked  bool // holds writeMu while tx is open
 	begun   time.Time
 	units   int
 	stmts   map[string]*sql.Stmt
@@ -28,14 +42,17 @@ type Batch struct {
 	Longest time.Duration // longest time a transaction was open
 }
 
-// Tx returns the open transaction, beginning one if needed.
+// Tx returns the open transaction, beginning one if needed. The transaction
+// holds writeMu until Flush or Close.
 func (b *Batch) Tx(ctx context.Context) (*sql.Tx, error) {
 	if b.tx == nil {
+		writeMu.Lock()
 		tx, err := b.DB.BeginTx(ctx, nil)
 		if err != nil {
+			writeMu.Unlock()
 			return nil, err
 		}
-		b.tx, b.begun, b.units, b.stmts = tx, time.Now(), 0, map[string]*sql.Stmt{}
+		b.tx, b.locked, b.begun, b.units, b.stmts = tx, true, time.Now(), 0, map[string]*sql.Stmt{}
 	}
 	return b.tx, nil
 }
@@ -86,14 +103,24 @@ func (b *Batch) Flush() error {
 	for _, st := range b.stmts {
 		st.Close()
 	}
-	if err := tx.Commit(); err != nil {
+	err := tx.Commit()
+	held := time.Since(b.begun)
+	b.unlock()
+	if err != nil {
 		return err
 	}
-	held := time.Since(b.begun)
 	b.Commits++
 	b.Longest = max(b.Longest, held)
 	rest(held)
 	return nil
+}
+
+// unlock releases writeMu if this Batch holds it.
+func (b *Batch) unlock() {
+	if b.locked {
+		b.locked = false
+		writeMu.Unlock()
+	}
 }
 
 // rest leaves the write lock free for as long as a transaction held it.
@@ -105,24 +132,38 @@ func rest(held time.Duration) { time.Sleep(held) }
 // Unit runs fn in one short write transaction on d, retrying it while the
 // database is busy (see RetryBusy), then rests as Flush does. fn must be safe
 // to run again. Use it for each batch of a long delete, so another writer
-// waits at most one batch.
+// waits at most one batch. As for Batch, a goroutine must not call Unit while
+// its own Batch has an open transaction.
 func Unit(ctx context.Context, d *sql.DB, fn func(tx *sql.Tx) error) error {
 	return RetryBusy(ctx, func() error {
-		tx, err := d.BeginTx(ctx, nil)
+		held, err := unitTx(ctx, d, fn)
 		if err != nil {
 			return err
 		}
-		begun := time.Now()
-		if err := fn(tx); err != nil {
-			tx.Rollback()
-			return err
-		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
-		rest(time.Since(begun))
+		rest(held)
 		return nil
 	})
+}
+
+// unitTx runs fn in one transaction and commits it. It holds writeMu from the
+// begin to the commit or rollback, and returns how long the transaction was
+// open. The rest is left to the caller, so the lock is free while it runs.
+func unitTx(ctx context.Context, d *sql.DB, fn func(tx *sql.Tx) error) (time.Duration, error) {
+	writeMu.Lock()
+	defer writeMu.Unlock()
+	tx, err := d.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	begun := time.Now()
+	if err := fn(tx); err != nil {
+		tx.Rollback()
+		return 0, err
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
+	return time.Since(begun), nil
 }
 
 // Close rolls back the open transaction, if any. Call it (deferred) on
@@ -135,6 +176,13 @@ func (b *Batch) Close() {
 		b.tx.Rollback()
 		b.tx = nil
 	}
+	b.unlock()
+}
+
+// IsBusy reports whether err is SQLite's "database is locked" (SQLITE_BUSY): a
+// write that waited out busy_timeout behind another writer.
+func IsBusy(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "database is locked")
 }
 
 // RetryBusy runs fn again, for up to about 30 seconds, while it fails with
@@ -144,7 +192,7 @@ func (b *Batch) Close() {
 func RetryBusy(ctx context.Context, fn func() error) error {
 	var err error
 	for attempt := 1; attempt <= 6; attempt++ {
-		if err = fn(); err == nil || !strings.Contains(err.Error(), "database is locked") {
+		if err = fn(); err == nil || !IsBusy(err) {
 			return err
 		}
 		select {

@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -221,4 +224,136 @@ func waitUntil(t *testing.T, what string, ok func() bool) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+}
+
+// Two libraries deleted at once take turns: while one is part way through its
+// books, the other has none removed. With one-book batches and a pause after
+// each, two deletes running together would both be part way through at once.
+func TestDeletesRunOneAtATime(t *testing.T) {
+	ctx := context.Background()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "a", 1, 2, 2)
+	seedDeleteLibrary(t, conn, "b", 1, 2, 2)
+	var overlap atomic.Bool
+	s := &Service{DB: conn, deleteBatch: 1}
+	s.deleteHook = func() {
+		// Libraries that still have some, but not all, of their four books.
+		var n int
+		if err := conn.QueryRow(`SELECT count(*) FROM (SELECT library_id FROM books GROUP BY library_id HAVING count(*) < 4)`).Scan(&n); err != nil {
+			t.Errorf("count: %v", err)
+			return
+		}
+		if n > 1 {
+			overlap.Store(true)
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	var wg sync.WaitGroup
+	errs := make([]error, 2)
+	for i, id := range []string{"a", "b"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			errs[i] = s.deleteLibrary(ctx, id, func(float64) {})
+		}()
+	}
+	wg.Wait()
+	for _, err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if overlap.Load() {
+		t.Error("two library deletes ran at once")
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM libraries`); n != 0 {
+		t.Errorf("libraries left: %d", n)
+	}
+}
+
+// The delete task's row outlives its library: it ends as done, detached from
+// the library, so the task list still shows the delete.
+func TestDeleteKeepsItsTaskRow(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "gone", 1, 1, 1)
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q}
+	tk, err := s.QueueDelete(ctx, "gone")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the delete task to end", func() bool {
+		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state = 'done'`, tk.ID) == 1
+	})
+	if n := countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = 'gone'`); n != 0 {
+		t.Errorf("library left: %d rows", n)
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND kind = 'delete' AND library_id IS NULL`, tk.ID); n != 1 {
+		t.Errorf("delete task row detached from its library: %d rows, want 1", n)
+	}
+}
+
+// A library left marked deleting with no task for it (the task failed, or its
+// queue request never got through) is queued again by the next tick.
+func TestScheduleRequeuesOrphanDelete(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "gone", 1, 1, 1)
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q}
+	s.queueDeletes(ctx) // one tick of Schedule
+	waitUntil(t, "the orphan delete to remove the library", func() bool {
+		return countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = 'gone'`) == 0
+	})
+}
+
+// The rows that a delete and its cascades look up by library, series or book
+// have full indexes: a partial index cannot serve them, and a scan of the
+// whole table per batch made the delete slow enough to hold the write lock.
+func TestCascadeUsesIndexes(t *testing.T) {
+	conn := openDeleteTestDB(t)
+	for _, c := range []struct{ query, index string }{
+		{`SELECT 1 FROM books WHERE series_id = ?`, "books_series_all"},
+		{`SELECT 1 FROM books WHERE library_id = ?`, "books_library_all"},
+		{`SELECT 1 FROM series WHERE library_id = ?`, "series_library_all"},
+		{`SELECT 1 FROM progress_writers WHERE book_id = ?`, "progress_writers_book"},
+		{`SELECT 1 FROM user_libraries WHERE library_id = ?`, "user_libraries_library"},
+		{`SELECT 1 FROM tasks WHERE library_id = ?`, "tasks_library"},
+	} {
+		if plan := queryPlan(t, conn, c.query); !strings.Contains(plan, c.index) {
+			t.Errorf("%s: plan does not use %s: %s", c.query, c.index, plan)
+		}
+	}
+}
+
+// queryPlan returns the EXPLAIN QUERY PLAN lines of a query with one parameter.
+func queryPlan(t *testing.T, conn *sql.DB, query string) string {
+	t.Helper()
+	rows, err := conn.Query("EXPLAIN QUERY PLAN "+query, "x")
+	if err != nil {
+		t.Fatalf("%s: %v", query, err)
+	}
+	defer rows.Close()
+	var lines []string
+	for rows.Next() {
+		var id, parent, unused int
+		var detail string
+		if err := rows.Scan(&id, &parent, &unused, &detail); err != nil {
+			t.Fatal(err)
+		}
+		lines = append(lines, detail)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return strings.Join(lines, "; ")
 }

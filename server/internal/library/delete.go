@@ -12,8 +12,19 @@ import (
 	"github.com/tabunugoku/mars/server/internal/task"
 )
 
-// deleteBatchSize is how many books, or series, one delete transaction removes.
-const deleteBatchSize = 200
+// Rows one delete transaction removes, at most. A book brings its 200 page
+// rows with it, so books go in smaller batches than series.
+const (
+	deleteBookBatch   = 50
+	deleteSeriesBatch = 200
+)
+
+// deleteLock lets one library delete run at a time. It is made on first use,
+// because tests build Service literals.
+func (s *Service) deleteLock() ctxMutex {
+	s.deleteOnce.Do(func() { s.deleteMu = newCtxMutex() })
+	return s.deleteMu
+}
 
 // QueueDelete queues the removal of a library. The caller has already set its
 // deleting flag, which hides the library at once; the task then removes the
@@ -35,9 +46,12 @@ func (s *Service) QueueDelete(ctx context.Context, libraryID string) (task.Task,
 }
 
 // queueDeletes queues the removal of every library still marked deleting, so
-// a deletion cut short by a restart goes on (see Schedule).
+// a deletion cut short by a restart goes on, and one whose task ended without
+// removing the library is tried again (see Schedule). A library with a delete
+// queued or running is skipped: that task is doing the work. Run resets the
+// tasks left by a restart before Schedule calls this, so none is left behind.
 func (s *Service) queueDeletes(ctx context.Context) {
-	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM libraries WHERE deleting = 1 ORDER BY id`)
+	rows, err := s.DB.QueryContext(ctx, `SELECT id FROM libraries l WHERE deleting = 1 AND NOT EXISTS (SELECT 1 FROM tasks t WHERE t.library_id = l.id AND t.kind = 'delete' AND t.state IN ('queued','running')) ORDER BY id`)
 	if err != nil {
 		slog.Error("resume deletes", "err", err)
 		return
@@ -54,7 +68,8 @@ func (s *Service) queueDeletes(ctx context.Context) {
 	}
 	rows.Close()
 	for _, id := range ids {
-		if _, err := s.QueueDelete(ctx, id); err != nil {
+		// ErrNotFound: the library went while the list was read.
+		if _, err := s.QueueDelete(ctx, id); err != nil && !errors.Is(err, ErrNotFound) {
 			slog.Error("resume delete", "library", id, "err", err)
 		}
 	}
@@ -68,6 +83,13 @@ func (s *Service) queueDeletes(ctx context.Context) {
 // finishes it. Thumbnail files are not removed (the handler never removed
 // them either).
 func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(float64)) error {
+	// Deletes take turns (see deleteLock): the batches of one leave the write
+	// lock free for the others, and deleted libraries go one after another.
+	dl := s.deleteLock()
+	if err := dl.Lock(ctx); err != nil {
+		return err
+	}
+	defer dl.Unlock()
 	// Scans hold this lock too (scanLibrary): one that began before the flag
 	// was set must not write rows back into the library while it goes.
 	mu := s.scanLock(id)
@@ -76,9 +98,12 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 	}
 	defer mu.Unlock()
 
-	size := s.deleteBatch
-	if size <= 0 {
-		size = deleteBatchSize
+	bookSize, seriesSize := s.deleteBatch, s.deleteBatch
+	if bookSize <= 0 {
+		bookSize = deleteBookBatch
+	}
+	if seriesSize <= 0 {
+		seriesSize = deleteSeriesBatch
 	}
 	var total int
 	if err := s.DB.QueryRowContext(ctx, `SELECT count(*) FROM books WHERE library_id = ?`, id).Scan(&total); err != nil {
@@ -102,7 +127,7 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 	for {
 		var n int
 		err := db.Unit(ctx, s.DB, func(tx *sql.Tx) error {
-			ids, err := idsOf(ctx, tx, `SELECT id FROM books WHERE library_id = ? LIMIT ?`, id, size)
+			ids, err := idsOf(ctx, tx, `SELECT id FROM books WHERE library_id = ? LIMIT ?`, id, bookSize)
 			if err != nil {
 				return err
 			}
@@ -115,7 +140,12 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 			if _, err := tx.ExecContext(ctx, `DELETE FROM search_rows WHERE kind = 'book' AND ref IN (`+placeholders(ids)+`)`, anys(ids)...); err != nil {
 				return err
 			}
-			// Pages, progress and read-list entries go by cascade.
+			// Pages go first, explicitly: the cascade would remove them too,
+			// but the explicit delete keeps the plan obvious. Progress and
+			// read-list entries go by cascade.
+			if _, err := tx.ExecContext(ctx, `DELETE FROM pages WHERE book_id IN (`+placeholders(ids)+`)`, anys(ids)...); err != nil {
+				return err
+			}
 			_, err = tx.ExecContext(ctx, `DELETE FROM books WHERE id IN (`+placeholders(ids)+`)`, anys(ids)...)
 			return err
 		})
@@ -135,7 +165,7 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 	for {
 		var n int
 		err := db.Unit(ctx, s.DB, func(tx *sql.Tx) error {
-			ids, err := idsOf(ctx, tx, `SELECT id FROM series WHERE library_id = ? LIMIT ?`, id, size)
+			ids, err := idsOf(ctx, tx, `SELECT id FROM series WHERE library_id = ? LIMIT ?`, id, seriesSize)
 			if err != nil {
 				return err
 			}
@@ -159,11 +189,11 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 	}
 
 	// Search rows of the library that no book or series row matched (none, in
-	// a healthy database), in batches of the same size.
+	// a healthy database), in series-sized batches.
 	for {
 		var n int
 		err := db.Unit(ctx, s.DB, func(tx *sql.Tx) error {
-			res, err := tx.ExecContext(ctx, `DELETE FROM search_rows WHERE id IN (SELECT id FROM search_rows WHERE library_id = ? LIMIT ?)`, id, size)
+			res, err := tx.ExecContext(ctx, `DELETE FROM search_rows WHERE id IN (SELECT id FROM search_rows WHERE library_id = ? LIMIT ?)`, id, seriesSize)
 			if err != nil {
 				return err
 			}
@@ -182,6 +212,11 @@ func (s *Service) deleteLibrary(ctx context.Context, id string, progress func(fl
 
 	if err := db.Unit(ctx, s.DB, func(tx *sql.Tx) error {
 		if err := db.DropEmptiedCollections(ctx, tx, emptied); err != nil {
+			return err
+		}
+		// The delete task's own row would go with the library by cascade.
+		// It is kept, detached, so the task list shows the delete as done.
+		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET library_id = NULL WHERE library_id = ? AND kind = 'delete'`, id); err != nil {
 			return err
 		}
 		_, err := tx.ExecContext(ctx, `DELETE FROM libraries WHERE id = ? AND deleting = 1`, id)

@@ -86,10 +86,14 @@ type Service struct {
 	watchDirty watchPending // per library: top-level entries a watcher saw change, not yet scanned
 
 	// deleteBatch is how many books or series one delete transaction removes
-	// (see QueueDelete); 0 means deleteBatchSize. deleteHook, when set, runs
-	// after each committed batch. Tests use both.
+	// (see QueueDelete); 0 means the batch sizes in delete.go. deleteHook, when
+	// set, runs after each committed batch. Tests use both.
 	deleteBatch int
 	deleteHook  func()
+	// deleteMu and deleteOnce make the lock that runs deletes one at a time
+	// (see deleteLock).
+	deleteMu   ctxMutex
+	deleteOnce sync.Once
 }
 
 // coverLock orders the writers of a book's cover: an analysis, a cover
@@ -938,7 +942,9 @@ var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time
 // minute. Each check queues a scan of every library that is due: one never
 // scanned, or one whose scan interval has passed since last_scan. A library
 // with interval "off" is not scanned. Libraries are not
-// scanned just because the server starts. Schedule returns when ctx is done.
+// scanned just because the server starts. Each check also queues the removal
+// of a library still marked deleting, when none is queued or running (see
+// queueDeletes). Schedule returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
 	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
 		slog.Error("reanalyse PDFs", "err", err)
@@ -952,6 +958,7 @@ func (s *Service) Schedule(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
+			s.queueDeletes(ctx)
 			s.queueDue(ctx)
 		}
 	}
