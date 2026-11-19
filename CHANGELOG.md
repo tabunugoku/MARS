@@ -7,6 +7,10 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+### Added
+
+- A CBZ, CBR or CB7 that holds other CBZ, CBR or CB7 files (one per volume) is read as one book: the inner archives' pages follow in file name order. Only one level is read. Books that failed with "no images in archive" need **Re-analyze** in Admin > Media management.
+
 ### Changed
 
 - The MARS name in the sidebar and on the sign-in and setup pages is now the MARS wordmark: Unbounded cut once like a gutter between manga panels.

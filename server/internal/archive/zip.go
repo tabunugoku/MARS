@@ -102,7 +102,25 @@ func (z *zipArchive) Close() error { return z.file.Close() }
 // uncompressed size, so the rest of an entry is never needed to reach the
 // next one. RAR, 7z and PDF do not qualify because their entries share state
 // or must be decoded in order, and skipping them would still decompress.
+//
+// A nested book whose outer archive is zip and whose volumes are all CBZ also
+// qualifies. Each page then comes from a zip entry, which can be left
+// part-read. The spill of a volume is still read whole by the wrapper, whatever
+// fn reads, so only the pages' own bytes are saved.
 func HeaderSkipCheap(a Archive) bool {
-	_, ok := a.(*zipArchive)
-	return ok
+	switch v := a.(type) {
+	case *zipArchive:
+		return true
+	case *nestedArchive:
+		if _, ok := v.outer.(*zipArchive); !ok {
+			return false
+		}
+		for _, name := range v.order {
+			if f, _ := formatOf(name); f != CBZ {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }

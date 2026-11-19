@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/tabunugoku/mars/server/internal/archive"
 	"github.com/tabunugoku/mars/server/internal/auth"
 	"github.com/tabunugoku/mars/server/internal/config"
 	"github.com/tabunugoku/mars/server/internal/db"
@@ -98,6 +99,17 @@ func run() error {
 	if threads < 1 {
 		threads = runtime.NumCPU()/2 + 1
 	}
+
+	// Volumes of archives inside a book are spilled here. This must be set
+	// before the queue starts, since analysis begins as soon as it runs. A
+	// leftover from a crash is removed first; a failure to remove it is not
+	// fatal, because MkdirAll reports a real problem.
+	dir := filepath.Join(cfg.DataDir, "tmp", "archive")
+	_ = os.RemoveAll(dir)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return err
+	}
+	archive.SetTempDir(dir)
 
 	hub := events.New()
 	queue := task.New(database, threads)
