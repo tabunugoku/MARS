@@ -77,6 +77,10 @@ type job struct {
 	// ran. It is held back from the workers and queued when this one ends,
 	// so the two never run at once. Guarded by Queue.mu.
 	next *job
+	// relabel is the label Relabel gave the running task. Progress events
+	// build on the row as it started, so they take it from here, or they
+	// would show the old label again. Guarded by Queue.mu.
+	relabel *Text
 }
 
 // Queue owns the workers. Create it with New, then call Run.
@@ -273,6 +277,28 @@ func (q *Queue) Cancel(ctx context.Context, id string) error {
 	return nil
 }
 
+// Relabel changes the label of a queued or running task and publishes it. A
+// delete uses it to show the library it is on now. The row is written first:
+// the job's override is set only after the write, so an event never shows a
+// label the row does not have.
+func (q *Queue) Relabel(ctx context.Context, id string, label Text) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if _, err := q.execRetry(ctx, `UPDATE tasks SET label = ?, label_code = ?, label_arg = ? WHERE id = ?`,
+		label.English, label.Code, label.Arg, id); err != nil {
+		return err
+	}
+	q.mu.Lock()
+	if j := q.live[id]; j != nil {
+		l := label
+		j.relabel = &l
+	}
+	q.mu.Unlock()
+	q.publish(ctx, id)
+	return nil
+}
+
 func (q *Queue) worker(ctx context.Context) {
 	for {
 		select {
@@ -352,6 +378,11 @@ func (q *Queue) run(parent context.Context, j *job) {
 		if startErr == nil && q.Events != nil {
 			t := started
 			t.Progress = p
+			q.mu.Lock()
+			if j.relabel != nil {
+				t.Label, t.LabelCode, t.LabelArg = j.relabel.English, j.relabel.Code, j.relabel.Arg
+			}
+			q.mu.Unlock()
 			q.publishTask(t)
 		}
 	}

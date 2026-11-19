@@ -90,13 +90,24 @@ type Service struct {
 	// set, runs after each committed batch. Tests use both.
 	deleteBatch int
 	deleteHook  func()
+	// deleteFail, when set, runs at the start of each library's delete and
+	// fails it when it returns an error. drainIdle, when set, runs in
+	// drainDeletes after its check finds no library, before the final check.
+	// Tests use both.
+	deleteFail func(id string) error
+	drainIdle  func()
 	// deleteMu and deleteOnce make the lock that runs deletes one at a time
 	// (see deleteLock).
 	deleteMu   ctxMutex
 	deleteOnce sync.Once
 	// deleteQueueMu makes QueueDelete look for a live delete task and submit
-	// one as a single step, so two requests cannot both submit one.
+	// one as a single step, so two requests cannot both submit one. It also
+	// guards drainOpen and drainTask.
 	deleteQueueMu sync.Mutex
+	// drainOpen is true while the delete task in drainTask may still reach a
+	// library marked after its last check (see QueueDelete and drainDeletes).
+	drainOpen bool
+	drainTask string // id of the task that drains; guarded by deleteQueueMu
 }
 
 // coverLock orders the writers of a book's cover: an analysis, a cover
@@ -947,8 +958,9 @@ var intervals = map[string]time.Duration{"hourly": time.Hour, "daily": 24 * time
 // with interval "off" is not scanned. Libraries are not
 // scanned just because the server starts. The first check also resumes the
 // removal of every library still marked deleting, and each later check queues
-// the removal of a deleting library that has no delete task row at all (see
-// resumeDeletes and queueOrphanDeletes). Schedule returns when ctx is done.
+// the removal of a deleting library that has no delete task row at all,
+// unless the latest delete task was cancelled or failed (see resumeDeletes
+// and queueOrphanDeletes). Schedule returns when ctx is done.
 func (s *Service) Schedule(ctx context.Context) {
 	if _, err := s.ReanalysePDFsOnce(ctx); err != nil {
 		slog.Error("reanalyse PDFs", "err", err)

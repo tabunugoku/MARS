@@ -322,11 +322,17 @@ func TestCancelledDeleteIsNotRequeuedByTick(t *testing.T) {
 	ctx := context.Background()
 	conn := openDeleteTestDB(t)
 	seedDeleteLibrary(t, conn, "gone", 1, 1, 1)
+	// Marked while the first one's drain is queued: it folds into that drain,
+	// so it has no delete task row of its own.
+	seedDeleteLibrary(t, conn, "folded", 1, 1, 1)
 	// No Run: the task stays queued until it is cancelled.
 	q := task.New(conn, 2)
 	s := &Service{DB: conn, Queue: q}
 	tk, err := s.QueueDelete(ctx, "gone")
 	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.QueueDelete(ctx, "folded"); err != nil {
 		t.Fatal(err)
 	}
 	if err := q.Cancel(ctx, tk.ID); err != nil {
@@ -339,8 +345,156 @@ func TestCancelledDeleteIsNotRequeuedByTick(t *testing.T) {
 	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state = 'cancelled'`, tk.ID); n != 1 {
 		t.Errorf("the cancelled delete task is not cancelled")
 	}
-	if n := countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = 'gone'`); n != 1 {
-		t.Errorf("the library of a cancelled delete was removed or re-queued: %d rows", n)
+	for _, id := range []string{"gone", "folded"} {
+		if n := countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = ?`, id); n != 1 {
+			t.Errorf("library %s of a cancelled delete was removed or re-queued: %d rows", id, n)
+		}
+	}
+}
+
+// A library marked after a drain's last query but before its final check is
+// still deleted by that drain, with no tick. drainIdle runs in exactly that
+// window: it marks library b and requests its delete from inside the drain,
+// where the request folds in because the drain is still open.
+func TestDrainTakesLibraryMarkedAfterItsLastCheck(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "a", 1, 1, 1)
+	seedDeleteLibrary(t, conn, "b", 0, 1, 1)
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q}
+	var fired atomic.Bool
+	s.drainIdle = func() {
+		if fired.Swap(true) {
+			return
+		}
+		if _, err := conn.Exec(`UPDATE libraries SET deleting = 1 WHERE id = 'b'`); err != nil {
+			t.Errorf("mark b: %v", err)
+			return
+		}
+		if _, err := s.QueueDelete(ctx, "b"); err != nil {
+			t.Errorf("QueueDelete(b): %v", err)
+		}
+	}
+	tk, err := s.QueueDelete(ctx, "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the delete task to end", func() bool {
+		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state IN ('done', 'failed', 'cancelled')`, tk.ID) == 1
+	})
+	if !fired.Load() {
+		t.Fatal("drainIdle never ran: the drain did not reach its final check")
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM libraries`); n != 0 {
+		t.Errorf("libraries left after the drain: %d, want 0 (b was marked during it)", n)
+	}
+	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE kind = 'delete'`); n != 1 {
+		t.Errorf("delete task rows = %d, want 1: b should fold into the drain", n)
+	}
+}
+
+// One library whose delete fails does not stop the others: they are removed,
+// the failed one stays marked deleting, and the task ends failed. A tick then
+// does not restart it.
+func TestFailingLibraryDoesNotBlockOthers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	for _, id := range []string{"a", "b", "c"} {
+		seedDeleteLibrary(t, conn, id, 1, 1, 1)
+	}
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q, deleteFail: func(id string) error {
+		if id == "b" {
+			return errors.New("disk on fire")
+		}
+		return nil
+	}}
+	tk, err := s.QueueDelete(ctx, "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	waitUntil(t, "the delete task to fail", func() bool {
+		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state = 'failed'`, tk.ID) == 1
+	})
+	for _, c := range []struct {
+		id   string
+		want int
+	}{{"a", 0}, {"b", 1}, {"c", 0}} {
+		if n := countRows(t, conn, `SELECT count(*) FROM libraries WHERE id = ?`, c.id); n != c.want {
+			t.Errorf("library %s rows = %d, want %d", c.id, n, c.want)
+		}
+	}
+	var msg string
+	if err := conn.QueryRow(`SELECT error FROM tasks WHERE id = ?`, tk.ID).Scan(&msg); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(msg, "1 libraries") {
+		t.Errorf("task error = %q, want it to name the one failed library", msg)
+	}
+	s.queueOrphanDeletes(ctx)
+	if n := countRows(t, conn, `SELECT count(*) FROM tasks WHERE kind = 'delete'`); n != 1 {
+		t.Errorf("delete task rows after a tick = %d, want 1: a failed drain is not restarted", n)
+	}
+}
+
+// A drain that takes a second library relabels its task with that library's
+// name, so the task list shows what is being deleted now.
+func TestDrainRelabelsTaskWithLibrary(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	conn := openDeleteTestDB(t)
+	seedDeleteLibrary(t, conn, "a", 1, 1, 1)
+	seedDeleteLibrary(t, conn, "b", 1, 1, 1)
+	if _, err := conn.Exec(`UPDATE libraries SET name = 'Second Library' WHERE id = 'b'`); err != nil {
+		t.Fatal(err)
+	}
+	q := task.New(conn, 2)
+	if err := q.Run(ctx); err != nil {
+		t.Fatal(err)
+	}
+	s := &Service{DB: conn, Queue: q}
+	// Hold the drain inside library a's first batch until b is requested, so
+	// b folds into this task rather than a task of its own starting after it.
+	started := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	s.deleteHook = func() {
+		once.Do(func() {
+			close(started)
+			<-release
+		})
+	}
+	tk, err := s.QueueDelete(ctx, "a")
+	if err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-started:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the drain never started")
+	}
+	if _, err := s.QueueDelete(ctx, "b"); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	waitUntil(t, "the delete task to end", func() bool {
+		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state = 'done'`, tk.ID) == 1
+	})
+	var arg, code string
+	if err := conn.QueryRow(`SELECT label_arg, label_code FROM tasks WHERE id = ?`, tk.ID).Scan(&arg, &code); err != nil {
+		t.Fatal(err)
+	}
+	if arg != "Second Library" || code != "task.delete_library" {
+		t.Errorf("task label = (%q, %q), want (%q, %q)", arg, code, "Second Library", "task.delete_library")
 	}
 }
 
