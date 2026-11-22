@@ -7,6 +7,15 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+## 0.1.4 — 2026-11-23
+
+The library list, library settings and the home screen are fast again on large libraries.
+
+### Fixed
+
+- The library list and saving a library's settings were slow on large libraries since 0.1.3: each library's book count and size read every book row. On a 37,000-book library, the list now answers in 9 ms (120 ms before), and a settings save during a scan takes 24 ms (178 ms before). In the same test, none of about 1,100 settings saves made during scans failed with "database is locked", a known problem in 0.1.2.
+- The home screen was slow on large libraries: its "recently added" and "recently updated" shelves sorted the whole library. On a 37,000-book library it now answers in about 75 ms (about 630 ms before).
+
 ## 0.1.3 — 2026-11-20
 
 Archives inside archives are read as one book, deleting libraries no longer locks the database, and covers no longer blink.
