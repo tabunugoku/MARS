@@ -275,21 +275,29 @@ func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject
 	if d.OnDeck, err = s.onDeckBooks(ctx, uid, bLib, libArgs); err != nil {
 		return nil, err
 	}
-	// The shelves below name the partial indexes that hold them in sort order.
-	// The access scope (libScope) is an IN subquery on library_id, which made
+	// The shelves name the partial indexes that hold them in sort order, so an
+	// unscoped dashboard walks the index and stops after 20 rows. The access
+	// scope (libScope) is an IN subquery on library_id, which otherwise made
 	// the planner walk a library index and sort the whole library (see
-	// docs/dev/perf-large-library.md): with the hint it walks the index and
-	// stops after 20 visible rows.
-	if d.RecentlyAddedBooks, err = booksIn("books_recent", ``, `ORDER BY b.created_at DESC, b.id DESC LIMIT 20`); err != nil {
+	// docs/dev/perf-large-library.md). A scoped call (libraryId, or a user with
+	// a few libraries) can have fewer than 20 matching rows, and then the forced
+	// walk would scan the whole global index, so it keeps the planner's choice.
+	shelf := func(index string) string {
+		if req.Params.LibraryId != nil || !seesAllLibraries(ctx) {
+			return ""
+		}
+		return index
+	}
+	if d.RecentlyAddedBooks, err = booksIn(shelf("books_recent"), ``, `ORDER BY b.created_at DESC, b.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
-	if d.RecentlyAddedSeries, err = seriesIn("series_created", ``, `ORDER BY s.created_at DESC, s.id DESC LIMIT 20`); err != nil {
+	if d.RecentlyAddedSeries, err = seriesIn(shelf("series_created"), ``, `ORDER BY s.created_at DESC, s.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
 	if d.RecentlyRead, err = books(` AND rp.completed = 1`, `ORDER BY rp.read_at DESC, b.id LIMIT 20`); err != nil {
 		return nil, err
 	}
-	if d.RecentlyUpdatedSeries, err = seriesIn("series_updated", ` AND s.updated_at > s.created_at`, `ORDER BY s.updated_at DESC, s.id DESC LIMIT 20`); err != nil {
+	if d.RecentlyUpdatedSeries, err = seriesIn(shelf("series_updated"), ` AND s.updated_at > s.created_at`, `ORDER BY s.updated_at DESC, s.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
 	return GetDashboard200JSONResponse(d), nil
@@ -336,4 +344,11 @@ func (s *server) Search(ctx context.Context, req SearchRequestObject) (SearchRes
 	}
 	res.Collections, res.ReadLists = cs[:min(len(cs), 20)], rl[:min(len(rl), 20)]
 	return Search200JSONResponse(res), nil
+}
+
+// seesAllLibraries reports whether the caller sees every library, as libScope
+// decides it: an administrator, or a user with AllLibraries.
+func seesAllLibraries(ctx context.Context) bool {
+	u, ok := userFrom(ctx)
+	return ok && u.ID != "" && (u.IsAdmin() || u.AllLibraries)
 }
