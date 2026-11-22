@@ -23,6 +23,10 @@ after.
   - 4 readers send `PUT /books/{id}/progress` (with `writer`/`seq`) every
     50 ms;
   - 2 readers send `GET /books/{id}/pages` every 100 ms;
+  - the admin sends `PATCH /libraries/{id}` every 500 ms, the save from the
+    library settings. The only field is `name`, toggled between two values;
+    the handler writes that one column and starts nothing (no scan, no
+    watcher restart). See "Settings saves during scans";
   - a probe on its own connection takes and releases the write lock
     (`BEGIN IMMEDIATE`) every 20 ms. How long it waits is how long some
     other write transaction held the lock.
@@ -106,6 +110,45 @@ just enough here. But the longest stall was already 1.5–1.8 s on this
 machine. On a NAS several times slower it would pass 5 s and fail. The fixed
 version keeps every write transaction short, so the margin no longer
 depends on the hardware.
+
+### Settings saves during scans
+
+The admin's library-settings save, `PATCH /libraries/{id}`, runs every 500 ms
+during each scan phase (see Setup). It writes only `name`, toggled between two
+values. The handler does not take the Go-side write turn (`writeSem`), so it
+depends on SQLite's `busy_timeout`. Latency in milliseconds, all PATCHes of
+the phase:
+
+| scan phase | saves | failed | p50 | p95 | max |
+|---|---:|---:|---:|---:|---:|
+| First scan + analysis | 826 | 0 | 177.9 | 255.8 | 294.7 |
+| Rescan, nothing changed | 329 | 0 | 286.0 | 312.9 | 370.3 |
+| Rescan, one book changed | 4 | 0 | 306.2 | 311.7 | 311.7 |
+
+The last phase lasts under 3 s, so it has only four saves.
+
+Control runs, first scan only, same library and test:
+
+| build | `busy_timeout` | saves | failed | p50 | p95 | max | progress PUT failed |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| v0.1.2 (before `writeSem`) | 5000 ms | 977 | 0 | 23.1 | 28.5 | 79.5 | 0 |
+| this branch | 5000 ms | 826 | 0 | 177.9 | 255.8 | 294.7 | 0 |
+| this branch | 200 ms | 797 | 0 | 178.1 | 271.7 | 362.2 | 0 |
+| this branch | 50 ms | 737 | 0 | 165.5 | 271.8 | 338.3 | 36 (`database is locked`) |
+
+What the numbers show:
+
+- **The pass criterion holds on this machine.** No save failed in any scan
+  phase, and the slowest took 370 ms, about 13 times less than 5 s.
+- **The harness does detect lock failures.** At a 50 ms budget, 36 progress
+  writes failed with `database is locked (5) (SQLITE_BUSY)`.
+- **The saves never failed, even at 50 ms, and their latency did not follow
+  `busy_timeout`.** So their wait is not SQLite's busy handler. This control
+  therefore does not show that a save fails under lock contention.
+- **Saves are slower than in v0.1.2:** median about 170 ms against 23 ms, at
+  the same 5 s setting. The cause is not identified. `UpdateLibrary` itself
+  is unchanged since v0.1.2, so the extra time comes from elsewhere on the
+  request path. Open item.
 
 ## What was slow, and the fixes
 
