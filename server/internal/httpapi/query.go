@@ -36,7 +36,11 @@ const seriesCoverCols = `(` + library.SeriesCoverSQL + `),
 
 // seriesQuery returns "SELECT ... FROM series s WHERE <visible>" and its
 // arguments. Append " AND ..." conditions, then ORDER BY / LIMIT.
-func seriesQuery(ctx context.Context) (string, []any) {
+func seriesQuery(ctx context.Context) (string, []any) { return seriesQueryIndexed(ctx, "") }
+
+// seriesQueryIndexed is seriesQuery with the series read through index (SQLite's
+// INDEXED BY) when index is not empty.
+func seriesQueryIndexed(ctx context.Context, index string) (string, []any) {
 	uid := currentUser(ctx).ID
 	cond, args := libScope(ctx, "s.library_id")
 	return `SELECT ` + seriesCols + `,
@@ -45,7 +49,7 @@ func seriesQuery(ctx context.Context) (string, []any) {
 	(SELECT count(*) FROM books b CROSS JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	  WHERE b.series_id = s.id AND b.deleted_at IS NULL AND rp.completed = 0),
 	` + seriesCoverCols + `
-	FROM series s WHERE s.deleted_at IS NULL AND ` + cond, append([]any{uid, uid}, args...)
+	FROM series s` + indexedBy(index) + ` WHERE s.deleted_at IS NULL AND ` + cond, append([]any{uid, uid}, args...)
 }
 
 func scanSeries(r scanner) (Series, error) {
@@ -87,7 +91,12 @@ func thumbURL(base, file string) string {
 // listSeries runs seriesQuery + where (starting with " AND", or "") + tail
 // (ORDER BY ...), with args for where and tail in that order.
 func (s *server) listSeries(ctx context.Context, where, tail string, args ...any) ([]Series, error) {
-	q, base := seriesQuery(ctx)
+	return s.listSeriesIndexed(ctx, "", where, tail, args...)
+}
+
+// listSeriesIndexed is listSeries reading the series through index.
+func (s *server) listSeriesIndexed(ctx context.Context, index, where, tail string, args ...any) ([]Series, error) {
+	q, base := seriesQueryIndexed(ctx, index)
 	rows, err := s.DB.QueryContext(ctx, q+where+" "+tail, append(base, args...)...)
 	if err != nil {
 		return nil, err
@@ -122,11 +131,15 @@ const bookCols = `b.id, b.series_id, b.library_id, b.title, b.number, b.number_s
 // bookQuery returns "SELECT ... FROM books b LEFT JOIN read_progress rp ...
 // WHERE <visible>" and its arguments, like seriesQuery. rp is the caller's
 // progress row (NULL columns when unread).
-func bookQuery(ctx context.Context) (string, []any) {
+func bookQuery(ctx context.Context) (string, []any) { return bookQueryIndexed(ctx, "") }
+
+// bookQueryIndexed is bookQuery with the books read through index (SQLite's
+// INDEXED BY) when index is not empty.
+func bookQueryIndexed(ctx context.Context, index string) (string, []any) {
 	uid := currentUser(ctx).ID
 	cond, args := libScope(ctx, "b.library_id")
 	return `SELECT ` + bookCols + `, rp.page, rp.completed, rp.read_at
-	FROM books b LEFT JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	FROM books b` + indexedBy(index) + ` LEFT JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
 	WHERE b.deleted_at IS NULL AND ` + cond, append([]any{uid}, args...)
 }
 
@@ -155,7 +168,12 @@ func scanBook(ctx context.Context, r scanner) (Book, error) {
 
 // listBooks is listSeries for books.
 func (s *server) listBooks(ctx context.Context, where, tail string, args ...any) ([]Book, error) {
-	q, base := bookQuery(ctx)
+	return s.listBooksIndexed(ctx, "", where, tail, args...)
+}
+
+// listBooksIndexed is listBooks reading the books through index.
+func (s *server) listBooksIndexed(ctx context.Context, index, where, tail string, args ...any) ([]Book, error) {
+	q, base := bookQueryIndexed(ctx, index)
 	rows, err := s.DB.QueryContext(ctx, q+where+" "+tail, append(base, args...)...)
 	if err != nil {
 		return nil, err
@@ -236,4 +254,12 @@ func archiveReason(ctx context.Context, reason string) string {
 		return msg(ctx, "media.pdf_too_big", mb)
 	}
 	return reason
+}
+
+// indexedBy is the INDEXED BY clause that names a table's index, or "".
+func indexedBy(index string) string {
+	if index == "" {
+		return ""
+	}
+	return " INDEXED BY " + index
 }
