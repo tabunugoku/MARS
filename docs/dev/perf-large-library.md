@@ -76,7 +76,7 @@ measured at the HTTP handler (JSON included).
 | `GET /books/{id}` | — ² | 0 | 1 |
 | `GET /books/{id}/pages` | — ² | 0.5 | 1 |
 | `GET /books/{id}/adjacent` | — ² | 0 | 1 |
-| `GET /libraries` | — ² | 7 | 12 |
+| `GET /libraries` | — ² | 9 | 11 |
 | `PATCH /series/{id}` | — ² | 2 | |
 | `PATCH /books/{id}` | — ² | 0.3 | |
 
@@ -145,10 +145,29 @@ What the numbers show:
 - **The saves never failed, even at 50 ms, and their latency did not follow
   `busy_timeout`.** So their wait is not SQLite's busy handler. This control
   therefore does not show that a save fails under lock contention.
-- **Saves are slower than in v0.1.2:** median about 170 ms against 23 ms, at
-  the same 5 s setting. The cause is not identified. `UpdateLibrary` itself
-  is unchanged since v0.1.2, so the extra time comes from elsewhere on the
-  request path. Open item.
+- **Saves were slower than in v0.1.2:** median about 170 ms against 23 ms.
+  The cause was `libraryCols`, the library's count and size subqueries, which
+  every save runs twice (through `getLibrary`). Migration 0013 added full
+  indexes on `books(library_id)` and `series(library_id)`. Without statistics
+  the planner picked them over the partial index `books_library_live`, so
+  each subquery read every book row of the library: about 110 ms per library
+  on this database, and the same delay hit `GET /libraries`. The planner
+  chooses those plans only by its defaults, so a hint was the smallest fix.
+  `libraryCols` now says `INDEXED BY books_library_live` and
+  `INDEXED BY series_library`. Migration 0013 stays, since library deletes
+  need its indexes.
+
+After the fix (full run, same library and load):
+
+| scan phase | saves | failed | p50 | p95 | max |
+|---|---:|---:|---:|---:|---:|
+| First scan + analysis | 1,072 | 0 | 23.6 | 29.0 | 91.7 |
+| Rescan, nothing changed | 6 | 0 | 24.4 | 40.3 | 40.3 |
+| Rescan, one book changed | 6 | 0 | 24.5 | 30.5 | 30.5 |
+
+`GET /libraries` on the same run: 9.4 ms p50, 11.2 ms p95 (120 ms p50 before
+the fix, 8.2 ms on v0.1.2). Progress writes in the first scan still show no
+failure.
 
 ## What was slow, and the fixes
 

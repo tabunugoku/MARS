@@ -58,10 +58,14 @@ func jsonText(v any) string {
 
 // ─── Libraries ───────────────────────────────────────────────────────────────
 
+// The counts name the partial indexes (WHERE deleted_at IS NULL). Without the
+// hint the planner, which has no statistics, picks the full library indexes from
+// migration 0013 and reads every book row of the library: 110 ms per library on
+// the 37,000-book database instead of 8 ms.
 const libraryCols = `l.id, l.name, l.root, l.kind, l.scan_interval, l.watch, l.import_comicinfo, l.import_local_artwork, l.exclude, l.last_scan,
-	(SELECT count(*) FROM series s WHERE s.library_id = l.id AND s.deleted_at IS NULL),
-	(SELECT count(*) FROM books b WHERE b.library_id = l.id AND b.deleted_at IS NULL),
-	(SELECT COALESCE(sum(size_bytes), 0) FROM books b WHERE b.library_id = l.id AND b.deleted_at IS NULL)`
+	(SELECT count(*) FROM series s INDEXED BY series_library WHERE s.library_id = l.id AND s.deleted_at IS NULL),
+	(SELECT count(*) FROM books b INDEXED BY books_library_live WHERE b.library_id = l.id AND b.deleted_at IS NULL),
+	(SELECT COALESCE(sum(size_bytes), 0) FROM books b INDEXED BY books_library_live WHERE b.library_id = l.id AND b.deleted_at IS NULL)`
 
 type scanner interface{ Scan(...any) error }
 
