@@ -30,6 +30,8 @@ func TestDeleteAfterCancelGetsNewTask(t *testing.T) {
 	// Block the drain inside a's delete, after its first committed batch.
 	blocked := make(chan struct{})
 	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(releaseOnce)
 	var once sync.Once
 	s.deleteHook = func() {
 		once.Do(func() {
@@ -60,7 +62,7 @@ func TestDeleteAfterCancelGetsNewTask(t *testing.T) {
 	if second.ID == first.ID {
 		t.Fatalf("delete of b folded into the cancelled task %s", first.ID)
 	}
-	close(release)
+	releaseOnce()
 
 	waitUntil(t, "the new delete task to end", func() bool {
 		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state IN ('done', 'failed', 'cancelled')`, second.ID) == 1
@@ -100,6 +102,8 @@ func TestDeleteAfterCancelBetweenLibraries(t *testing.T) {
 	s := &Service{DB: conn, Queue: q}
 	idle := make(chan struct{})
 	release := make(chan struct{})
+	releaseOnce := sync.OnceFunc(func() { close(release) })
+	t.Cleanup(releaseOnce)
 	var once sync.Once
 	s.drainIdle = func() {
 		once.Do(func() {
@@ -130,7 +134,7 @@ func TestDeleteAfterCancelBetweenLibraries(t *testing.T) {
 	if second.ID == first.ID {
 		t.Fatalf("delete of b folded into the cancelled task %s", first.ID)
 	}
-	close(release)
+	releaseOnce()
 
 	waitUntil(t, "the new delete task to end", func() bool {
 		return countRows(t, conn, `SELECT count(*) FROM tasks WHERE id = ? AND state IN ('done', 'failed', 'cancelled')`, second.ID) == 1
