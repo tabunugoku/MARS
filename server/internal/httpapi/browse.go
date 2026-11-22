@@ -214,7 +214,7 @@ func (s *server) GetAdjacentBooks(ctx context.Context, req GetAdjacentBooksReque
 // has one, it takes that series' first unread book, then checks the rest.
 // Testing every unread book of the library instead cost 5 s at 37,000 books
 // (docs/dev/perf-large-library.md). The caller's user id is bound three times,
-// then once more in the ORDER BY (see GetDashboard).
+// then once more in the ORDER BY (see onDeckBooks).
 const onDeckWhere = ` AND rp.book_id IS NULL
   AND b.id IN (SELECT (SELECT u.id FROM books u LEFT JOIN read_progress ur ON ur.book_id = u.id AND ur.user_id = ?
       WHERE u.series_id = c.series_id AND u.deleted_at IS NULL AND ur.book_id IS NULL
@@ -225,6 +225,29 @@ const onDeckWhere = ` AND rp.book_id IS NULL
     WHERE q.series_id = b.series_id AND q.deleted_at IS NULL AND qr.completed = 0)
   AND EXISTS (SELECT 1 FROM books p WHERE p.series_id = b.series_id AND p.deleted_at IS NULL
     AND (p.number_sort, p.path) < (b.number_sort, b.path))`
+
+// onDeckOrder ranks on-deck books: the series' latest finished read first.
+const onDeckOrder = `(SELECT max(sr.read_at) FROM books sb
+	  CROSS JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
+	  WHERE sb.series_id = b.series_id AND sb.deleted_at IS NULL) DESC, b.id`
+
+// onDeckBooks returns the dashboard's on-deck books. Sorting the full rows
+// of every candidate cost about 170 ms at 37,000 books, so the 20 ids are
+// first picked by a narrow query (id and sort key only, same filter, same
+// order), and then those books are read in full in that order.
+func (s *server) onDeckBooks(ctx context.Context, uid, bLib string, libArgs []any) ([]Book, error) {
+	scope, scopeArgs := libScope(ctx, "b.library_id")
+	inner := `SELECT b.id FROM books b LEFT JOIN read_progress rp ON rp.book_id = b.id AND rp.user_id = ?
+	  WHERE b.deleted_at IS NULL AND ` + scope + bLib + onDeckWhere + ` ORDER BY ` + onDeckOrder + ` LIMIT 20`
+	args := append([]any{uid}, scopeArgs...)
+	args = append(args, libArgs...)
+	args = append(args, uid, uid, uid, uid)
+	// The outer query takes the library filter, then the inner ids, then the
+	// sort key's user id; listBooks adds the caller's own bookQuery arguments.
+	where := bLib + ` AND b.id IN (` + inner + `)`
+	outer := append(append(append([]any{}, libArgs...), args...), uid)
+	return s.listBooks(ctx, where, `ORDER BY `+onDeckOrder+` LIMIT 20`, outer...)
+}
 
 func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject) (GetDashboardResponseObject, error) {
 	uid := currentUser(ctx).ID
@@ -237,8 +260,11 @@ func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject
 	books := func(where, tail string, args ...any) ([]Book, error) {
 		return s.listBooks(ctx, bLib+where, tail, append(append([]any{}, libArgs...), args...)...)
 	}
-	series := func(where, tail string, args ...any) ([]Series, error) {
-		return s.listSeries(ctx, sLib+where, tail, append(append([]any{}, libArgs...), args...)...)
+	booksIn := func(index, where, tail string, args ...any) ([]Book, error) {
+		return s.listBooksIndexed(ctx, index, bLib+where, tail, append(append([]any{}, libArgs...), args...)...)
+	}
+	seriesIn := func(index, where, tail string, args ...any) ([]Series, error) {
+		return s.listSeriesIndexed(ctx, index, sLib+where, tail, append(append([]any{}, libArgs...), args...)...)
 	}
 
 	var d Dashboard
@@ -246,21 +272,32 @@ func (s *server) GetDashboard(ctx context.Context, req GetDashboardRequestObject
 	if d.KeepReading, err = books(` AND rp.completed = 0`, `ORDER BY rp.read_at DESC, b.id LIMIT 20`); err != nil {
 		return nil, err
 	}
-	if d.OnDeck, err = books(onDeckWhere, `ORDER BY (SELECT max(sr.read_at) FROM books sb
-	  CROSS JOIN read_progress sr ON sr.book_id = sb.id AND sr.user_id = ?
-	  WHERE sb.series_id = b.series_id AND sb.deleted_at IS NULL) DESC, b.id LIMIT 20`, uid, uid, uid, uid); err != nil {
+	if d.OnDeck, err = s.onDeckBooks(ctx, uid, bLib, libArgs); err != nil {
 		return nil, err
 	}
-	if d.RecentlyAddedBooks, err = books(``, `ORDER BY b.created_at DESC, b.id DESC LIMIT 20`); err != nil {
+	// The shelves name the partial indexes that hold them in sort order, so an
+	// unscoped dashboard walks the index and stops after 20 rows. The access
+	// scope (libScope) is an IN subquery on library_id, which otherwise made
+	// the planner walk a library index and sort the whole library (see
+	// docs/dev/perf-large-library.md). A scoped call (libraryId, or a user with
+	// a few libraries) can have fewer than 20 matching rows, and then the forced
+	// walk would scan the whole global index, so it keeps the planner's choice.
+	shelf := func(index string) string {
+		if req.Params.LibraryId != nil || !seesAllLibraries(ctx) {
+			return ""
+		}
+		return index
+	}
+	if d.RecentlyAddedBooks, err = booksIn(shelf("books_recent"), ``, `ORDER BY b.created_at DESC, b.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
-	if d.RecentlyAddedSeries, err = series(``, `ORDER BY s.created_at DESC, s.id DESC LIMIT 20`); err != nil {
+	if d.RecentlyAddedSeries, err = seriesIn(shelf("series_created"), ``, `ORDER BY s.created_at DESC, s.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
 	if d.RecentlyRead, err = books(` AND rp.completed = 1`, `ORDER BY rp.read_at DESC, b.id LIMIT 20`); err != nil {
 		return nil, err
 	}
-	if d.RecentlyUpdatedSeries, err = series(` AND s.updated_at > s.created_at`, `ORDER BY s.updated_at DESC, s.id DESC LIMIT 20`); err != nil {
+	if d.RecentlyUpdatedSeries, err = seriesIn(shelf("series_updated"), ` AND s.updated_at > s.created_at`, `ORDER BY s.updated_at DESC, s.id DESC LIMIT 20`); err != nil {
 		return nil, err
 	}
 	return GetDashboard200JSONResponse(d), nil
@@ -307,4 +344,11 @@ func (s *server) Search(ctx context.Context, req SearchRequestObject) (SearchRes
 	}
 	res.Collections, res.ReadLists = cs[:min(len(cs), 20)], rl[:min(len(rl), 20)]
 	return Search200JSONResponse(res), nil
+}
+
+// seesAllLibraries reports whether the caller sees every library, as libScope
+// decides it: an administrator, or a user with AllLibraries.
+func seesAllLibraries(ctx context.Context) bool {
+	u, ok := userFrom(ctx)
+	return ok && u.ID != "" && (u.IsAdmin() || u.AllLibraries)
 }

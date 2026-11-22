@@ -66,7 +66,7 @@ measured at the HTTP handler (JSON included).
 | `GET /series?readState=read&limit=50` | 49,390 | 158 | 178 |
 | `GET /series?genres=SF&limit=50` | 564 | 7 | 15 |
 | `GET /series?search=騎士` | 1,703 | 39 | 48 |
-| `GET /dashboard` | ≈ 59,000 ¹ | 149 | 152 |
+| `GET /dashboard` | ≈ 59,000 ¹ | 78 | 89 |
 | `GET /search?q=竜` (1 character) | — ² | 50 | 57 |
 | `GET /search?q=騎士` (2 characters) | — ² | 49 | 55 |
 | `GET /search?q=魔法使い` | — ² | 21 | 25 |
@@ -210,7 +210,12 @@ books: for each series with one, it takes that series' first unread book,
 then checks that the series has nothing in progress and that the book is
 not the series' first. The old "the book right before it is finished" test
 followed from the other conditions and was dropped.
-`TestDashboard` still covers the rules.
+`TestDashboard` still covers the rules. The `GET /dashboard` p50 went from
+618–646 ms to 73–80 ms for an unscoped user (20 runs, idle, 37,000 books). A
+scoped call to the 37,000-book library is 547 ms p50 (planner's choice, see
+Indexes), and to a 3-book library 0.6 ms. The response is byte-identical to
+the previous build, for the unscoped and the library-scoped call (checked
+before the scope gate, which changes the plan and not the order).
 
 ### Indexes (migration `0008_browse_indexes.sql`)
 
@@ -218,6 +223,22 @@ followed from the other conditions and was dropped.
   with `id` added, all partial on live rows. They are in the dashboard
   shelves' sort order, so a `LIMIT 20` reads 20 rows instead of sorting the
   library: 80–113 ms → < 1 ms.
+  The planner stopped using them after 2026-11-14 (`f213fe0`): the access
+  scope became `library_id IN (SELECT id FROM libraries WHERE deleting = 0)`,
+  and the planner walked a library index and sorted the whole library
+  instead. For an unscoped caller (an administrator or a user with all
+  libraries, and no `libraryId`), the shelves now name their index with
+  `INDEXED BY`, so they are < 1 ms again: recently added books 207 → 0.5 ms,
+  recently added series 144 → 0.5 ms, recently updated series 131 → 0.5 ms
+  (p50, 20 runs, idle, 37,000 books). The on-deck query picks its 20 ids by a
+  narrow query before reading full rows: 165 → 55 ms.
+  A scoped call keeps the planner's choice. A narrow scope (a small or old
+  library, or a user with a few libraries) can have fewer than 20 matching
+  rows, and the forced walk then scans the whole global index: the shelf
+  took 67 ms for a 3-book library and 72 ms for a restricted user. A scope
+  that holds most of the books (the 37,000-book library) takes 246 ms with
+  the planner's choice, and 0.0 ms with the hint. The gate is on the scope,
+  not on the size of the library, so that case stays slow for now.
 - `books_series` gains `path` (`series_id, number_sort, path`). "First
   unread book", previous/next and a series' book list then stop at the
   first match without sorting.
@@ -314,7 +335,7 @@ median of three runs.
 | Filter 読みかけ (559 series), first page | n/a | 151 ms |
 
 The home screen no longer fetches the series list. It makes one
-`/dashboard` call (178 ms, 140 KB) and nothing else. These numbers come
+`/dashboard` call (178 ms, 140 KB, measured in the browser at the time; about 80 ms and 149 KB at the HTTP handler after the Indexes fix) and nothing else. These numbers come
 from a fast machine. The 1.6 MB responses and the 2,500-card render cost
 more on a phone or a slow link.
 
