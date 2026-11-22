@@ -207,18 +207,20 @@ func (l *latencies) summary() string {
 		fails = append(fails, fmt.Sprintf("%s×%d", k, v))
 	}
 	slices.Sort(fails)
-	return fmt.Sprintf("n=%d fail=%d p50=%sms p99=%sms max=%sms %s", len(l.d), nf,
-		ms(pct(l.d, .5)), ms(pct(l.d, .99)), ms(pct(l.d, 1)), strings.Join(fails, " "))
+	return fmt.Sprintf("n=%d fail=%d p50=%sms p95=%sms p99=%sms max=%sms %s", len(l.d), nf,
+		ms(pct(l.d, .5)), ms(pct(l.d, .95)), ms(pct(l.d, .99)), ms(pct(l.d, 1)), strings.Join(fails, " "))
 }
 
-// load runs progress writers, page-list readers and a write-lock probe
-// until stop is called.
+// load runs progress writers, page-list readers, settings saves and a
+// write-lock probe until stop is called.
 type load struct {
-	writes, reads, probe latencies
-	stop                 func()
+	writes, reads, settings, probe latencies
+	stop                           func()
 }
 
-func startLoad(t *testing.T, e *env, reader client, dbPath, bookID string, pageCount int) *load {
+// startLoad runs the load. libID returns the id of the library whose settings
+// are saved; it returns "" until that library exists, and no save is sent then.
+func startLoad(t *testing.T, e *env, reader client, dbPath, bookID string, pageCount int, libID func() string) *load {
 	l := &load{}
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
@@ -274,6 +276,26 @@ func startLoad(t *testing.T, e *env, reader client, dbPath, bookID string, pageC
 			}
 		}()
 	}
+	// Settings saves as the admin. The only field is name, toggled between
+	// two values: UpdateLibrary writes that one column and nothing else (no
+	// scan, no watcher restart; see handlers.go). It creates no task, so
+	// waitIdle is not affected.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; ctx.Err() == nil; i++ {
+			if id := libID(); id != "" {
+				name := "大"
+				if i%2 == 1 {
+					name = "大 (計測)"
+				}
+				t0 := time.Now()
+				code, body := call(e.admin, "PATCH", "/api/v1/libraries/"+id, map[string]any{"name": name})
+				l.settings.add(time.Since(t0), classify(code, body))
+			}
+			time.Sleep(500 * time.Millisecond)
+		}
+	}()
 	// The probe takes the write lock on its own connection (waiting as long
 	// as needed) and releases it at once: the wait is how long some other
 	// write transaction held the lock.
@@ -392,6 +414,9 @@ func TestPerfLargeLibrary(t *testing.T) {
 	}
 	e := newEnvAt(t, data)
 	dbPath := filepath.Join(data, "t.db")
+	// The big library's id, once it exists; read by the settings-save load.
+	var bigID atomic.Value
+	libID := func() string { s, _ := bigID.Load().(string); return s }
 
 	// A small library whose book the readers write progress on.
 	small := filepath.Join(data, "small")
@@ -424,7 +449,7 @@ func TestPerfLargeLibrary(t *testing.T) {
 	out("## Library\n\n%d series, %d books (walk alone: %s)\n", len(listing.Series), nb, time.Since(walkStart).Round(time.Millisecond))
 
 	phase := func(name string, run func() int) {
-		l := startLoad(t, e, reader, dbPath, smallBook, 4)
+		l := startLoad(t, e, reader, dbPath, smallBook, 4, libID)
 		start := time.Now()
 		want := run()
 		tasks := waitIdle(t, e.db, start, want)
@@ -437,6 +462,7 @@ func TestPerfLargeLibrary(t *testing.T) {
 		}
 		out("- progress PUT (4 writers): %s", l.writes.summary())
 		out("- page list GET (2 readers): %s", l.reads.summary())
+		out("- settings PATCH (admin, every 500 ms): %s", l.settings.summary())
 		out("- write-lock wait (probe): %s", l.probe.summary())
 		out("- db %s, wal %s, peak RSS %s\n", mb(fileSize(dbPath)), mb(fileSize(dbPath+"-wal")), mb(peakRSS()))
 	}
@@ -444,6 +470,7 @@ func TestPerfLargeLibrary(t *testing.T) {
 	out("## Scans\n")
 	phase("First scan + analysis", func() int {
 		e.admin.json("POST", "/api/v1/libraries", map[string]any{"name": "大", "root": libRoot, "kind": "manga"}, 201, &bigLib)
+		bigID.Store(bigLib.Id)
 		return 2
 	})
 	if os.Getenv("PERF_FIRST_ONLY") != "" {
