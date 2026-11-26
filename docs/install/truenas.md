@@ -68,7 +68,7 @@ Open **Apps > Discover Apps**, open the **⋮** menu, and select **Install via Y
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:0.1
+    image: ghcr.io/tabunugoku/mars:1
     user: "568:568"
     restart: unless-stopped
     ports:
@@ -100,7 +100,7 @@ Open **Apps > Discover Apps** and select **Custom App**. Enter the following.
 | --- | --- | --- |
 | Application Name | Application Name | `mars` |
 | Image Configuration | Repository | `ghcr.io/tabunugoku/mars` |
-| | Tag | `0.1` |
+| | Tag | `1` |
 | | Pull Policy | Only pull image if not present on host (default) |
 | Container Configuration | Timezone | Your time zone |
 | | Restart Policy | Unless Stopped |
@@ -143,8 +143,8 @@ On a library, you can turn on **Watch for file changes and scan automatically**.
 
 ## 7. Updates and backups
 
-- Tag `0.1` follows every 0.1.x release. When a new image is published, **Update** appears on the app. You can also use **Pull Image** to get the latest `0.1`.
-- While MARS is 0.x, a new minor version (such as 0.2) may change behavior. To move to it, change the tag to `0.2` yourself.
+- Tag `1` follows every 1.x release. When a new image is published, **Update** appears on the app. You can also use **Pull Image** to get the latest `1`.
+- Within 1.x, updates keep compatibility. A new major version (such as 2.0) may change behavior, so to move to it, change the tag to `2` yourself.
 - Take regular snapshots of the data dataset. Stop the app before you roll back to a snapshot. If files are rewritten while the database is open, the database can be corrupted.
 
 ## 8. Running behind a reverse proxy

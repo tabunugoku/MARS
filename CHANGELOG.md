@@ -7,6 +7,24 @@ All notable changes to MARS are listed here. Versions follow
 
 ## Unreleased
 
+## 1.0.0 — 2026-11-26
+
+The first stable release: every feature of the withdrawn 1.0.0 (see its entry below), with the changes and fixes from 0.1.0 to 0.1.4.
+
+### Changed
+
+- Memory use is bounded: the Go memory target follows the container memory limit, images are decoded only within a memory budget, and books with pages up to 200 megapixels are analysed.
+- The server no longer scans every library when it starts.
+- Books are analysed up to 4 at a time, and thumbnails are made about 40% faster.
+- A CBZ, CBR or CB7 that holds other archives (one per volume) is read as one book.
+
+### Fixed
+
+- Deleting a library no longer blocks other changes, and other writes no longer fail with "database is locked (SQLITE_BUSY)" during deletes.
+- The library list, library settings and the home screen answer quickly on large libraries.
+- Covers no longer blink while thumbnails are being made.
+- Two tasks of the same kind for one library no longer run at once.
+
 ## 0.1.4 — 2026-11-23
 
 The library list, library settings and the home screen are fast again on large libraries.

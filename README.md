@@ -6,8 +6,6 @@ English | [日本語](README.ja.md)
 
 *Your manga. Your server. Your universe.*
 
-> The current version is v0.1.4, a preview. v1.0.0 was withdrawn after problems with large libraries were found.
-
 ![MARS home screen](docs/screenshots/desktop-home.webp)
 
 MARS is a lightweight, self-hosted comic and manga server. A single static Go binary includes SQLite and the web UI. It scans your folders, builds series and books, and lets you read them in the reader from any browser. It needs no external database.
@@ -68,7 +66,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:0.1
+  ghcr.io/tabunugoku/mars:1
 ```
 
 1. Open http://localhost:25600 in your browser.
