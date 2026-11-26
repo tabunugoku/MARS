@@ -103,7 +103,7 @@ The image has no shell, so you cannot read files with `docker exec`. Use the log
 | `1` | Follows every 1.x release. Normally use this tag |
 | `1.0` | Follows every 1.0.x release |
 | `1.0.0` | This version only |
-| `latest` | The newest release. Moves to each new major version too |
+| `latest` | Points to the newest release. When a new major version (such as 2.0) comes out, this tag moves to it too |
 
 Within 1.x, updates keep compatibility. A new major version (such as 2.0) may change behavior, so to move to it, change the tag yourself.
 
