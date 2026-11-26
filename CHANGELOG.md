@@ -9,11 +9,7 @@ All notable changes to MARS are listed here. Versions follow
 
 ## 1.0.0 — 2026-11-26
 
-The first stable release: the features of the withdrawn 1.0.0, with the fixes from 0.1.0 to 0.1.4.
-
-### What 1.0.0 is
-
-1.0.0 has every feature of the withdrawn 1.0.0 (see its entry below), plus the fixes from 0.1.0 to 0.1.4.
+The first stable release: every feature of the withdrawn 1.0.0 (see its entry below), with the changes and fixes from 0.1.0 to 0.1.4.
 
 ### Changed
 
@@ -25,7 +21,7 @@ The first stable release: the features of the withdrawn 1.0.0, with the fixes fr
 ### Fixed
 
 - Deleting a library no longer blocks other changes, and other writes no longer fail with "database is locked (SQLITE_BUSY)" during deletes.
-- The library list and the home screen are fast again on large libraries.
+- The library list, library settings and the home screen answer quickly on large libraries.
 - Covers no longer blink while thumbnails are being made.
 - Two tasks of the same kind for one library no longer run at once.
 
