@@ -68,7 +68,7 @@ sudo cp -p mars.db mars.db.new && sudo mv mars.db.new mars.db
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:0.1
+    image: ghcr.io/tabunugoku/mars:1
     user: "568:568"
     restart: unless-stopped
     ports:
@@ -100,7 +100,7 @@ services:
 | --- | --- | --- |
 | Application Name | Application Name | `mars` |
 | Image Configuration | Repository | `ghcr.io/tabunugoku/mars` |
-| | Tag | `0.1` |
+| | Tag | `1` |
 | | Pull Policy | Only pull image if not present on host（既定値） |
 | Container Configuration | Timezone | お使いの時間帯 |
 | | Restart Policy | Unless Stopped |
@@ -143,8 +143,8 @@ services:
 
 ## 7. 更新とバックアップ
 
-- タグ `0.1` は 0.1.x のすべてのリリースに追従します。新しいイメージが公開されると、アプリに **Update** が表示されます。または **Pull Image** を使って、新しい `0.1` を取得できます。
-- MARS は 0.x のあいだ、新しいマイナー版（0.2 など）で動作が変わることがあります。移行するときは、タグを `0.2` に変えてください。
+- タグ `1` は 1.x のすべてのリリースに追従します。新しいイメージが公開されると、アプリに **Update** が表示されます。または **Pull Image** を使って、新しい `1` を取得できます。
+- 1.x のあいだは、更新しても互換性が保たれます。新しいメジャー版（2.0 など）では動作が変わることがあります。そちらへ移るには、タグを `2` に変えてください。
 - データのデータセットには、定期的にスナップショットを設定してください。スナップショットを戻す前に、アプリを停止してください。データベースが開いたままファイルが書き換わると、データベースが壊れることがあります。
 
 ## 8. リバースプロキシの背後で使う場合

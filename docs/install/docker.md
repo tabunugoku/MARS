@@ -17,7 +17,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:0.1
+  ghcr.io/tabunugoku/mars:1
 ```
 
 - `-v mars-data:/data` stores the database, thumbnails, and page cache. `mars-data` is a named volume that Docker manages.
@@ -31,7 +31,7 @@ Create a `docker-compose.yml` file.
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:0.1
+    image: ghcr.io/tabunugoku/mars:1
     container_name: mars
     restart: unless-stopped
     ports:
@@ -100,11 +100,12 @@ The image has no shell, so you cannot read files with `docker exec`. Use the log
 
 | Tag | Meaning |
 | --- | --- |
-| `0.1` | Follows every 0.1.x release. Normally use this tag |
-| `0.1.4` | This version only |
-| `latest` | The newest release. Moves to each new minor and major version |
+| `1` | Follows every 1.x release. Normally use this tag |
+| `1.0` | Follows every 1.0.x release |
+| `1.0.0` | This version only |
+| `latest` | The newest release. Moves to each new major version too |
 
-While MARS is 0.x, a new minor version (such as 0.2) may change behavior. To move to it, change the tag yourself.
+Within 1.x, updates keep compatibility. A new major version (such as 2.0) may change behavior, so to move to it, change the tag yourself.
 
 ## Upgrade
 
@@ -113,13 +114,13 @@ Back up your data before you upgrade. See [Backup](../backup.md).
 If you started MARS with `docker run`, pull the new image and recreate the container.
 
 ```sh
-docker pull ghcr.io/tabunugoku/mars:0.1
+docker pull ghcr.io/tabunugoku/mars:1
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:0.1
+  ghcr.io/tabunugoku/mars:1
 ```
 
 Your data stays in the named volume, so it is not lost when you recreate the container.
@@ -175,6 +176,6 @@ cd MARS
 docker build -t mars .
 ```
 
-This creates a local image named `mars`. To use it, replace `ghcr.io/tabunugoku/mars:0.1` in the examples above with `mars`.
+This creates a local image named `mars`. To use it, replace `ghcr.io/tabunugoku/mars:1` in the examples above with `mars`.
 
 To update an image that you built, run `git pull` to update the source, run `docker build -t mars .` again, and recreate the container as described in [Upgrade](#upgrade).

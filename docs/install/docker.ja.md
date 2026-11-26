@@ -17,7 +17,7 @@ docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:0.1
+  ghcr.io/tabunugoku/mars:1
 ```
 
 - `-v mars-data:/data` は、データベース、サムネイル、ページのキャッシュを保存します。`mars-data` は Docker が管理する名前付きボリュームです。
@@ -31,7 +31,7 @@ docker run -d --name mars \
 ```yaml
 services:
   mars:
-    image: ghcr.io/tabunugoku/mars:0.1
+    image: ghcr.io/tabunugoku/mars:1
     container_name: mars
     restart: unless-stopped
     ports:
@@ -100,11 +100,12 @@ docker compose up -d
 
 | タグ | 意味 |
 | --- | --- |
-| `0.1` | 0.1.x のすべてのリリースに追従します。通常はこのタグを使ってください |
-| `0.1.4` | この版だけを指定します |
-| `latest` | 最新のリリースです。新しいマイナー版やメジャー版が出ると、そちらに移ります |
+| `1` | 1.x のすべてのリリースに追従します。通常はこのタグを使ってください |
+| `1.0` | 1.0.x のすべてのリリースに追従します |
+| `1.0.0` | この版だけを指定します |
+| `latest` | 最新のリリースです。新しいメジャー版（2.0 など）が出ると、そちらに移ります |
 
-MARS は 0.x のあいだ、新しいマイナー版（0.2 など）で動作が変わることがあります。そのため、新しいマイナー版へは、タグを自分で変えて移行してください。
+1.x のあいだは、更新しても互換性が保たれます。新しいメジャー版（2.0 など）では動作が変わることがあります。そちらへ移るには、タグを自分で変更してください。
 
 ## アップグレード
 
@@ -113,13 +114,13 @@ MARS は 0.x のあいだ、新しいマイナー版（0.2 など）で動作が
 docker run で起動している場合は、新しいイメージを取得してから、コンテナを作り直します。
 
 ```sh
-docker pull ghcr.io/tabunugoku/mars:0.1
+docker pull ghcr.io/tabunugoku/mars:1
 docker rm -f mars
 docker run -d --name mars \
   -p 25600:25600 \
   -v mars-data:/data \
   -v /path/to/comics:/comics:ro \
-  ghcr.io/tabunugoku/mars:0.1
+  ghcr.io/tabunugoku/mars:1
 ```
 
 データは名前付きボリュームに残るため、作り直しても失われません。
@@ -175,6 +176,6 @@ cd MARS
 docker build -t mars .
 ```
 
-作られるイメージの名前は `mars` です。この場合は、上の例の `ghcr.io/tabunugoku/mars:0.1` を `mars` に置き換えてください。
+作られるイメージの名前は `mars` です。この場合は、上の例の `ghcr.io/tabunugoku/mars:1` を `mars` に置き換えてください。
 
 ソースから作ったイメージを更新するには、`git pull` でソースを更新してから `docker build -t mars .` をもう一度実行し、[アップグレード](#アップグレード) と同じようにコンテナを作り直してください。
